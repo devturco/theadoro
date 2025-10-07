@@ -10,7 +10,11 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
           {/* Brand */}
           <div className="space-y-4">
-            <h3 className="text-3xl font-serif font-bold text-champagne">THEADORO</h3>
+            <img 
+              src="/logo-colors.png" 
+              alt="THEADORO" 
+              className="h-16 w-auto"
+            />
             <p className="text-white/80 text-sm leading-relaxed">
               O marketplace premium que conecta você a vendedores excepcionais,
               presentes únicos e experiências inesquecíveis.

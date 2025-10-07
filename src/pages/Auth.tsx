@@ -33,13 +33,12 @@ const Auth = () => {
     e.preventDefault();
     setLoading(true);
 
-    const { error } = await signIn(loginEmail, loginPassword);
-
-    if (error) {
-      toast.error(error.message);
-    } else {
+    try {
+      await signIn(loginEmail, loginPassword);
       toast.success('Login realizado com sucesso!');
       navigate('/dashboard');
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao fazer login');
     }
 
     setLoading(false);
@@ -49,13 +48,12 @@ const Auth = () => {
     e.preventDefault();
     setLoading(true);
 
-    const { error } = await signUp(signupEmail, signupPassword, signupFullName);
-
-    if (error) {
-      toast.error(error.message);
-    } else {
+    try {
+      await signUp(signupEmail, signupPassword, { full_name: signupFullName });
       toast.success('Conta criada com sucesso!');
       navigate('/dashboard');
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao criar conta');
     }
 
     setLoading(false);
@@ -66,9 +64,12 @@ const Auth = () => {
       <Card className="w-full max-w-md shadow-elegant">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
-            <Gift className="h-12 w-12 text-wine" />
+            <img 
+              src="/logo-colors.png" 
+              alt="THEADORO" 
+              className="h-16 w-auto"
+            />
           </div>
-          <CardTitle className="text-3xl font-serif">THEADORO</CardTitle>
           <CardDescription>
             Acesse sua conta ou crie uma nova para começar
           </CardDescription>

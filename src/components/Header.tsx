@@ -1,7 +1,8 @@
 import { Search, ShoppingBag, User, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Header = () => {
   const navigate = useNavigate();
@@ -19,7 +20,11 @@ const Header = () => {
         <div className="flex h-20 items-center justify-between">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2">
-            <h1 className="text-3xl font-bold text-gradient-wine">THEADORO</h1>
+            <img 
+              src="/logo-colors.png" 
+              alt="THEADORO" 
+              className="h-12 w-auto"
+            />
           </Link>
 
           {/* Search Bar */}
