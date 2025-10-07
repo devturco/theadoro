@@ -49,10 +49,9 @@ FROM nginx:alpine AS production
 # Instalar curl para health checks
 RUN apk add --no-cache curl
 
-# Remover configuração padrão do nginx
+# Remover configuração padrão do nginx e copiar nossas configurações
 RUN rm /etc/nginx/conf.d/default.conf
-
-# Copiar configuração customizada do nginx
+COPY nginx-main.conf /etc/nginx/nginx.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Copiar arquivos buildados do stage anterior
@@ -68,15 +67,18 @@ COPY --from=builder /app/public/robots.txt /usr/share/nginx/html/
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nextjs -u 1001
 
-# Definir permissões corretas
-RUN chown -R nextjs:nodejs /usr/share/nginx/html && \
+# Criar diretórios necessários e definir permissões
+RUN mkdir -p /var/cache/nginx /var/log/nginx /var/lib/nginx && \
+    chown -R nextjs:nodejs /usr/share/nginx/html && \
     chown -R nextjs:nodejs /var/cache/nginx && \
     chown -R nextjs:nodejs /var/log/nginx && \
-    chown -R nextjs:nodejs /etc/nginx/conf.d
+    chown -R nextjs:nodejs /var/lib/nginx && \
+    chown -R nextjs:nodejs /etc/nginx/conf.d && \
+    chmod 755 /var/cache/nginx /var/log/nginx /var/lib/nginx
 
-# Criar diretórios necessários para nginx
-RUN touch /var/run/nginx.pid && \
-    chown -R nextjs:nodejs /var/run/nginx.pid
+# Configurar nginx para rodar sem PID file (mais seguro para containers)
+RUN mkdir -p /tmp/nginx && \
+    chown -R nextjs:nodejs /tmp/nginx
 
 # Mudar para usuário não-root
 USER nextjs
