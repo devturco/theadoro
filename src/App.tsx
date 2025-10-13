@@ -13,11 +13,30 @@ import RoleGuard from '@/components/auth/RoleGuard';
 import AdminLayout from '@/components/layouts/AdminLayout';
 import SellerLayout from '@/components/layouts/SellerLayout';
 import BuyerLayout from '@/components/layouts/BuyerLayout';
+import PublicLayout from '@/components/layouts/PublicLayout';
 
 // Public Pages
 import Index from '@/pages/Index';
 import Auth from '@/pages/Auth';
 import NotFound from '@/pages/NotFound';
+
+// Public Marketplace Pages
+import Products from '@/pages/Products';
+import ProductDetail from '@/pages/ProductDetail';
+import Cart from '@/pages/Cart';
+import Checkout from '@/pages/Checkout';
+import Categories from '@/pages/Categories';
+import CategoryProducts from '@/pages/CategoryProducts';
+import Search from '@/pages/Search';
+import Wishlist from '@/pages/Wishlist';
+import Sellers from '@/pages/Sellers';
+import SellerProfile from '@/pages/SellerProfile';
+
+// Institutional Pages
+import About from '@/pages/About';
+import Contact from '@/pages/Contact';
+import Terms from '@/pages/Terms';
+import Privacy from '@/pages/Privacy';
 
 // General Dashboard
 import Dashboard from '@/pages/Dashboard';
@@ -58,6 +77,24 @@ function App() {
               {/* Public Routes */}
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
+              
+              {/* Public Marketplace Routes */}
+              <Route path="/products" element={<PublicLayout><Products /></PublicLayout>} />
+              <Route path="/products/:id" element={<PublicLayout><ProductDetail /></PublicLayout>} />
+              <Route path="/categories" element={<PublicLayout><Categories /></PublicLayout>} />
+              <Route path="/categories/:slug" element={<PublicLayout><CategoryProducts /></PublicLayout>} />
+              <Route path="/search" element={<PublicLayout><Search /></PublicLayout>} />
+              <Route path="/cart" element={<PublicLayout><Cart /></PublicLayout>} />
+              <Route path="/checkout" element={<PublicLayout><Checkout /></PublicLayout>} />
+              <Route path="/wishlist" element={<PublicLayout><Wishlist /></PublicLayout>} />
+              <Route path="/sellers" element={<PublicLayout><Sellers /></PublicLayout>} />
+              <Route path="/sellers/:id" element={<PublicLayout><SellerProfile /></PublicLayout>} />
+              
+              {/* Institutional Pages */}
+              <Route path="/about" element={<PublicLayout><About /></PublicLayout>} />
+              <Route path="/contact" element={<PublicLayout><Contact /></PublicLayout>} />
+              <Route path="/terms" element={<PublicLayout><Terms /></PublicLayout>} />
+              <Route path="/privacy" element={<PublicLayout><Privacy /></PublicLayout>} />
               
               {/* General Dashboard (redirects based on role) */}
               <Route 

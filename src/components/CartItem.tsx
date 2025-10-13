@@ -1,0 +1,271 @@
+import React, { useState } from 'react';
+import { Minus, Plus, Trash2, Heart, ExternalLink } from 'lucide-react';
+import { CartItem as CartItemType } from '@/types/product';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { useCart } from '@/hooks/useCart';
+import { useWishlist } from '@/hooks/useWishlist';
+import { cn } from '@/lib/utils';
+import { Link } from 'react-router-dom';
+
+interface CartItemProps {
+  item: CartItemType;
+  showActions?: boolean;
+  compact?: boolean;
+  className?: string;
+}
+
+export const CartItem: React.FC<CartItemProps> = ({
+  item,
+  showActions = true,
+  compact = false,
+  className,
+}) => {
+  const { updateQuantity, removeFromCart } = useCart();
+  const { addToWishlist, isInWishlist } = useWishlist();
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const handleQuantityChange = async (newQuantity: number) => {
+    if (newQuantity < 1) return;
+    
+    setIsUpdating(true);
+    try {
+      await updateQuantity(item.id, newQuantity);
+    } catch (error) {
+      console.error('Error updating quantity:', error);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleRemove = async () => {
+    try {
+      await removeFromCart(item.id);
+    } catch (error) {
+      console.error('Error removing item:', error);
+    }
+  };
+
+  const handleMoveToWishlist = async () => {
+    try {
+      await addToWishlist({
+        id: item.product.id,
+        name: item.product.name,
+        price: item.product.price,
+        image: item.product.images[0]?.url || '',
+        seller: item.product.seller,
+      });
+      await removeFromCart(item.id);
+    } catch (error) {
+      console.error('Error moving to wishlist:', error);
+    }
+  };
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(price);
+  };
+
+  const totalPrice = item.product.price * item.quantity;
+  const hasDiscount = item.product.originalPrice && item.product.originalPrice > item.product.price;
+  const discountPercentage = hasDiscount 
+    ? Math.round(((item.product.originalPrice! - item.product.price) / item.product.originalPrice!) * 100)
+    : 0;
+
+  const itemClasses = cn(
+    'bg-white border border-gray-200 rounded-lg p-4',
+    compact && 'p-3',
+    className
+  );
+
+  return (
+    <div className={itemClasses}>
+      <div className={cn('flex gap-4', compact && 'gap-3')}>
+        {/* Product Image */}
+        <div className={cn('flex-shrink-0', compact ? 'w-16 h-16' : 'w-20 h-20')}>
+          <img
+            src={item.product.images[0]?.url || '/placeholder-product.jpg'}
+            alt={item.product.name}
+            className="w-full h-full object-cover rounded-md"
+          />
+        </div>
+
+        {/* Product Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between">
+            <div className="flex-1 min-w-0">
+              <Link
+                to={`/products/${item.product.id}`}
+                className="text-sm font-medium text-gray-900 hover:text-blue-600 line-clamp-2"
+              >
+                {item.product.name}
+              </Link>
+              
+              {item.product.seller && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Vendido por {item.product.seller.name}
+                </p>
+              )}
+
+              {/* Variant Info */}
+              {item.variant && (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {item.variant.color && (
+                    <Badge variant="outline" className="text-xs">
+                      {item.variant.color}
+                    </Badge>
+                  )}
+                  {item.variant.size && (
+                    <Badge variant="outline" className="text-xs">
+                      {item.variant.size}
+                    </Badge>
+                  )}
+                </div>
+              )}
+
+              {/* Stock Status */}
+              {item.product.stock <= 5 && item.product.stock > 0 && (
+                <p className="text-xs text-orange-600 mt-1">
+                  Apenas {item.product.stock} em estoque
+                </p>
+              )}
+              
+              {item.product.stock === 0 && (
+                <p className="text-xs text-red-600 mt-1">
+                  Fora de estoque
+                </p>
+              )}
+            </div>
+
+            {/* Quick Actions */}
+            {!compact && (
+              <div className="flex items-center gap-1 ml-2">
+                <Link to={`/products/${item.product.id}`}>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                    <ExternalLink className="h-3 w-3" />
+                  </Button>
+                </Link>
+                
+                {showActions && !isInWishlist(item.product.id) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleMoveToWishlist}
+                    className="h-8 w-8 p-0"
+                    title="Mover para lista de desejos"
+                  >
+                    <Heart className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Price and Quantity */}
+          <div className="flex items-center justify-between mt-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-gray-900">
+                {formatPrice(item.product.price)}
+              </span>
+              
+              {hasDiscount && (
+                <>
+                  <span className="text-xs text-gray-500 line-through">
+                    {formatPrice(item.product.originalPrice!)}
+                  </span>
+                  <Badge variant="destructive" className="text-xs">
+                    -{discountPercentage}%
+                  </Badge>
+                </>
+              )}
+            </div>
+
+            {/* Quantity Controls */}
+            {showActions && (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center border border-gray-300 rounded-md">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleQuantityChange(item.quantity - 1)}
+                    disabled={item.quantity <= 1 || isUpdating}
+                    className="h-8 w-8 p-0 rounded-none"
+                  >
+                    <Minus className="h-3 w-3" />
+                  </Button>
+                  
+                  <span className="px-3 py-1 text-sm font-medium min-w-[2rem] text-center">
+                    {item.quantity}
+                  </span>
+                  
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleQuantityChange(item.quantity + 1)}
+                    disabled={item.quantity >= item.product.stock || isUpdating}
+                    className="h-8 w-8 p-0 rounded-none"
+                  >
+                    <Plus className="h-3 w-3" />
+                  </Button>
+                </div>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRemove}
+                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                  title="Remover item"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Total Price */}
+          {item.quantity > 1 && (
+            <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-100">
+              <span className="text-xs text-gray-500">
+                {item.quantity} × {formatPrice(item.product.price)}
+              </span>
+              <span className="text-sm font-semibold text-gray-900">
+                {formatPrice(totalPrice)}
+              </span>
+            </div>
+          )}
+
+          {/* Shipping Info */}
+          {item.product.shippingInfo && (
+            <div className="mt-2 pt-2 border-t border-gray-100">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-gray-500">Frete:</span>
+                <span className={cn(
+                  'font-medium',
+                  item.product.shippingInfo.freeShipping 
+                    ? 'text-green-600' 
+                    : 'text-gray-700'
+                )}>
+                  {item.product.shippingInfo.freeShipping 
+                    ? 'Grátis' 
+                    : formatPrice(item.product.shippingInfo.price)
+                  }
+                </span>
+              </div>
+              
+              {item.product.shippingInfo.estimatedDays && (
+                <div className="flex items-center justify-between text-xs mt-1">
+                  <span className="text-gray-500">Entrega:</span>
+                  <span className="text-gray-700">
+                    {item.product.shippingInfo.estimatedDays} dias úteis
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
