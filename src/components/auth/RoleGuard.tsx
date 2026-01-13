@@ -75,12 +75,15 @@ export const RoleGuard = ({
                   </Button>
                 </div>
 
-                <div className="mt-4 p-2 bg-muted rounded text-xs font-mono">
-                  <p>Debug Info:</p>
-                  <p>User ID: {user?.id}</p>
-                  <p>Profile Raw: {JSON.stringify(useAuth().profile)}</p>
-                  <p>Roles Detec: {JSON.stringify(roles)}</p>
-                  <p>Roles Req: {JSON.stringify(allowedRoles)}</p>
+                <div className="mt-4 p-4 bg-muted/50 rounded-md text-xs font-mono border border-border">
+                  <p className="font-semibold mb-2">Debug Info (Production Help):</p>
+                  <div className="space-y-1">
+                    <p>Current User: {user?.email}</p>
+                    <p>User ID: {user?.id}</p>
+                    <p>Profile Role: {profile?.role || 'null'}</p>
+                    <p>Detected Roles: {JSON.stringify(roles)}</p>
+                    <p>Required Roles: {JSON.stringify(allowedRoles)}</p>
+                  </div>
                 </div>
               </AlertDescription>
             </Alert>
