@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  ArrowLeft, 
-  CreditCard, 
-  MapPin, 
-  User, 
-  Lock, 
+import {
+  ArrowLeft,
+  CreditCard,
+  MapPin,
+  User,
+  Lock,
   CheckCircle,
   AlertCircle,
   Truck,
@@ -13,6 +13,9 @@ import {
 } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
 import { useCheckout } from '@/hooks/useCheckout';
+import { GiftOptions } from '@/components/checkout/GiftOptions';
+import { DeliveryScheduler } from '@/components/checkout/DeliveryScheduler';
+import { GiftOptions as GiftOptionsType, DeliverySchedule as DeliveryScheduleType } from '@/types/order';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,7 +34,7 @@ interface CheckoutFormData {
   lastName: string;
   email: string;
   phone: string;
-  
+
   // Shipping Address
   zipCode: string;
   street: string;
@@ -40,7 +43,7 @@ interface CheckoutFormData {
   neighborhood: string;
   city: string;
   state: string;
-  
+
   // Payment
   paymentMethod: 'credit' | 'debit' | 'pix' | 'boleto';
   cardNumber: string;
@@ -48,23 +51,57 @@ interface CheckoutFormData {
   cardExpiry: string;
   cardCvv: string;
   installments: number;
-  
+
   // Options
   saveAddress: boolean;
   isGift: boolean;
   giftMessage: string;
   newsletter: boolean;
+
+  // New complex objects
+  giftOptions: GiftOptionsType;
+  deliverySchedule: DeliveryScheduleType;
 }
+
+// Initial state helpers
+const INITIAL_GIFT_OPTIONS: GiftOptionsType = {
+  is_gift: false,
+};
+
+const INITIAL_DELIVERY_SCHEDULE: DeliveryScheduleType = {
+  scheduled_date: '',
+  scheduled_slot: '',
+};
 
 export const Checkout: React.FC = () => {
   const navigate = useNavigate();
-  const { cart, getCartSummary } = useCart();
-  const { processOrder, calculateShipping, validateCheckoutData } = useCheckout();
-  
+  const { cart } = useCart();
+  const {
+    processOrder,
+    getShippingQuotes,
+    shippingQuotes,
+    selectedShipping,
+    setSelectedShipping,
+    validateCheckoutData
+  } = useCheckout();
+
+  // Calculate summary derived from cart items
+  const subtotal = cart.items.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+  const shippingCost = selectedShipping?.price || 0;
+  const discount = 0;
+  const total = subtotal + shippingCost - discount;
+
+  const summary = {
+    subtotal,
+    shipping: shippingCost,
+    discount,
+    total
+  };
+
   const [currentStep, setCurrentStep] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  
+
   const [formData, setFormData] = useState<CheckoutFormData>({
     firstName: '',
     lastName: '',
@@ -87,9 +124,11 @@ export const Checkout: React.FC = () => {
     isGift: false,
     giftMessage: '',
     newsletter: false,
+    giftOptions: INITIAL_GIFT_OPTIONS,
+    deliverySchedule: INITIAL_DELIVERY_SCHEDULE,
   });
 
-  const summary = getCartSummary();
+
 
   useEffect(() => {
     // Redirect if cart is empty
@@ -105,9 +144,9 @@ export const Checkout: React.FC = () => {
     }).format(price);
   };
 
-  const handleInputChange = (field: keyof CheckoutFormData, value: string | number | boolean) => {
+  const handleInputChange = (field: keyof CheckoutFormData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    
+
     // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
@@ -143,6 +182,15 @@ export const Checkout: React.FC = () => {
         if (!formData.cardExpiry.trim()) newErrors.cardExpiry = 'Validade é obrigatória';
         if (!formData.cardCvv.trim()) newErrors.cardCvv = 'CVV é obrigatório';
       }
+      if (!formData.cardCvv.trim()) newErrors.cardCvv = 'CVV é obrigatório';
+    }
+
+
+    // Validate Gift Options if Gift is selected
+    if (formData.giftOptions.is_gift) {
+      if (!formData.giftOptions.wrap_style_id) newErrors.giftWrap = 'Escolha uma embalagem';
+      if (!formData.giftOptions.recipient_name) newErrors.recipientName = 'Informe o nome do destinatário';
+      if (!formData.giftOptions.sender_name) newErrors.senderName = 'Informe seu nome (De)';
     }
 
     setErrors(newErrors);
@@ -164,16 +212,45 @@ export const Checkout: React.FC = () => {
 
     setIsProcessing(true);
     try {
-      const orderData = {
-        ...formData,
-        items: cart.items,
-        summary,
+      const orderItems = cart.items.map(item => ({
+        ...item,
+        addedAt: new Date().toISOString(),
+      }));
+
+      // Map payment method values
+      const paymentMethodMap: Record<string, 'credit_card' | 'debit_card' | 'pix' | 'boleto'> = {
+        'credit': 'credit_card',
+        'debit': 'debit_card',
+        'pix': 'pix',
+        'boleto': 'boleto'
       };
 
-      const order = await processOrder(orderData);
-      
-      // Redirect to success page
-      navigate(`/order-success/${order.id}`);
+      // Construct CheckoutData expected by useCheckout
+      const checkoutData = {
+        ...formData,
+        paymentMethod: paymentMethodMap[formData.paymentMethod],
+        address: `${formData.street}, ${formData.number}`,
+        neighborhood: formData.neighborhood,
+        city: formData.city,
+        state: formData.state,
+        zipCode: formData.zipCode,
+        country: 'Brasil',
+        paymentDetails: {
+          cardNumber: formData.cardNumber,
+          cardName: formData.cardName,
+          cardExpiry: formData.cardExpiry,
+          cardCvv: formData.cardCvv,
+          installments: formData.installments
+        }
+      };
+
+      // Pass items and mapped data
+      const order = await processOrder(orderItems as any, checkoutData);
+
+      if (order) {
+        // Redirect to success page
+        navigate(`/order-success/${order.id}`);
+      }
     } catch (error) {
       console.error('Error processing order:', error);
       setErrors({ general: 'Erro ao processar pedido. Tente novamente.' });
@@ -190,7 +267,7 @@ export const Checkout: React.FC = () => {
   ];
 
   if (cart.items.length === 0) {
-    return null; // Will redirect in useEffect
+    return null;
   }
 
   return (
@@ -207,7 +284,7 @@ export const Checkout: React.FC = () => {
               >
                 <ArrowLeft className="h-5 w-5" />
               </Button>
-              
+
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">
                   Finalizar Compra
@@ -229,20 +306,20 @@ export const Checkout: React.FC = () => {
               const Icon = step.icon;
               const isActive = currentStep === step.number;
               const isCompleted = currentStep > step.number;
-              
+
               return (
                 <div key={step.number} className="flex items-center">
                   <div className={cn(
                     'flex items-center justify-center w-10 h-10 rounded-full border-2',
-                    isCompleted 
+                    isCompleted
                       ? 'bg-green-600 border-green-600 text-white'
-                      : isActive 
+                      : isActive
                         ? 'bg-blue-600 border-blue-600 text-white'
                         : 'bg-white border-gray-300 text-gray-400'
                   )}>
                     <Icon className="h-5 w-5" />
                   </div>
-                  
+
                   <div className="ml-3 hidden sm:block">
                     <p className={cn(
                       'text-sm font-medium',
@@ -251,7 +328,7 @@ export const Checkout: React.FC = () => {
                       {step.title}
                     </p>
                   </div>
-                  
+
                   {index < steps.length - 1 && (
                     <div className={cn(
                       'flex-1 h-0.5 mx-4',
@@ -274,7 +351,7 @@ export const Checkout: React.FC = () => {
                   <h2 className="text-xl font-semibold text-gray-900">
                     Dados Pessoais
                   </h2>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="firstName">Nome *</Label>
@@ -288,7 +365,7 @@ export const Checkout: React.FC = () => {
                         <p className="text-sm text-red-600 mt-1">{errors.firstName}</p>
                       )}
                     </div>
-                    
+
                     <div>
                       <Label htmlFor="lastName">Sobrenome *</Label>
                       <Input
@@ -302,7 +379,7 @@ export const Checkout: React.FC = () => {
                       )}
                     </div>
                   </div>
-                  
+
                   <div>
                     <Label htmlFor="email">E-mail *</Label>
                     <Input
@@ -316,7 +393,7 @@ export const Checkout: React.FC = () => {
                       <p className="text-sm text-red-600 mt-1">{errors.email}</p>
                     )}
                   </div>
-                  
+
                   <div>
                     <Label htmlFor="phone">Telefone *</Label>
                     <Input
@@ -330,7 +407,7 @@ export const Checkout: React.FC = () => {
                       <p className="text-sm text-red-600 mt-1">{errors.phone}</p>
                     )}
                   </div>
-                  
+
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="newsletter"
@@ -350,7 +427,7 @@ export const Checkout: React.FC = () => {
                   <h2 className="text-xl font-semibold text-gray-900">
                     Endereço de Entrega
                   </h2>
-                  
+
                   <div>
                     <Label htmlFor="zipCode">CEP *</Label>
                     <Input
@@ -364,7 +441,7 @@ export const Checkout: React.FC = () => {
                       <p className="text-sm text-red-600 mt-1">{errors.zipCode}</p>
                     )}
                   </div>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="md:col-span-2">
                       <Label htmlFor="street">Endereço *</Label>
@@ -378,7 +455,7 @@ export const Checkout: React.FC = () => {
                         <p className="text-sm text-red-600 mt-1">{errors.street}</p>
                       )}
                     </div>
-                    
+
                     <div>
                       <Label htmlFor="number">Número *</Label>
                       <Input
@@ -392,7 +469,7 @@ export const Checkout: React.FC = () => {
                       )}
                     </div>
                   </div>
-                  
+
                   <div>
                     <Label htmlFor="complement">Complemento</Label>
                     <Input
@@ -402,7 +479,7 @@ export const Checkout: React.FC = () => {
                       placeholder="Apartamento, bloco, etc."
                     />
                   </div>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <Label htmlFor="neighborhood">Bairro *</Label>
@@ -416,7 +493,7 @@ export const Checkout: React.FC = () => {
                         <p className="text-sm text-red-600 mt-1">{errors.neighborhood}</p>
                       )}
                     </div>
-                    
+
                     <div>
                       <Label htmlFor="city">Cidade *</Label>
                       <Input
@@ -429,7 +506,7 @@ export const Checkout: React.FC = () => {
                         <p className="text-sm text-red-600 mt-1">{errors.city}</p>
                       )}
                     </div>
-                    
+
                     <div>
                       <Label htmlFor="state">Estado *</Label>
                       <Select value={formData.state} onValueChange={(value) => handleInputChange('state', value)}>
@@ -448,7 +525,7 @@ export const Checkout: React.FC = () => {
                       )}
                     </div>
                   </div>
-                  
+
                   <div className="space-y-3">
                     <div className="flex items-center space-x-2">
                       <Checkbox
@@ -460,7 +537,7 @@ export const Checkout: React.FC = () => {
                         Salvar este endereço para futuras compras
                       </Label>
                     </div>
-                    
+
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="isGift"
@@ -471,7 +548,7 @@ export const Checkout: React.FC = () => {
                         Este pedido é um presente
                       </Label>
                     </div>
-                    
+
                     {formData.isGift && (
                       <div>
                         <Label htmlFor="giftMessage">Mensagem do presente</Label>
@@ -488,13 +565,75 @@ export const Checkout: React.FC = () => {
                 </div>
               )}
 
+              {currentStep === 2 && (
+                <div className="mt-8 pt-6 border-t border-gray-100">
+                  <DeliveryScheduler
+                    value={formData.deliverySchedule}
+                    onChange={(val) => handleInputChange('deliverySchedule', val)}
+                  />
+
+                  {/* Shipping Options */}
+                  <div className="mt-8 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-gray-900">Opções de Frete</h3>
+                      <button
+                        onClick={() => getShippingQuotes(cart.items as any[], formData.zipCode)}
+                        type="button" // Prevent form submission
+                        className="text-sm text-primary hover:underline"
+                      >
+                        Calcular Frete
+                      </button>
+                    </div>
+
+                    {shippingQuotes.length > 0 ? (
+                      <RadioGroup
+                        value={selectedShipping?.service_id.toString()}
+                        onValueChange={(val) => {
+                          const selected = shippingQuotes.find(q => q.service_id.toString() === val);
+                          if (selected) setSelectedShipping(selected);
+                        }}
+                      >
+                        <div className="space-y-3">
+                          {shippingQuotes.map((quote) => (
+                            <div key={quote.service_id} className="flex items-center justify-between space-x-2 p-4 border border-gray-200 rounded-lg">
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value={quote.service_id.toString()} id={`shipping-${quote.service_id}`} />
+                                <Label htmlFor={`shipping-${quote.service_id}`} className="flex flex-col">
+                                  <span className="font-medium">{quote.name}</span>
+                                  <span className="text-sm text-gray-500">Chega em {quote.estimated_delivery}</span>
+                                </Label>
+                              </div>
+                              <span className="font-semibold">
+                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(quote.price)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </RadioGroup>
+                    ) : (
+                      <div className="text-sm text-gray-500 bg-gray-50 p-4 rounded-lg">
+                        Informe o CEP e clique em Calcular Frete para ver as opções.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Step 3: Payment */}
               {currentStep === 3 && (
                 <div className="space-y-6">
                   <h2 className="text-xl font-semibold text-gray-900">
                     Forma de Pagamento
                   </h2>
-                  
+
+                  {/* Gift Options Section */}
+                  <div className="mb-8">
+                    <GiftOptions
+                      value={formData.giftOptions}
+                      onChange={(val) => handleInputChange('giftOptions', val)}
+                    />
+                  </div>
+
                   <RadioGroup
                     value={formData.paymentMethod}
                     onValueChange={(value) => handleInputChange('paymentMethod', value)}
@@ -510,7 +649,7 @@ export const Checkout: React.FC = () => {
                           </div>
                         </Label>
                       </div>
-                      
+
                       <div className="flex items-center space-x-2 p-4 border border-gray-200 rounded-lg">
                         <RadioGroupItem value="debit" id="debit" />
                         <Label htmlFor="debit" className="flex-1">
@@ -520,7 +659,7 @@ export const Checkout: React.FC = () => {
                           </div>
                         </Label>
                       </div>
-                      
+
                       <div className="flex items-center space-x-2 p-4 border border-gray-200 rounded-lg">
                         <RadioGroupItem value="pix" id="pix" />
                         <Label htmlFor="pix" className="flex-1">
@@ -531,7 +670,7 @@ export const Checkout: React.FC = () => {
                           </div>
                         </Label>
                       </div>
-                      
+
                       <div className="flex items-center space-x-2 p-4 border border-gray-200 rounded-lg">
                         <RadioGroupItem value="boleto" id="boleto" />
                         <Label htmlFor="boleto" className="flex-1">
@@ -544,11 +683,11 @@ export const Checkout: React.FC = () => {
                       </div>
                     </div>
                   </RadioGroup>
-                  
+
                   {(formData.paymentMethod === 'credit' || formData.paymentMethod === 'debit') && (
                     <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
                       <h3 className="font-medium text-gray-900">Dados do Cartão</h3>
-                      
+
                       <div>
                         <Label htmlFor="cardNumber">Número do Cartão *</Label>
                         <Input
@@ -562,7 +701,7 @@ export const Checkout: React.FC = () => {
                           <p className="text-sm text-red-600 mt-1">{errors.cardNumber}</p>
                         )}
                       </div>
-                      
+
                       <div>
                         <Label htmlFor="cardName">Nome no Cartão *</Label>
                         <Input
@@ -576,7 +715,7 @@ export const Checkout: React.FC = () => {
                           <p className="text-sm text-red-600 mt-1">{errors.cardName}</p>
                         )}
                       </div>
-                      
+
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <Label htmlFor="cardExpiry">Validade *</Label>
@@ -591,7 +730,7 @@ export const Checkout: React.FC = () => {
                             <p className="text-sm text-red-600 mt-1">{errors.cardExpiry}</p>
                           )}
                         </div>
-                        
+
                         <div>
                           <Label htmlFor="cardCvv">CVV *</Label>
                           <Input
@@ -606,12 +745,12 @@ export const Checkout: React.FC = () => {
                           )}
                         </div>
                       </div>
-                      
+
                       {formData.paymentMethod === 'credit' && (
                         <div>
                           <Label htmlFor="installments">Parcelas</Label>
-                          <Select 
-                            value={formData.installments.toString()} 
+                          <Select
+                            value={formData.installments.toString()}
                             onValueChange={(value) => handleInputChange('installments', parseInt(value))}
                           >
                             <SelectTrigger>
@@ -630,7 +769,7 @@ export const Checkout: React.FC = () => {
                       )}
                     </div>
                   )}
-                  
+
                   {formData.paymentMethod === 'pix' && (
                     <Alert>
                       <AlertCircle className="h-4 w-4" />
@@ -640,7 +779,7 @@ export const Checkout: React.FC = () => {
                       </AlertDescription>
                     </Alert>
                   )}
-                  
+
                   {formData.paymentMethod === 'boleto' && (
                     <Alert>
                       <AlertCircle className="h-4 w-4" />
@@ -659,7 +798,7 @@ export const Checkout: React.FC = () => {
                   <h2 className="text-xl font-semibold text-gray-900">
                     Confirmar Pedido
                   </h2>
-                  
+
                   <div className="space-y-4">
                     {/* Personal Info Summary */}
                     <div className="p-4 bg-gray-50 rounded-lg">
@@ -670,7 +809,7 @@ export const Checkout: React.FC = () => {
                         {formData.phone}
                       </p>
                     </div>
-                    
+
                     {/* Address Summary */}
                     <div className="p-4 bg-gray-50 rounded-lg">
                       <h3 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
@@ -684,7 +823,22 @@ export const Checkout: React.FC = () => {
                         CEP: {formData.zipCode}
                       </p>
                     </div>
-                    
+
+                    {/* Delivery Schedule Summary */}
+                    {formData.deliverySchedule.scheduled_date && (
+                      <div className="p-4 bg-gray-50 rounded-lg">
+                        <h3 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
+                          <Truck className="h-4 w-4" />
+                          Agendamento de Entrega
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          Data: {new Date(formData.deliverySchedule.scheduled_date).toLocaleDateString('pt-BR')}<br />
+                          Período: {formData.deliverySchedule.scheduled_slot === 'morning' ? 'Manhã' :
+                            formData.deliverySchedule.scheduled_slot === 'afternoon' ? 'Tarde' : 'Horário Comercial'}
+                        </p>
+                      </div>
+                    )}
+
                     {/* Payment Summary */}
                     <div className="p-4 bg-gray-50 rounded-lg">
                       <h3 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
@@ -698,7 +852,7 @@ export const Checkout: React.FC = () => {
                         {formData.paymentMethod === 'boleto' && 'Boleto Bancário'}
                       </p>
                     </div>
-                    
+
                     {formData.isGift && (
                       <div className="p-4 bg-blue-50 rounded-lg">
                         <h3 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
@@ -717,7 +871,7 @@ export const Checkout: React.FC = () => {
                       </div>
                     )}
                   </div>
-                  
+
                   {errors.general && (
                     <Alert className="border-red-200 bg-red-50">
                       <AlertCircle className="h-4 w-4" />
@@ -738,7 +892,7 @@ export const Checkout: React.FC = () => {
                 >
                   Voltar
                 </Button>
-                
+
                 {currentStep < 4 ? (
                   <Button onClick={handleNextStep}>
                     Continuar
@@ -764,13 +918,13 @@ export const Checkout: React.FC = () => {
                 <h3 className="text-lg font-semibold text-gray-900">
                   Resumo do Pedido
                 </h3>
-                
+
                 {/* Items */}
                 <div className="space-y-3">
                   {cart.items.map((item) => (
                     <div key={item.id} className="flex gap-3">
                       <img
-                        src={item.product.images[0]?.url || '/placeholder-product.jpg'}
+                        src={item.product.images[0] || '/placeholder-product.jpg'}
                         alt={item.product.name}
                         className="w-12 h-12 object-cover rounded"
                       />
@@ -788,16 +942,16 @@ export const Checkout: React.FC = () => {
                     </div>
                   ))}
                 </div>
-                
+
                 <Separator />
-                
+
                 {/* Summary */}
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Subtotal</span>
                     <span className="font-medium">{formatPrice(summary.subtotal)}</span>
                   </div>
-                  
+
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Frete</span>
                     <span className={cn(
@@ -807,7 +961,7 @@ export const Checkout: React.FC = () => {
                       {summary.shipping === 0 ? 'Grátis' : formatPrice(summary.shipping)}
                     </span>
                   </div>
-                  
+
                   {summary.discount > 0 && (
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Desconto</span>
@@ -816,9 +970,9 @@ export const Checkout: React.FC = () => {
                       </span>
                     </div>
                   )}
-                  
+
                   <Separator />
-                  
+
                   <div className="flex justify-between">
                     <span className="text-lg font-semibold text-gray-900">Total</span>
                     <span className="text-lg font-bold text-gray-900">
@@ -826,7 +980,7 @@ export const Checkout: React.FC = () => {
                     </span>
                   </div>
                 </div>
-                
+
                 {/* Security Info */}
                 <div className="pt-4 border-t border-gray-200">
                   <div className="flex items-center gap-2 text-xs text-gray-500 mb-2">
@@ -843,7 +997,7 @@ export const Checkout: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
+    </div >
   );
 };
 

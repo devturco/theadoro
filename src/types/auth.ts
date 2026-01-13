@@ -22,6 +22,7 @@ export interface UserProfile {
   postal_code: string | null;
   created_at: string;
   updated_at: string;
+  role?: UserRole;
   roles?: UserRole[];
 }
 

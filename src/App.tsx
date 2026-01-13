@@ -8,6 +8,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 // Components
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import RoleGuard from '@/components/auth/RoleGuard';
+import { MaintenanceGuard } from '@/components/auth/MaintenanceGuard';
 
 // Layouts
 import AdminLayout from '@/components/layouts/AdminLayout';
@@ -25,6 +26,7 @@ import Products from '@/pages/Products';
 import ProductDetail from '@/pages/ProductDetail';
 import Cart from '@/pages/Cart';
 import Checkout from '@/pages/Checkout';
+import OrderSuccess from '@/pages/OrderSuccess';
 import Categories from '@/pages/Categories';
 import CategoryProducts from '@/pages/CategoryProducts';
 import Search from '@/pages/Search';
@@ -48,6 +50,8 @@ import AdminProducts from '@/pages/admin/AdminProducts';
 import AdminCategories from '@/pages/admin/AdminCategories';
 import AdminOrders from '@/pages/admin/AdminOrders';
 import AdminReports from '@/pages/admin/AdminReports';
+import AdminContent from '@/pages/admin/AdminContent';
+import AdminSettings from '@/pages/admin/AdminSettings';
 
 // Seller Pages
 import SellerDashboard from '@/pages/seller/SellerDashboard';
@@ -75,40 +79,53 @@ function App() {
           <AuthProvider>
             <Routes>
               {/* Public Routes */}
-              <Route path="/" element={<Index />} />
+              <Route path="/" element={<MaintenanceGuard><Index /></MaintenanceGuard>} />
               <Route path="/auth" element={<Auth />} />
-              
+
               {/* Public Marketplace Routes */}
-              <Route path="/products" element={<PublicLayout><Products /></PublicLayout>} />
-              <Route path="/products/:id" element={<PublicLayout><ProductDetail /></PublicLayout>} />
-              <Route path="/categories" element={<PublicLayout><Categories /></PublicLayout>} />
-              <Route path="/categories/:slug" element={<PublicLayout><CategoryProducts /></PublicLayout>} />
-              <Route path="/search" element={<PublicLayout><Search /></PublicLayout>} />
-              <Route path="/cart" element={<PublicLayout><Cart /></PublicLayout>} />
-              <Route path="/checkout" element={<PublicLayout><Checkout /></PublicLayout>} />
-              <Route path="/wishlist" element={<PublicLayout><Wishlist /></PublicLayout>} />
-              <Route path="/sellers" element={<PublicLayout><Sellers /></PublicLayout>} />
-              <Route path="/sellers/:id" element={<PublicLayout><SellerProfile /></PublicLayout>} />
-              
+              <Route path="/products" element={<MaintenanceGuard><PublicLayout><Products /></PublicLayout></MaintenanceGuard>} />
+              <Route path="/products/:id" element={<MaintenanceGuard><PublicLayout><ProductDetail /></PublicLayout></MaintenanceGuard>} />
+              <Route path="/categories" element={<MaintenanceGuard><PublicLayout><Categories /></PublicLayout></MaintenanceGuard>} />
+              <Route path="/categories/:slug" element={<MaintenanceGuard><PublicLayout><CategoryProducts /></PublicLayout></MaintenanceGuard>} />
+              <Route path="/search" element={<MaintenanceGuard><PublicLayout><Search /></PublicLayout></MaintenanceGuard>} />
+              <Route path="/cart" element={<MaintenanceGuard><PublicLayout><Cart /></PublicLayout></MaintenanceGuard>} />
+              <Route path="/checkout" element={<MaintenanceGuard><PublicLayout><Checkout /></PublicLayout></MaintenanceGuard>} />
+              <Route path="/order-success/:id" element={<MaintenanceGuard><PublicLayout><OrderSuccess /></PublicLayout></MaintenanceGuard>} />
+              <Route path="/wishlist" element={<MaintenanceGuard><PublicLayout><Wishlist /></PublicLayout></MaintenanceGuard>} />
+              <Route path="/sellers" element={<MaintenanceGuard><PublicLayout><Sellers /></PublicLayout></MaintenanceGuard>} />
+              <Route path="/sellers/:id" element={<MaintenanceGuard><PublicLayout><SellerProfile /></PublicLayout></MaintenanceGuard>} />
+
               {/* Institutional Pages */}
-              <Route path="/about" element={<PublicLayout><About /></PublicLayout>} />
-              <Route path="/contact" element={<PublicLayout><Contact /></PublicLayout>} />
-              <Route path="/terms" element={<PublicLayout><Terms /></PublicLayout>} />
-              <Route path="/privacy" element={<PublicLayout><Privacy /></PublicLayout>} />
-              
-              {/* General Dashboard (redirects based on role) */}
-              <Route 
-                path="/dashboard" 
+              <Route path="/about" element={<MaintenanceGuard><PublicLayout><About /></PublicLayout></MaintenanceGuard>} />
+              <Route path="/contact" element={<MaintenanceGuard><PublicLayout><Contact /></PublicLayout></MaintenanceGuard>} />
+              <Route path="/terms" element={<MaintenanceGuard><PublicLayout><Terms /></PublicLayout></MaintenanceGuard>} />
+              <Route path="/privacy" element={<MaintenanceGuard><PublicLayout><Privacy /></PublicLayout></MaintenanceGuard>} />
+
+              {/* General Dashboard */}
+              <Route
+                path="/dashboard"
                 element={
-                  <ProtectedRoute>
-                    <Dashboard />
-                  </ProtectedRoute>
-                } 
+                  <MaintenanceGuard>
+                    <ProtectedRoute>
+                      <Dashboard />
+                    </ProtectedRoute>
+                  </MaintenanceGuard>
+                }
+              />
+              <Route
+                path="/dashboard/profile"
+                element={
+                  <MaintenanceGuard>
+                    <ProtectedRoute>
+                      <BuyerProfile />
+                    </ProtectedRoute>
+                  </MaintenanceGuard>
+                }
               />
 
               {/* Admin Routes */}
-              <Route 
-                path="/admin/*" 
+              <Route
+                path="/admin/*"
                 element={
                   <ProtectedRoute>
                     <RoleGuard allowedRoles={['admin']}>
@@ -120,17 +137,19 @@ function App() {
                           <Route path="categories" element={<AdminCategories />} />
                           <Route path="orders" element={<AdminOrders />} />
                           <Route path="reports" element={<AdminReports />} />
+                          <Route path="content" element={<AdminContent />} />
+                          <Route path="settings" element={<AdminSettings />} />
                           <Route path="*" element={<AdminDashboard />} />
                         </Routes>
                       </AdminLayout>
                     </RoleGuard>
                   </ProtectedRoute>
-                } 
+                }
               />
 
               {/* Seller Routes */}
-              <Route 
-                path="/seller/*" 
+              <Route
+                path="/seller/*"
                 element={
                   <ProtectedRoute>
                     <RoleGuard allowedRoles={['seller', 'admin']}>
@@ -146,12 +165,12 @@ function App() {
                       </SellerLayout>
                     </RoleGuard>
                   </ProtectedRoute>
-                } 
+                }
               />
 
               {/* Buyer Routes */}
-              <Route 
-                path="/buyer/*" 
+              <Route
+                path="/buyer/*"
                 element={
                   <ProtectedRoute>
                     <RoleGuard allowedRoles={['buyer', 'admin']}>
@@ -167,7 +186,7 @@ function App() {
                       </BuyerLayout>
                     </RoleGuard>
                   </ProtectedRoute>
-                } 
+                }
               />
 
               {/* Catch all route */}

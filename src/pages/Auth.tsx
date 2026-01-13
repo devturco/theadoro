@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,10 +24,16 @@ const Auth = () => {
   const [signupFullName, setSignupFullName] = useState('');
 
   // Redirect if already logged in
-  if (user) {
-    navigate('/');
-    return null;
-  }
+  // Redirect if already logged in
+  const location = useLocation();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      const from = location.state?.from?.pathname || '/dashboard';
+      navigate(from, { replace: true });
+    }
+  }, [user, navigate, location]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,7 +42,7 @@ const Auth = () => {
     try {
       await signIn(loginEmail, loginPassword);
       toast.success('Login realizado com sucesso!');
-      navigate('/dashboard');
+      // Navigation is handled by useEffect when user state updates
     } catch (error: any) {
       toast.error(error.message || 'Erro ao fazer login');
     }
@@ -51,7 +57,7 @@ const Auth = () => {
     try {
       await signUp(signupEmail, signupPassword, { full_name: signupFullName });
       toast.success('Conta criada com sucesso!');
-      navigate('/dashboard');
+      // Navigation is handled by useEffect when user state updates
     } catch (error: any) {
       toast.error(error.message || 'Erro ao criar conta');
     }
@@ -64,9 +70,9 @@ const Auth = () => {
       <Card className="w-full max-w-md shadow-elegant">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
-            <img 
-              src="/logo-colors.png" 
-              alt="THEADORO" 
+            <img
+              src="/logo-colors.png"
+              alt="THEADORO"
               className="h-16 w-auto"
             />
           </div>

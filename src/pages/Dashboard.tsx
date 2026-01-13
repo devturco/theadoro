@@ -1,77 +1,41 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { useRole } from '@/hooks/useRole';
+
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Package, Calendar, Heart, User, ShoppingBag, Store } from 'lucide-react';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
-  const [roles, setRoles] = useState<string[]>([]);
-  const [profile, setProfile] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, profile, roles, loading } = useAuth();
+  const { isAdmin, isSeller } = useRole();
 
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (!loading && !user) {
       navigate('/auth');
-      return;
     }
+  }, [user, loading, navigate]);
 
-    if (user) {
-      fetchUserData();
-    }
-  }, [user, authLoading, navigate]);
 
-  const fetchUserData = async () => {
-    if (!user) return;
-
-    try {
-      // Fetch profile
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      setProfile(profileData);
-
-      // Fetch roles
-      const { data: rolesData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id);
-
-      if (rolesData) {
-        setRoles(rolesData.map((r) => r.role));
-      }
-    } catch (error) {
-      console.error('Error fetching user data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (authLoading || loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground">Carregando...</p>
-      </div>
-    );
-  }
-
-  const isAdmin = roles.includes('admin');
-  const isSeller = roles.includes('seller') || isAdmin;
-  const isBuyer = roles.includes('buyer');
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      
+
+      {/* Debug Dump */}
+      <div className="container mx-auto px-4 py-4 bg-muted mb-4 rounded text-xs font-mono">
+        <p>User ID: {user?.id}</p>
+        <p>Roles: {JSON.stringify(roles)}</p>
+        <p>Profile Role: {profile?.role}</p>
+      </div>
+      {/* End Debug Dump */}
+
       <main className="container mx-auto px-4 py-8 mt-20">
         <div className="mb-8">
           <h1 className="text-4xl font-serif text-wine mb-2">Minha Conta</h1>

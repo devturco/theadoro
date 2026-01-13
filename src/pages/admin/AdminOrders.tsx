@@ -25,17 +25,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRole } from '@/hooks/useRole';
 import { useOrders } from '@/hooks/useOrders';
-import { 
-  ShoppingCart, 
-  Eye, 
-  Edit, 
+import {
+  ShoppingCart,
+  Eye,
+  Edit,
   Package,
   Truck,
   CheckCircle,
   XCircle,
   Clock,
   DollarSign,
-  Calendar
+  Calendar,
+  User,
+  Gift,
+  Download,
+  Printer
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Order, OrderStatus } from '@/types/order';
@@ -70,13 +74,13 @@ const AdminOrders = () => {
       toast.error('Acesso negado. Apenas administradores podem acessar esta página.');
       return;
     }
-    
+
     calculateStats();
   }, [isAdmin, orders]);
 
   const calculateStats = () => {
     if (!orders) return;
-    
+
     const stats = {
       total: orders.length,
       pending: orders.filter(o => o.status === 'pending').length,
@@ -86,7 +90,7 @@ const AdminOrders = () => {
       cancelled: orders.filter(o => o.status === 'cancelled').length,
       totalRevenue: orders.reduce((sum, order) => sum + order.total_amount, 0)
     };
-    
+
     setStats(stats);
   };
 
@@ -139,13 +143,13 @@ const AdminOrders = () => {
       delivered: Package,
       cancelled: XCircle
     };
-    
+
     const Icon = icons[status];
     return <Icon className="h-4 w-4" />;
   };
 
-  const filteredOrders = statusFilter === 'all' 
-    ? orders 
+  const filteredOrders = statusFilter === 'all'
+    ? orders
     : orders?.filter(order => order.status === statusFilter);
 
   const columns = [
@@ -241,7 +245,7 @@ const AdminOrders = () => {
             <div className="text-2xl font-bold">{stats.total}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Pendentes</CardTitle>
@@ -251,7 +255,7 @@ const AdminOrders = () => {
             <div className="text-2xl font-bold">{stats.pending}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Confirmados</CardTitle>
@@ -261,7 +265,7 @@ const AdminOrders = () => {
             <div className="text-2xl font-bold">{stats.confirmed}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Enviados</CardTitle>
@@ -271,7 +275,7 @@ const AdminOrders = () => {
             <div className="text-2xl font-bold">{stats.shipped}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Entregues</CardTitle>
@@ -281,7 +285,7 @@ const AdminOrders = () => {
             <div className="text-2xl font-bold">{stats.delivered}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Cancelados</CardTitle>
@@ -291,7 +295,7 @@ const AdminOrders = () => {
             <div className="text-2xl font-bold">{stats.cancelled}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Receita</CardTitle>
@@ -354,75 +358,163 @@ const AdminOrders = () => {
 
       {/* Dialog de detalhes do pedido */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Detalhes do Pedido #{selectedOrder?.id.slice(0, 8)}</DialogTitle>
             <DialogDescription>
               Informações completas do pedido
             </DialogDescription>
           </DialogHeader>
-          
-          {selectedOrder && (
-            <div className="space-y-6">
-              {/* Informações do cliente */}
-              <div>
-                <h3 className="font-semibold mb-2">Informações do Cliente</h3>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="font-medium">Nome:</span> {selectedOrder.buyer?.name || 'N/A'}
-                  </div>
-                  <div>
-                    <span className="font-medium">Email:</span> {selectedOrder.buyer?.email || 'N/A'}
-                  </div>
-                </div>
-              </div>
 
-              {/* Status e datas */}
-              <div>
-                <h3 className="font-semibold mb-2">Status e Datas</h3>
-                <div className="grid grid-cols-2 gap-4 text-sm">
+          {selectedOrder && (() => {
+            // Parse JSON fields safely
+            const notes = selectedOrder.notes ? (typeof selectedOrder.notes === 'string' ? JSON.parse(selectedOrder.notes) : selectedOrder.notes) : {};
+            const shippingAddress = selectedOrder.shipping_address ? (typeof selectedOrder.shipping_address === 'string' ? JSON.parse(selectedOrder.shipping_address) : selectedOrder.shipping_address) : null;
+
+            // Safe accessors
+            const giftOptions = notes.giftOptions;
+            const deliverySchedule = notes.deliverySchedule;
+            const paymentInfo = notes.paymentInfo;
+
+            return (
+              <div className="space-y-6">
+                {/* Status Bar */}
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium">Status:</span>
-                    {getStatusIcon(selectedOrder.status)}
+                    <span className="font-medium text-sm text-gray-500">Status atual:</span>
                     {getStatusBadge(selectedOrder.status)}
                   </div>
-                  <div>
-                    <span className="font-medium">Data do Pedido:</span> {new Date(selectedOrder.created_at).toLocaleString('pt-BR')}
+                  <div className="text-sm text-gray-500">
+                    Realizado em {new Date(selectedOrder.created_at).toLocaleString('pt-BR')}
                   </div>
                 </div>
-              </div>
 
-              {/* Itens do pedido */}
-              <div>
-                <h3 className="font-semibold mb-2">Itens do Pedido</h3>
-                <div className="space-y-2">
-                  {selectedOrder.items?.map((item, index) => (
-                    <div key={index} className="flex justify-between items-center p-3 border rounded-lg">
-                      <div>
-                        <div className="font-medium">{item.product?.name || 'Produto'}</div>
-                        <div className="text-sm text-muted-foreground">
-                          Quantidade: {item.quantity} × R$ {item.unit_price.toFixed(2)}
-                        </div>
-                      </div>
-                      <div className="font-medium">
-                        R$ {(item.quantity * item.unit_price).toFixed(2)}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Coluna Esquerda: Cliente e Entrega */}
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="flex items-center gap-2 font-semibold mb-3">
+                        <User className="h-4 w-4" /> Cliente
+                      </h3>
+                      <div className="bg-white border rounded-lg p-3 text-sm space-y-1">
+                        <p><span className="font-medium">Nome:</span> {notes.customer?.firstName} {notes.customer?.lastName} ({selectedOrder.buyer?.name})</p>
+                        <p><span className="font-medium">Email:</span> {selectedOrder.buyer?.email}</p>
+                        <p><span className="font-medium">Telefone:</span> {notes.customer?.phone}</p>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </div>
 
-              {/* Total */}
-              <div className="border-t pt-4">
-                <div className="flex justify-between items-center text-lg font-semibold">
-                  <span>Total do Pedido:</span>
-                  <span>R$ {selectedOrder.total_amount.toFixed(2)}</span>
+                    <div>
+                      <h3 className="flex items-center gap-2 font-semibold mb-3">
+                        <Truck className="h-4 w-4" /> Entrega
+                      </h3>
+                      <div className="bg-white border rounded-lg p-3 text-sm space-y-1">
+                        {shippingAddress ? (
+                          <>
+                            <p>{shippingAddress.address}</p>
+                            <p>{shippingAddress.neighborhood} - {shippingAddress.city}/{shippingAddress.state}</p>
+                            <p>CEP: {shippingAddress.zipCode}</p>
+                            <p>{shippingAddress.country}</p>
+                          </>
+                        ) : (
+                          <p className="text-muted-foreground">Endereço não disponível</p>
+                        )}
+
+                        {deliverySchedule && (
+                          <div className="mt-3 pt-3 border-t">
+                            <p className="font-medium flex items-center gap-2 text-blue-600">
+                              <Calendar className="h-3 w-3" /> Agendamento
+                            </p>
+                            <p>Data: {new Date(deliverySchedule.scheduled_date).toLocaleDateString('pt-BR')}</p>
+                            <p>Período: {deliverySchedule.scheduled_slot === 'morning' ? 'Manhã' : deliverySchedule.scheduled_slot === 'afternoon' ? 'Tarde' : 'Comercial'}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Coluna Direita: Pagamento e Presente */}
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="flex items-center gap-2 font-semibold mb-3">
+                        <DollarSign className="h-4 w-4" /> Pagamento
+                      </h3>
+                      <div className="bg-white border rounded-lg p-3 text-sm space-y-2">
+                        <p className="capitalize"><span className="font-medium">Método:</span> {selectedOrder.payment_method?.replace('_', ' ')}</p>
+                        <p><span className="font-medium">Total:</span> R$ {selectedOrder.total_amount.toFixed(2)}</p>
+
+                        {paymentInfo && (
+                          <div className="bg-gray-50 p-2 rounded text-xs">
+                            <p>Transaction ID: {paymentInfo.id}</p>
+                            {paymentInfo.pixCode && (
+                              <div className="mt-1 break-all">
+                                <span className="font-semibold">PIX Code:</span> {paymentInfo.pixCode.slice(0, 20)}...
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {giftOptions && giftOptions.is_gift && (
+                      <div>
+                        <h3 className="flex items-center gap-2 font-semibold mb-3 text-purple-600">
+                          <Gift className="h-4 w-4" /> Opções de Presente
+                        </h3>
+                        <div className="bg-purple-50 border border-purple-100 rounded-lg p-3 text-sm space-y-2">
+                          <p>🎁 <strong>Pedido para Presente</strong></p>
+                          {giftOptions.message && (
+                            <div className="italic text-gray-600">
+                              "{giftOptions.message}"
+                            </div>
+                          )}
+                          <div className="text-xs text-gray-500 mt-2">
+                            <p>De: {giftOptions.sender_name || 'Anônimo'}</p>
+                            <p>Para: {giftOptions.recipient_name || 'Destinatário'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
+
+                {/* Itens do pedido */}
+                <div>
+                  <h3 className="font-semibold mb-3">Itens do Pedido</h3>
+                  <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2">
+                    {selectedOrder.items?.map((item, index) => (
+                      <div key={index} className="flex justify-between items-center p-3 border rounded-lg bg-white">
+                        <div className="flex gap-3 items-center">
+                          <div className="h-10 w-10 bg-gray-100 rounded flex items-center justify-center">
+                            <Package className="h-5 w-5 text-gray-400" />
+                          </div>
+                          <div>
+                            <div className="font-medium">{item.product?.name || 'Produto'}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {item.quantity}un x R$ {item.unit_price.toFixed(2)}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="font-medium">
+                          R$ {(item.quantity * item.unit_price).toFixed(2)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
               </div>
+            );
+          })()}
+
+          <DialogFooter className="sm:justify-between">
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm">
+                <Download className="h-4 w-4 mr-2" /> Nota Fiscal
+              </Button>
+              <Button variant="outline" size="sm">
+                <Printer className="h-4 w-4 mr-2" /> Imprimir
+              </Button>
             </div>
-          )}
-          
-          <DialogFooter>
             <Button variant="outline" onClick={() => setIsDetailsOpen(false)}>
               Fechar
             </Button>

@@ -9,13 +9,15 @@ interface ProtectedRouteProps {
   redirectTo?: string;
 }
 
-export const ProtectedRoute = ({ 
-  children, 
-  requireAuth = true, 
-  redirectTo = '/auth' 
+export const ProtectedRoute = ({
+  children,
+  requireAuth = true,
+  redirectTo = '/auth'
 }: ProtectedRouteProps) => {
   const { user, loading } = useAuth();
   const location = useLocation();
+
+
 
   if (loading) {
     return (

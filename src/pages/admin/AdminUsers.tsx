@@ -24,12 +24,12 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useRole } from '@/hooks/useRole';
 import { useCRUD } from '@/hooks/useCRUD';
-import { 
-  Users, 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Shield, 
+import {
+  Users,
+  Plus,
+  Edit,
+  Trash2,
+  Shield,
   ShieldCheck,
   UserCheck,
   UserX,
@@ -64,7 +64,7 @@ const AdminUsers = () => {
     updateItem,
     deleteItem,
     refetch
-  } = useCRUD({ table: 'users' });
+  } = useCRUD({ table: 'profiles' });
 
   useEffect(() => {
     if (!isAdmin) {
@@ -75,23 +75,25 @@ const AdminUsers = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       if (editingUser) {
         await updateItem(editingUser.id, {
-          name: formData.name,
-          roles: [{ role: formData.role, status: formData.status }]
+          full_name: formData.name,
+          role: formData.role
         });
         toast.success('Usuário atualizado com sucesso!');
       } else {
+        // Note: Creating a profile directly might not create the auth user. 
+        // Ideally should use an edge function or admin API to create both.
         await createItem({
-          name: formData.name,
+          full_name: formData.name,
           email: formData.email,
-          roles: [{ role: formData.role, status: formData.status }]
+          role: formData.role
         });
         toast.success('Usuário criado com sucesso!');
       }
-      
+
       setIsDialogOpen(false);
       resetForm();
       refetch();
@@ -104,17 +106,17 @@ const AdminUsers = () => {
   const handleEdit = (user: any) => {
     setEditingUser(user);
     setFormData({
-      name: user.name || '',
+      name: user.full_name || '',
       email: user.email || '',
-      role: user.roles?.[0]?.role || 'buyer',
-      status: user.roles?.[0]?.status || 'approved'
+      role: user.role || 'buyer',
+      status: 'approved' // Status logic might be deprecated or need specific column
     });
     setIsDialogOpen(true);
   };
 
   const handleDelete = async (userId: string) => {
     if (!confirm('Tem certeza que deseja excluir este usuário?')) return;
-    
+
     try {
       await deleteItem(userId);
       toast.success('Usuário excluído com sucesso!');
@@ -126,21 +128,20 @@ const AdminUsers = () => {
   };
 
   const handleToggleStatus = async (user: any) => {
-    const currentStatus = user.roles?.[0]?.status || 'pending';
-    const newStatus = currentStatus === 'approved' ? 'pending' : 'approved';
-    
+    // Logic adapted: If 'buyer', promote to 'seller'. If 'seller', demote to 'buyer'.
+    // This replaces the old 'status' approval flow.
+    const currentRole = user.role || 'buyer';
+    const newRole = currentRole === 'seller' ? 'buyer' : 'seller';
+
     try {
       await updateItem(user.id, {
-        roles: [{ 
-          role: user.roles?.[0]?.role || 'buyer', 
-          status: newStatus 
-        }]
+        role: newRole
       });
-      toast.success(`Usuário ${newStatus === 'approved' ? 'aprovado' : 'suspenso'} com sucesso!`);
+      toast.success(`Usuário alterado para ${newRole === 'seller' ? 'Vendedor' : 'Comprador'} com sucesso!`);
       refetch();
     } catch (error) {
-      console.error('Erro ao alterar status:', error);
-      toast.error('Erro ao alterar status do usuário');
+      console.error('Erro ao alterar papel:', error);
+      toast.error('Erro ao alterar papel do usuário');
     }
   };
 
@@ -156,7 +157,7 @@ const AdminUsers = () => {
 
   const columns = [
     {
-      key: 'name',
+      key: 'full_name',
       title: 'Nome',
       render: (value: string) => value || 'N/A'
     },
@@ -165,26 +166,13 @@ const AdminUsers = () => {
       title: 'Email'
     },
     {
-      key: 'roles',
+      key: 'role',
       title: 'Função',
-      render: (roles: UserRole[]) => {
-        const role = roles?.[0]?.role || 'buyer';
+      render: (role: string) => {
         return (
           <Badge variant={role === 'admin' ? 'destructive' : role === 'seller' ? 'default' : 'secondary'}>
-            {role === 'admin' ? 'Administrador' : 
-             role === 'seller' ? 'Vendedor' : 'Comprador'}
-          </Badge>
-        );
-      }
-    },
-    {
-      key: 'status',
-      title: 'Status',
-      render: (_: any, row: any) => {
-        const status = row.roles?.[0]?.status || 'pending';
-        return (
-          <Badge variant={status === 'approved' ? 'default' : 'secondary'}>
-            {status === 'approved' ? 'Aprovado' : 'Pendente'}
+            {role === 'admin' ? 'Administrador' :
+              role === 'seller' ? 'Vendedor' : 'Comprador'}
           </Badge>
         );
       }
@@ -233,7 +221,7 @@ const AdminUsers = () => {
             Gerencie usuários, funções e permissões do sistema
           </p>
         </div>
-        
+
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button onClick={resetForm}>
@@ -247,7 +235,7 @@ const AdminUsers = () => {
                 {editingUser ? 'Editar Usuário' : 'Novo Usuário'}
               </DialogTitle>
               <DialogDescription>
-                {editingUser 
+                {editingUser
                   ? 'Edite as informações do usuário abaixo.'
                   : 'Preencha as informações para criar um novo usuário.'
                 }

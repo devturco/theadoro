@@ -18,6 +18,23 @@ export interface Order {
     phone: string | null;
   };
   items?: OrderItem[];
+  gift_options?: GiftOptions;
+  delivery_schedule?: DeliverySchedule;
+}
+
+export interface GiftOptions {
+  is_gift: boolean;
+  message?: string;
+  sender_name?: string;
+  recipient_name?: string;
+  wrap_style_id?: string;
+  notification_type?: 'physical_card' | 'digital_sms' | 'digital_whatsapp';
+  recipient_phone?: string;
+}
+
+export interface DeliverySchedule {
+  scheduled_date: string; // ISO date string YYYY-MM-DD
+  scheduled_slot: string; // e.g. "morning", "afternoon" or "14:00-16:00"
 }
 
 export interface OrderItem {

@@ -7,99 +7,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+
+// Type definition matches DB now
 interface Category {
   id: string;
   name: string;
   slug: string;
   description?: string;
-  image?: string;
+  image?: string; // Note: Database column is 'image_url' usually, check logic
   productCount: number;
-  parentId?: string;
+  // subcategories support would need self-join or separate fetch, simplifying for now
   subcategories?: Category[];
 }
-
-// Mock data para demonstração
-const mockCategories: Category[] = [
-  {
-    id: '1',
-    name: 'Presentes',
-    slug: 'presentes',
-    description: 'Presentes especiais para todas as ocasiões',
-    image: 'https://trae-api-us.mchost.guru/api/ide/v1/text_to_image?prompt=beautiful%20gift%20boxes%20with%20ribbons%20and%20bows%20colorful%20presents%20celebration&image_size=square_hd',
-    productCount: 245,
-    subcategories: [
-      { id: '1a', name: 'Aniversário', slug: 'aniversario', productCount: 89, parentId: '1' },
-      { id: '1b', name: 'Casamento', slug: 'casamento', productCount: 67, parentId: '1' },
-      { id: '1c', name: 'Dia das Mães', slug: 'dia-das-maes', productCount: 45, parentId: '1' },
-      { id: '1d', name: 'Natal', slug: 'natal', productCount: 44, parentId: '1' }
-    ]
-  },
-  {
-    id: '2',
-    name: 'Flores & Cestas',
-    slug: 'flores-cestas',
-    description: 'Arranjos florais e cestas de presente',
-    image: 'https://trae-api-us.mchost.guru/api/ide/v1/text_to_image?prompt=beautiful%20flower%20arrangements%20and%20gift%20baskets%20colorful%20flowers%20elegant%20presentation&image_size=square_hd',
-    productCount: 156,
-    subcategories: [
-      { id: '2a', name: 'Buquês', slug: 'buques', productCount: 78, parentId: '2' },
-      { id: '2b', name: 'Arranjos', slug: 'arranjos', productCount: 45, parentId: '2' },
-      { id: '2c', name: 'Cestas Gourmet', slug: 'cestas-gourmet', productCount: 33, parentId: '2' }
-    ]
-  },
-  {
-    id: '3',
-    name: 'Moda',
-    slug: 'moda',
-    description: 'Roupas e acessórios da moda',
-    image: 'https://trae-api-us.mchost.guru/api/ide/v1/text_to_image?prompt=fashion%20clothing%20and%20accessories%20stylish%20modern%20wardrobe%20elegant%20display&image_size=square_hd',
-    productCount: 189,
-    subcategories: [
-      { id: '3a', name: 'Roupas Femininas', slug: 'roupas-femininas', productCount: 89, parentId: '3' },
-      { id: '3b', name: 'Roupas Masculinas', slug: 'roupas-masculinas', productCount: 67, parentId: '3' },
-      { id: '3c', name: 'Acessórios', slug: 'acessorios', productCount: 33, parentId: '3' }
-    ]
-  },
-  {
-    id: '4',
-    name: 'Beleza & Bem-estar',
-    slug: 'beleza-bem-estar',
-    description: 'Produtos de beleza e cuidados pessoais',
-    image: 'https://trae-api-us.mchost.guru/api/ide/v1/text_to_image?prompt=beauty%20and%20wellness%20products%20cosmetics%20skincare%20spa%20elegant%20arrangement&image_size=square_hd',
-    productCount: 134,
-    subcategories: [
-      { id: '4a', name: 'Skincare', slug: 'skincare', productCount: 56, parentId: '4' },
-      { id: '4b', name: 'Maquiagem', slug: 'maquiagem', productCount: 45, parentId: '4' },
-      { id: '4c', name: 'Perfumes', slug: 'perfumes', productCount: 33, parentId: '4' }
-    ]
-  },
-  {
-    id: '5',
-    name: 'Serviços',
-    slug: 'servicos',
-    description: 'Serviços especializados e consultorias',
-    image: 'https://trae-api-us.mchost.guru/api/ide/v1/text_to_image?prompt=professional%20services%20consultation%20business%20meeting%20modern%20office&image_size=square_hd',
-    productCount: 78,
-    subcategories: [
-      { id: '5a', name: 'Consultoria', slug: 'consultoria', productCount: 34, parentId: '5' },
-      { id: '5b', name: 'Design', slug: 'design', productCount: 25, parentId: '5' },
-      { id: '5c', name: 'Fotografia', slug: 'fotografia', productCount: 19, parentId: '5' }
-    ]
-  },
-  {
-    id: '6',
-    name: 'Experiências',
-    slug: 'experiencias',
-    description: 'Experiências únicas e memoráveis',
-    image: 'https://trae-api-us.mchost.guru/api/ide/v1/text_to_image?prompt=unique%20experiences%20adventure%20travel%20memorable%20moments%20lifestyle&image_size=square_hd',
-    productCount: 92,
-    subcategories: [
-      { id: '6a', name: 'Viagens', slug: 'viagens', productCount: 45, parentId: '6' },
-      { id: '6b', name: 'Gastronomia', slug: 'gastronomia', productCount: 28, parentId: '6' },
-      { id: '6c', name: 'Aventura', slug: 'aventura', productCount: 19, parentId: '6' }
-    ]
-  }
-];
 
 export default function Categories() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -107,37 +28,46 @@ export default function Categories() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Simular carregamento de dados
     const loadCategories = async () => {
       setIsLoading(true);
-      // Simular delay da API
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setCategories(mockCategories);
-      setFeaturedCategories(mockCategories.slice(0, 3));
-      setIsLoading(false);
+      try {
+        // Fetch active categories
+        const { data, error } = await supabase
+          .from('categories')
+          .select('*')
+          .eq('is_active', true)
+          .order('name');
+
+        if (error) throw error;
+
+        // Transform data slightly to match UI expectations (productCount placeholder)
+        const transformedData = (data || []).map((cat: any) => ({
+          ...cat,
+          productCount: 0, // TODO: Implement real count later
+          subcategories: [] // TODO: Implement hierarchy later
+        }));
+
+        setCategories(transformedData);
+        setFeaturedCategories(transformedData.slice(0, 3));
+      } catch (error) {
+        console.error('Error loading categories:', error);
+        toast.error('Erro ao carregar categorias.');
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     loadCategories();
   }, []);
 
-  const totalProducts = categories.reduce((sum, cat) => sum + cat.productCount, 0);
+  const totalProducts = 0; // Placeholder until counts are real
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="container mx-auto px-4 py-8">
-          {/* Header Skeleton */}
-          <div className="text-center mb-12">
-            <div className="h-8 bg-gray-200 rounded w-64 mx-auto mb-4 animate-pulse"></div>
-            <div className="h-4 bg-gray-200 rounded w-96 mx-auto animate-pulse"></div>
-          </div>
-          
-          {/* Categories Grid Skeleton */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <div key={index} className="bg-gray-200 rounded-lg h-80 animate-pulse"></div>
-            ))}
+          <div className="flex justify-center p-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           </div>
         </div>
       </div>
@@ -153,7 +83,7 @@ export default function Categories() {
             Explore Nossas Categorias
           </h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Descubra uma ampla variedade de produtos e serviços organizados por categoria. 
+            Descubra uma ampla variedade de produtos e serviços organizados por categoria.
             Encontre exatamente o que você está procurando.
           </p>
           <div className="mt-6">
@@ -174,9 +104,9 @@ export default function Categories() {
               </Link>
             </Button>
           </div>
-          
-          <CategoryGrid 
-            categories={featuredCategories} 
+
+          <CategoryGrid
+            categories={featuredCategories}
             variant="featured"
             className="mb-8"
           />
@@ -202,7 +132,7 @@ export default function Categories() {
         {/* Seção de Subcategorias Populares */}
         <section className="mt-16">
           <h2 className="text-2xl font-bold text-gray-900 mb-8">Subcategorias Populares</h2>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {categories.map((category) => (
               category.subcategories && category.subcategories.length > 0 && (

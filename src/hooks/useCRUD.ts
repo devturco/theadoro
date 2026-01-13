@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { PaginationParams, ApiResponse, CRUDOperations } from '@/types/common';
@@ -20,6 +20,11 @@ export const useCRUD = <T extends { id: string }>({
   realtime = false,
   pageSize = 10
 }: UseCRUDOptions) => {
+  // Stabilize object references to prevent infinite loops
+  const stableOrderBy = useMemo(() => orderBy, [JSON.stringify(orderBy)]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const stableFilters = useMemo(() => filters, [JSON.stringify(filters)]);
+
   const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,11 +47,12 @@ export const useCRUD = <T extends { id: string }>({
       let query = supabase
         .from(table)
         .select(select, { count: 'exact' })
+        .select(select, { count: 'exact' })
         .range(from, to)
-        .order(orderBy.column, { ascending: orderBy.ascending });
+        .order(stableOrderBy.column, { ascending: stableOrderBy.ascending });
 
       // Apply filters
-      const allFilters = { ...filters, ...customFilters };
+      const allFilters = { ...stableFilters, ...customFilters };
       Object.entries(allFilters).forEach(([key, value]) => {
         if (value !== undefined && value !== null && value !== '') {
           if (typeof value === 'string' && value.includes('%')) {
@@ -75,7 +81,7 @@ export const useCRUD = <T extends { id: string }>({
     } finally {
       setLoading(false);
     }
-  }, [table, select, orderBy, filters, pageSize]);
+  }, [table, select, stableOrderBy, stableFilters, pageSize]);
 
   // Create item
   const create = useCallback(async (item: Omit<T, 'id' | 'created_at' | 'updated_at'>): Promise<T> => {
@@ -179,7 +185,7 @@ export const useCRUD = <T extends { id: string }>({
 
     const subscription = supabase
       .channel(`${table}_changes`)
-      .on('postgres_changes', 
+      .on('postgres_changes',
         { event: '*', schema: 'public', table },
         () => {
           refresh();

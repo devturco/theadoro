@@ -2,29 +2,31 @@ import { ReactNode } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { 
-  Sidebar, 
-  SidebarContent, 
-  SidebarGroup, 
-  SidebarGroupContent, 
-  SidebarGroupLabel, 
-  SidebarMenu, 
-  SidebarMenuButton, 
-  SidebarMenuItem, 
-  SidebarProvider, 
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
   SidebarTrigger,
   SidebarHeader,
   SidebarFooter
 } from '@/components/ui/sidebar';
-import { 
-  LayoutDashboard, 
-  Users, 
-  Package, 
-  FolderTree, 
-  ShoppingCart, 
-  BarChart3, 
+import {
+  LayoutDashboard,
+  Users,
+  Package,
+  FolderTree,
+  ShoppingCart,
+  BarChart3,
   LogOut,
-  Gift
+  Gift,
+  LayoutTemplate,
+  Settings
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -62,6 +64,16 @@ const adminMenuItems = [
     url: '/admin/reports',
     icon: BarChart3,
   },
+  {
+    title: 'Conteúdo',
+    url: '/admin/content',
+    icon: LayoutTemplate,
+  },
+  {
+    title: 'Gerais',
+    url: '/admin/settings',
+    icon: Settings,
+  },
 ];
 
 export const AdminLayout = ({ children }: AdminLayoutProps) => {
@@ -82,15 +94,15 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
         <Sidebar>
           <SidebarHeader className="border-b border-sidebar-border p-4">
             <div className="flex items-center gap-2">
-              <img 
-                src="/icon.png" 
-                alt="THEADORO" 
+              <img
+                src="/icon.png"
+                alt="THEADORO"
                 className="h-6 w-6"
               />
               <span className="font-bold text-lg">THEADORO Admin</span>
             </div>
           </SidebarHeader>
-          
+
           <SidebarContent>
             <SidebarGroup>
               <SidebarGroupLabel>Administração</SidebarGroupLabel>
@@ -98,8 +110,8 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
                 <SidebarMenu>
                   {adminMenuItems.map((item) => (
                     <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton 
-                        asChild 
+                      <SidebarMenuButton
+                        asChild
                         isActive={location.pathname === item.url}
                       >
                         <Link to={item.url}>
@@ -119,9 +131,9 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
               <div className="text-sm text-muted-foreground">
                 {profile?.full_name || 'Admin'}
               </div>
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={handleSignOut}
                 className="w-full justify-start"
               >
@@ -139,7 +151,7 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
               <h1 className="text-xl font-semibold">Painel Administrativo</h1>
             </div>
           </header>
-          
+
           <div className="flex-1 p-6">
             {children || <Outlet />}
           </div>

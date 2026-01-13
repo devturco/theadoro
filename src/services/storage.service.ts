@@ -26,8 +26,23 @@ class StorageService {
     PRODUCTS: 'products',
     AVATARS: 'avatars',
     CATEGORIES: 'categories',
-    DOCUMENTS: 'documents'
+    DOCUMENTS: 'documents',
+    CMS: 'cms'
   } as const;
+
+  /**
+   * Upload CMS image
+   */
+  async uploadCMSImage(file: File): Promise<UploadResult> {
+    const path = this.generateFilePath('hero', file.name);
+
+    return this.uploadFile({
+      bucket: this.buckets.CMS,
+      path,
+      file,
+      upsert: true
+    });
+  }
 
   /**
    * Upload a file to Supabase Storage
@@ -169,8 +184,8 @@ class StorageService {
    * Get signed URL for private files
    */
   async getSignedUrl(
-    bucket: string, 
-    path: string, 
+    bucket: string,
+    path: string,
     expiresIn: number = 3600
   ): Promise<{ data: { signedUrl: string } | null; error: Error | null }> {
     try {
@@ -287,7 +302,7 @@ class StorageService {
     const randomString = Math.random().toString(36).substring(2, 8);
     const extension = fileName.split('.').pop();
     const nameWithoutExtension = fileName.replace(/\.[^/.]+$/, '');
-    
+
     const sanitizedName = nameWithoutExtension
       .toLowerCase()
       .replace(/[^a-z0-9]/g, '-')
@@ -295,11 +310,11 @@ class StorageService {
       .replace(/^-|-$/g, '');
 
     const uniqueName = `${sanitizedName}-${timestamp}-${randomString}.${extension}`;
-    
+
     if (userId) {
       return `${folder}/${userId}/${uniqueName}`;
     }
-    
+
     return `${folder}/${uniqueName}`;
   }
 
@@ -312,7 +327,7 @@ class StorageService {
     sellerId: string
   ): Promise<UploadResult> {
     const path = this.generateFilePath('products', file.name, sellerId);
-    
+
     return this.uploadFile({
       bucket: this.buckets.PRODUCTS,
       path,
@@ -340,7 +355,7 @@ class StorageService {
    */
   async uploadAvatar(file: File, userId: string): Promise<UploadResult> {
     const path = this.generateFilePath('avatars', file.name, userId);
-    
+
     return this.uploadFile({
       bucket: this.buckets.AVATARS,
       path,
@@ -354,7 +369,7 @@ class StorageService {
    */
   async uploadCategoryImage(file: File, categoryId: string): Promise<UploadResult> {
     const path = this.generateFilePath('categories', file.name);
-    
+
     return this.uploadFile({
       bucket: this.buckets.CATEGORIES,
       path,
@@ -371,7 +386,7 @@ class StorageService {
     documentType: string
   ): Promise<UploadResult> {
     const path = this.generateFilePath(`documents/${documentType}`, file.name, userId);
-    
+
     return this.uploadFile({
       bucket: this.buckets.DOCUMENTS,
       path,
@@ -387,11 +402,11 @@ class StorageService {
       const urlObj = new URL(url);
       const pathParts = urlObj.pathname.split('/');
       const bucketIndex = pathParts.findIndex(part => part === bucket);
-      
+
       if (bucketIndex !== -1 && bucketIndex < pathParts.length - 1) {
         return pathParts.slice(bucketIndex + 1).join('/');
       }
-      
+
       return null;
     } catch (error) {
       console.error('Error extracting path from URL:', error);
@@ -419,7 +434,7 @@ class StorageService {
    */
   async deleteAvatar(avatarUrl: string): Promise<DeleteResult> {
     const path = this.extractPathFromUrl(avatarUrl, this.buckets.AVATARS);
-    
+
     if (!path) {
       return { error: new Error('Invalid avatar URL') };
     }

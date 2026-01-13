@@ -19,11 +19,11 @@ import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRole } from '@/hooks/useRole';
 import { useCRUD } from '@/hooks/useCRUD';
-import { 
-  FolderOpen, 
-  Plus, 
-  Edit, 
-  Trash2, 
+import {
+  FolderOpen,
+  Plus,
+  Edit,
+  Trash2,
   ToggleLeft,
   ToggleRight
 } from 'lucide-react';
@@ -32,6 +32,7 @@ import { Category } from '@/types/product';
 
 interface CategoryFormData {
   name: string;
+  slug: string;
   description: string;
   is_active: boolean;
 }
@@ -43,6 +44,7 @@ const AdminCategories = () => {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [formData, setFormData] = useState<CategoryFormData>({
     name: '',
+    slug: '',
     description: '',
     is_active: true
   });
@@ -63,18 +65,37 @@ const AdminCategories = () => {
     }
   }, [isAdmin]);
 
+  /* Helper to generate slug */
+  const generateSlug = (text: string) => {
+    return text
+      .toString()
+      .toLowerCase()
+      .normalize('NFD') // Separate accents
+      .replace(/[\u0300-\u036f]/g, '') // Remove accents
+      .replace(/\s+/g, '-') // Replace spaces with -
+      .replace(/[^\w\-]+/g, '') // Remove all non-word chars
+      .replace(/\-\-+/g, '-') // Replace multiple - with single -
+      .replace(/^-+/, '') // Trim - from start
+      .replace(/-+$/, ''); // Trim - from end
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
+      const payload = {
+        ...formData,
+        slug: formData.slug || generateSlug(formData.name)
+      };
+
       if (editingCategory) {
-        await updateItem(editingCategory.id, formData);
+        await updateItem(editingCategory.id, payload);
         toast.success('Categoria atualizada com sucesso!');
       } else {
-        await createItem(formData);
+        await createItem(payload);
         toast.success('Categoria criada com sucesso!');
       }
-      
+
       setIsDialogOpen(false);
       resetForm();
       refetch();
@@ -89,14 +110,15 @@ const AdminCategories = () => {
     setFormData({
       name: category.name,
       description: category.description || '',
-      is_active: category.is_active
+      is_active: category.is_active,
+      slug: category.slug || ''
     });
     setIsDialogOpen(true);
   };
 
   const handleDelete = async (categoryId: string) => {
     if (!confirm('Tem certeza que deseja excluir esta categoria? Todos os produtos associados serão afetados.')) return;
-    
+
     try {
       await deleteItem(categoryId);
       toast.success('Categoria excluída com sucesso!');
@@ -123,6 +145,7 @@ const AdminCategories = () => {
   const resetForm = () => {
     setFormData({
       name: '',
+      slug: '',
       description: '',
       is_active: true
     });
@@ -213,7 +236,7 @@ const AdminCategories = () => {
             Organize produtos em categorias para facilitar a navegação
           </p>
         </div>
-        
+
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button onClick={resetForm}>
@@ -227,7 +250,7 @@ const AdminCategories = () => {
                 {editingCategory ? 'Editar Categoria' : 'Nova Categoria'}
               </DialogTitle>
               <DialogDescription>
-                {editingCategory 
+                {editingCategory
                   ? 'Edite as informações da categoria abaixo.'
                   : 'Preencha as informações para criar uma nova categoria.'
                 }
@@ -245,7 +268,18 @@ const AdminCategories = () => {
                     required
                   />
                 </div>
-                
+
+                <div className="grid gap-2">
+                  <Label htmlFor="slug">Slug (URL amigável)</Label>
+                  <Input
+                    id="slug"
+                    value={formData.slug}
+                    onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                    placeholder="ex: presentes-criativos"
+                  />
+                  <p className="text-xs text-muted-foreground">Deixe em branco para gerar automaticamente</p>
+                </div>
+
                 <div className="grid gap-2">
                   <Label htmlFor="description">Descrição</Label>
                   <Textarea
@@ -289,7 +323,7 @@ const AdminCategories = () => {
             <div className="text-2xl font-bold">{categories?.length || 0}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Categorias Ativas</CardTitle>
@@ -301,7 +335,7 @@ const AdminCategories = () => {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Categorias Inativas</CardTitle>

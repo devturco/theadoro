@@ -4,6 +4,10 @@ import { toast } from 'sonner';
 import { useCRUD } from './useCRUD';
 import type { Order, OrderStatus, OrderItem } from '@/types/order';
 
+// Static, stable references to prevent infinite loops in useCRUD
+const ORDER_BY = { column: 'created_at', ascending: false };
+const NO_FILTERS = {};
+
 export const useOrders = () => {
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
@@ -34,7 +38,8 @@ export const useOrders = () => {
         product:products(id, name, images, price)
       )
     `,
-    orderBy: { column: 'created_at', ascending: false },
+    orderBy: ORDER_BY,
+    filters: NO_FILTERS,
     realtime: true,
     pageSize: 10
   });
@@ -53,9 +58,9 @@ export const useOrders = () => {
   }): Promise<Order> => {
     try {
       const { items, ...orderInfo } = orderData;
-      
+
       // Calculate total
-      const total_amount = items.reduce((sum, item) => 
+      const total_amount = items.reduce((sum, item) =>
         sum + (item.quantity * item.unit_price), 0
       );
 
@@ -77,7 +82,7 @@ export const useOrders = () => {
 
       const { error: itemsError } = await supabase
         .from('order_items')
-        .insert(orderItemsData);
+        .insert(orderItemsData as any);
 
       if (itemsError) throw itemsError;
 
@@ -90,7 +95,7 @@ export const useOrders = () => {
 
   // Update order status
   const updateOrderStatus = useCallback(async (
-    orderId: string, 
+    orderId: string,
     status: OrderStatus,
     notes?: string
   ): Promise<void> => {
@@ -99,7 +104,7 @@ export const useOrders = () => {
       if (notes) updateData.notes = notes;
 
       await update(orderId, updateData);
-      
+
       const statusMessages = {
         pending: 'Pedido marcado como pendente',
         confirmed: 'Pedido confirmado',
@@ -238,7 +243,7 @@ export const useOrders = () => {
 
   // Search orders
   const searchOrders = useCallback((query: string) => {
-    search({ 
+    search({
       id: `%${query}%`
     });
   }, [search]);
