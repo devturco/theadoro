@@ -22,6 +22,14 @@ export const RoleGuard = ({
 }: RoleGuardProps) => {
   const { user, roles, loading } = useAuth();
 
+  console.log('RoleGuard Check:', {
+    path: window.location.pathname,
+    user: user?.email,
+    roles,
+    allowedRoles,
+    hasAccess: allowedRoles.some(role => roles.includes(role))
+  });
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
