@@ -27,11 +27,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRole } from '@/hooks/useRole';
 import { useProducts } from '@/hooks/useProducts';
 import { useCRUD } from '@/hooks/useCRUD';
-import { 
-  Package, 
-  Plus, 
-  Edit, 
-  Trash2, 
+import {
+  Package,
+  Plus,
+  Edit,
+  Trash2,
   Eye,
   ToggleLeft,
   ToggleRight,
@@ -77,7 +77,7 @@ const AdminProducts = () => {
     refetch
   } = useProducts();
 
-  const { data: categories } = useCRUD('categories');
+  const { data: categories } = useCRUD({ table: 'categories' });
 
   useEffect(() => {
     if (!isAdmin) {
@@ -88,7 +88,7 @@ const AdminProducts = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       if (editingProduct) {
         await updateProduct(editingProduct.id, formData);
@@ -100,7 +100,7 @@ const AdminProducts = () => {
         });
         toast.success('Produto criado com sucesso!');
       }
-      
+
       setIsDialogOpen(false);
       resetForm();
       refetch();
@@ -127,7 +127,7 @@ const AdminProducts = () => {
 
   const handleDelete = async (productId: string) => {
     if (!confirm('Tem certeza que deseja excluir este produto?')) return;
-    
+
     try {
       await deleteProduct(productId);
       toast.success('Produto excluído com sucesso!');
@@ -179,9 +179,9 @@ const AdminProducts = () => {
       render: (images: string[]) => (
         <div className="w-12 h-12 rounded-md overflow-hidden bg-muted">
           {images?.[0] ? (
-            <img 
-              src={images[0]} 
-              alt="Produto" 
+            <img
+              src={images[0]}
+              alt="Produto"
               className="w-full h-full object-cover"
             />
           ) : (
@@ -296,7 +296,7 @@ const AdminProducts = () => {
             Gerencie todos os produtos da plataforma
           </p>
         </div>
-        
+
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button onClick={resetForm}>
@@ -310,7 +310,7 @@ const AdminProducts = () => {
                 {editingProduct ? 'Editar Produto' : 'Novo Produto'}
               </DialogTitle>
               <DialogDescription>
-                {editingProduct 
+                {editingProduct
                   ? 'Edite as informações do produto abaixo.'
                   : 'Preencha as informações para criar um novo produto.'
                 }
@@ -327,7 +327,7 @@ const AdminProducts = () => {
                     required
                   />
                 </div>
-                
+
                 <div className="grid gap-2">
                   <Label htmlFor="description">Descrição</Label>
                   <Textarea
@@ -351,7 +351,7 @@ const AdminProducts = () => {
                       required
                     />
                   </div>
-                  
+
                   <div className="grid gap-2">
                     <Label htmlFor="stock">Estoque</Label>
                     <Input
@@ -383,7 +383,7 @@ const AdminProducts = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  
+
                   <div className="grid gap-2">
                     <Label htmlFor="type">Tipo</Label>
                     <Select
@@ -414,8 +414,8 @@ const AdminProducts = () => {
                     <div className="grid grid-cols-3 gap-2 mt-2">
                       {formData.images.map((url, index) => (
                         <div key={index} className="relative">
-                          <img 
-                            src={url} 
+                          <img
+                            src={url}
                             alt={`Produto ${index + 1}`}
                             className="w-full h-20 object-cover rounded-md"
                           />

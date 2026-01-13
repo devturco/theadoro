@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Link } from "react-router-dom";
 import { Star, MapPin, Award } from "lucide-react";
 
 const sellers = [
@@ -115,8 +116,10 @@ const FeaturedSellers = () => {
 
                   {/* Actions */}
                   <div className="flex gap-2 pt-2">
-                    <Button variant="wine" className="flex-1">
-                      Visitar Loja
+                    <Button variant="wine" className="flex-1" asChild>
+                      <Link to={`/sellers/${seller.id}`}>
+                        Visitar Loja
+                      </Link>
                     </Button>
                     <Button variant="outline" className="flex-1">
                       Ver Produtos

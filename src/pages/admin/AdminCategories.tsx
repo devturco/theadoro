@@ -34,6 +34,7 @@ interface CategoryFormData {
   name: string;
   slug: string;
   description: string;
+  image_url: string;
   is_active: boolean;
 }
 
@@ -46,6 +47,7 @@ const AdminCategories = () => {
     name: '',
     slug: '',
     description: '',
+    image_url: '',
     is_active: true
   });
 
@@ -56,7 +58,7 @@ const AdminCategories = () => {
     updateItem,
     deleteItem,
     refetch
-  } = useCRUD('categories');
+  } = useCRUD({ table: 'categories' });
 
   useEffect(() => {
     if (!isAdmin) {
@@ -147,6 +149,7 @@ const AdminCategories = () => {
       name: '',
       slug: '',
       description: '',
+      image_url: '',
       is_active: true
     });
     setEditingCategory(null);
@@ -278,6 +281,16 @@ const AdminCategories = () => {
                     placeholder="ex: presentes-criativos"
                   />
                   <p className="text-xs text-muted-foreground">Deixe em branco para gerar automaticamente</p>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="image_url">URL da Imagem</Label>
+                  <Input
+                    id="image_url"
+                    value={formData.image_url}
+                    onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+                    placeholder="https://..."
+                  />
                 </div>
 
                 <div className="grid gap-2">

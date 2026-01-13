@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ShoppingBag, ArrowLeft, Trash2, Heart, Plus, Minus } from 'lucide-react';
+import { ShoppingBag, ArrowLeft, Trash2, Heart, Plus, Minus, Truck, MapPin } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
 import { useWishlist } from '@/hooks/useWishlist';
+import { useShipping } from '@/hooks/useShipping';
 import { CartItem } from '@/components/CartItem';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -12,19 +14,35 @@ import { cn } from '@/lib/utils';
 
 export const Cart: React.FC = () => {
   const navigate = useNavigate();
-  const { 
-    cart, 
-    loading, 
-    updateQuantity, 
-    removeFromCart, 
+  const {
+    cart,
+    updateQuantity,
+    removeFromCart,
     clearCart,
-    getCartSummary 
   } = useCart();
-  
+
   const [isClearing, setIsClearing] = useState(false);
   const [processingItems, setProcessingItems] = useState<Set<string>>(new Set());
 
-  const summary = getCartSummary();
+  // Shipping Logic
+  const [cep, setCep] = useState('');
+  const { calculateShipping, options: shippingOptions, loading: loadingShipping } = useShipping();
+
+  const handleCalculateShipping = () => {
+    if (cep.length < 9) return;
+
+    // Create shipping items from cart items
+    const shippingItems = cart.items.map(item => ({
+      weight: 1, // Default 1kg for now, ideally comes from product
+      width: 20,
+      height: 20,
+      length: 20,
+      quantity: item.quantity,
+      price: item.product.price
+    }));
+
+    calculateShipping(cep, shippingItems);
+  };
 
   const handleClearCart = async () => {
     if (window.confirm('Tem certeza que deseja remover todos os itens do carrinho?')) {
@@ -51,26 +69,14 @@ export const Cart: React.FC = () => {
     }).format(price);
   };
 
-  const hasUnavailableItems = cart.items.some(item => 
-    item.product.stock === 0 || 
-    (item.variant && item.variant.stock === 0)
+  const hasUnavailableItems = cart.items.some(item =>
+    (item.product.stock_quantity || 0) === 0
   );
 
   const hasLowStockItems = cart.items.some(item => {
-    const stock = item.variant?.stock ?? item.product.stock;
+    const stock = item.product.stock_quantity || 0;
     return stock > 0 && stock <= 5;
   });
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Carregando carrinho...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -86,15 +92,15 @@ export const Cart: React.FC = () => {
               >
                 <ArrowLeft className="h-5 w-5" />
               </Button>
-              
+
               <div>
                 <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
                   <ShoppingBag className="h-6 w-6" />
                   Carrinho de Compras
                 </h1>
                 <p className="text-sm text-gray-600 mt-1">
-                  {cart.items.length === 0 
-                    ? 'Seu carrinho está vazio' 
+                  {cart.items.length === 0
+                    ? 'Seu carrinho está vazio'
                     : `${cart.items.length} ${cart.items.length === 1 ? 'item' : 'itens'} no carrinho`
                   }
                 </p>
@@ -156,7 +162,7 @@ export const Cart: React.FC = () => {
                   <h2 className="text-lg font-semibold text-gray-900">
                     Itens no Carrinho ({cart.items.length})
                   </h2>
-                  
+
                   <Button
                     variant="ghost"
                     size="sm"
@@ -210,10 +216,10 @@ export const Cart: React.FC = () => {
                   <div className="space-y-3">
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">
-                        Subtotal ({summary.itemCount} {summary.itemCount === 1 ? 'item' : 'itens'})
+                        Subtotal ({cart.items.length} {cart.items.length === 1 ? 'item' : 'itens'})
                       </span>
                       <span className="font-medium text-gray-900">
-                        {formatPrice(summary.subtotal)}
+                        {formatPrice(cart.subtotal)}
                       </span>
                     </div>
 
@@ -221,42 +227,91 @@ export const Cart: React.FC = () => {
                       <span className="text-gray-600">Frete</span>
                       <span className={cn(
                         'font-medium',
-                        summary.shipping === 0 ? 'text-green-600' : 'text-gray-900'
+                        cart.shipping === 0 ? 'text-green-600' : 'text-gray-900'
                       )}>
-                        {summary.shipping === 0 ? 'Grátis' : formatPrice(summary.shipping)}
+                        {cart.shipping === 0 ? 'Grátis' : formatPrice(cart.shipping)}
                       </span>
                     </div>
 
-                    {summary.tax > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Impostos</span>
-                        <span className="font-medium text-gray-900">
-                          {formatPrice(summary.tax)}
-                        </span>
-                      </div>
-                    )}
-
-                    {summary.discount > 0 && (
+                    {cart.discount > 0 && (
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-600">Desconto</span>
                         <span className="font-medium text-green-600">
-                          -{formatPrice(summary.discount)}
+                          -{formatPrice(cart.discount)}
                         </span>
                       </div>
                     )}
 
                     <Separator />
 
+                    {/* Shipping Calculator */}
+                    <div className="border-t border-gray-200 pt-4 pb-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Truck className="h-4 w-4 text-gray-600" />
+                        <span className="font-medium text-sm text-gray-900">Estimar Frete</span>
+                      </div>
+
+                      <div className="flex gap-2 mb-3">
+                        <Input
+                          placeholder="CEP"
+                          value={cep}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, '').slice(0, 8);
+                            setCep(val.replace(/(\d{5})(\d)/, '$1-$2'));
+                          }}
+                          maxLength={9}
+                          className="h-9 bg-white"
+                        />
+                        <Button
+                          onClick={handleCalculateShipping}
+                          disabled={loadingShipping || cep.length < 9}
+                          variant="secondary"
+                          size="sm"
+                        >
+                          {loadingShipping ? '...' : 'OK'}
+                        </Button>
+                      </div>
+
+                      {shippingOptions.length > 0 && (
+                        <div className="space-y-2">
+                          {shippingOptions.map((option) => (
+                            <div key={option.id} className="flex justify-between items-center text-sm p-2 bg-gray-50 rounded border border-gray-100">
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-medium text-gray-700">{option.name}</span>
+                                  {option.deliveryTime === 0 && (
+                                    <Badge className="bg-green-600 hover:bg-green-700 text-[10px] px-1 h-4">
+                                      ⚡ FULL
+                                    </Badge>
+                                  )}
+                                </div>
+                                <span className="text-xs text-gray-500">
+                                  {option.deliveryTime === 0 ? 'Chega hoje!' : `${option.deliveryTime} dias úteis`}
+                                </span>
+                              </div>
+                              <span className={cn("font-medium", option.price === 0 ? "text-green-600" : "text-gray-900")}>
+                                {option.price === 0 ? 'Grátis' : formatPrice(option.price)}
+                              </span>
+                            </div>
+                          ))}
+                          <div className="flex items-center text-[10px] text-blue-600 mt-1 pl-1">
+                            <MapPin className="h-3 w-3 mr-1" />
+                            Rastreamento em tempo real disponível
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
                     <div className="flex justify-between">
                       <span className="text-lg font-semibold text-gray-900">Total</span>
                       <span className="text-lg font-bold text-gray-900">
-                        {formatPrice(summary.total)}
+                        {formatPrice(cart.total)}
                       </span>
                     </div>
                   </div>
 
                   {/* Shipping Info */}
-                  {summary.shipping === 0 && (
+                  {cart.shipping === 0 && (
                     <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                       <p className="text-sm text-green-800 font-medium">
                         🎉 Você ganhou frete grátis!
@@ -286,7 +341,7 @@ export const Cart: React.FC = () => {
                       <span>🔒</span>
                       <span>Compra 100% segura e protegida</span>
                     </div>
-                    
+
                     <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
                       <span>↩️</span>
                       <span>7 dias para devolução</span>
@@ -311,7 +366,7 @@ export const Cart: React.FC = () => {
                   <h4 className="font-medium text-gray-900 mb-4">
                     Você também pode gostar
                   </h4>
-                  
+
                   <div className="space-y-3">
                     {/* This would be populated with recommended products */}
                     <div className="text-center text-sm text-gray-500 py-4">

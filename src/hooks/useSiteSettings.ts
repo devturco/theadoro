@@ -40,7 +40,7 @@ export const useSiteSettings = (section?: string) => {
         }
     }, [section]);
 
-    const updateSetting = async (id: string, value: any) => {
+    const updateSetting = async (id: string, value: any, options: { showToast?: boolean } = { showToast: true }) => {
         try {
             const { error } = await supabase
                 .from('site_settings')
@@ -54,10 +54,15 @@ export const useSiteSettings = (section?: string) => {
                     item.id === id ? { ...item, value } : item
                 )
             );
-            toast.success('Configuração atualizada com sucesso!');
+
+            if (options.showToast) {
+                toast.success('Configuração atualizada com sucesso!');
+            }
         } catch (error) {
             console.error('Error updating setting:', error);
-            toast.error('Erro ao atualizar configuração');
+            if (options.showToast) {
+                toast.error('Erro ao atualizar configuração');
+            }
             throw error;
         }
     };

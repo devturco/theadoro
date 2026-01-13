@@ -18,7 +18,7 @@ export const useProduct = (productId: string | undefined) => {
     setError(null);
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('products')
         .select(`
           *,
@@ -32,12 +32,20 @@ export const useProduct = (productId: string | undefined) => {
           profiles (
             id,
             full_name,
-            avatar_url,
-            location
+            avatar_url
           )
-        `)
-        .eq('id', productId)
-        .single();
+        `);
+
+      // Check if productId is a valid UUID
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(productId);
+
+      if (isUUID) {
+        query = query.eq('id', productId);
+      } else {
+        query = query.eq('slug', productId);
+      }
+
+      const { data, error } = await query.single();
 
       if (error) throw error;
 
@@ -117,8 +125,7 @@ export const useProduct = (productId: string | undefined) => {
           profiles (
             id,
             full_name,
-            avatar_url,
-            location
+            avatar_url
           )
         `)
         .eq('category_id', categoryId)
@@ -214,7 +221,7 @@ export const useProduct = (productId: string | undefined) => {
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       if (!user) {
         toast({
           title: "Login necessário",
@@ -243,7 +250,7 @@ export const useProduct = (productId: string | undefined) => {
 
       // Refresh reviews
       fetchReviews();
-      
+
       // Refresh product to update rating
       fetchProduct();
 
@@ -266,8 +273,8 @@ export const useProduct = (productId: string | undefined) => {
       if (error) throw error;
 
       // Update local state
-      setReviews(prev => prev.map(review => 
-        review.id === reviewId 
+      setReviews(prev => prev.map(review =>
+        review.id === reviewId
           ? { ...review, helpful: review.helpful + 1 }
           : review
       ));

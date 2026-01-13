@@ -1,56 +1,60 @@
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Heart, ShoppingBag, Star } from "lucide-react";
 
-// Mock data - would come from API in real app
-const products = [
-  {
-    id: 1,
-    name: "Bouquet Premium de Rosas",
-    price: 249.90,
-    originalPrice: 299.90,
-    image: "/placeholder.svg",
-    seller: "Flores da Vila",
-    rating: 4.9,
-    reviews: 127,
-    badge: "Mais Vendido",
-  },
-  {
-    id: 2,
-    name: "Kit Spa Premium para Presente",
-    price: 189.90,
-    image: "/placeholder.svg",
-    seller: "Essence & Beauty",
-    rating: 5.0,
-    reviews: 89,
-    badge: "Destaque",
-  },
-  {
-    id: 3,
-    name: "Bolsa de Couro Artesanal",
-    price: 549.90,
-    image: "/placeholder.svg",
-    seller: "Atelier Elegance",
-    rating: 4.8,
-    reviews: 64,
-    badge: "Novo",
-  },
-  {
-    id: 4,
-    name: "Jantar Romântico a Dois",
-    price: 399.90,
-    image: "/placeholder.svg",
-    seller: "Momentos Especiais",
-    rating: 4.9,
-    reviews: 156,
-    badge: "Experiência",
-  },
-];
+import { useEffect, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Product } from '@/types/product';
+// ... imports
 
 const FeaturedProducts = () => {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadFeatured = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('products')
+          .select('*, seller:profiles(full_name)')
+          .limit(4);
+
+        if (error) throw error;
+
+        setProducts((data || []).map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          price: p.price,
+          originalPrice: p.original_price,
+          image: p.image_url || 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?q=80&w=2000',
+          seller: p.seller?.full_name || 'Vendedor',
+          rating: 5.0, // placeholder
+          reviews: 0,
+          badge: p.is_promotion ? 'Oferta' : undefined,
+          description: p.description,
+          images: p.images || [],
+          reviewCount: 0,
+          sellerId: p.seller_id,
+          sellerName: p.seller?.full_name || 'Vendedor',
+          categoryId: p.category_id,
+        })));
+      } catch (error) {
+        console.error('Error loading featured products:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadFeatured();
+  }, []);
+
+  if (isLoading) return <div className="py-20 text-center">Carregando destaques...</div>;
+
   return (
     <section className="py-20 bg-cream">
       <div className="container mx-auto px-4">
+        {/* ... keeping header ... */}
         <div className="flex justify-between items-center mb-12">
           <div className="animate-fade-in">
             <h2 className="text-4xl font-serif font-bold text-foreground mb-4">
@@ -60,16 +64,17 @@ const FeaturedProducts = () => {
               Selecionados especialmente para você
             </p>
           </div>
-          <Button variant="outline" className="hidden md:flex">
-            Ver Todos os Produtos
+          <Button variant="outline" className="hidden md:flex" asChild>
+            <Link to="/products">Ver Todos os Produtos</Link>
           </Button>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {products.map((product, index) => (
-            <div
+            <Link
+              to={`/products/${product.id}`}
               key={product.id}
-              className="group bg-card rounded-2xl overflow-hidden shadow-md hover:shadow-wine transition-all duration-300 animate-fade-in hover-scale"
+              className="group bg-card rounded-2xl overflow-hidden shadow-md hover:shadow-wine transition-all duration-300 animate-fade-in hover-scale block"
               style={{ animationDelay: `${index * 100}ms` }}
             >
               {/* Image */}
@@ -88,6 +93,10 @@ const FeaturedProducts = () => {
                   size="icon"
                   variant="ghost"
                   className="absolute top-3 right-3 bg-white/90 hover:bg-white"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    // Add wishlist logic here
+                  }}
                 >
                   <Heart className="h-4 w-4" />
                 </Button>
@@ -96,7 +105,7 @@ const FeaturedProducts = () => {
               {/* Content */}
               <div className="p-5 space-y-3">
                 {/* Seller */}
-                <p className="text-xs text-muted-foreground">{product.seller}</p>
+                <p className="text-xs text-muted-foreground">{product.sellerName}</p>
 
                 {/* Title */}
                 <h3 className="font-semibold text-foreground line-clamp-2 group-hover:text-primary transition-colors">
@@ -123,20 +132,22 @@ const FeaturedProducts = () => {
                 </div>
 
                 {/* Actions */}
-                <Button variant="wine" className="w-full group-hover:shadow-wine">
+                <Button
+                  variant="wine"
+                  className="w-full group-hover:shadow-wine"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    // Add to cart logic here if needed
+                  }}
+                >
                   <ShoppingBag className="mr-2 h-4 w-4" />
                   Adicionar ao Carrinho
                 </Button>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
-
-        <div className="text-center mt-12 md:hidden">
-          <Button variant="outline" className="w-full sm:w-auto">
-            Ver Todos os Produtos
-          </Button>
-        </div>
+        {/* ... footer button ... */}
       </div>
     </section>
   );

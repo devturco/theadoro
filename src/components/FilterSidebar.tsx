@@ -99,7 +99,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     const newTags = currentTags.includes(tag)
       ? currentTags.filter(t => t !== tag)
       : [...currentTags, tag];
-    
+
     onFiltersChange({ tags: newTags.length > 0 ? newTags : undefined });
   };
 
@@ -123,7 +123,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
 
   const sidebarClasses = cn(
     'bg-white border-r border-gray-200 h-full overflow-y-auto',
-    'w-80 flex-shrink-0',
+    'w-full flex-shrink-0',
     className
   );
 
@@ -147,7 +147,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
             </Button>
           )}
         </div>
-        
+
         {getActiveFiltersCount() > 0 && (
           <Button
             variant="outline"
@@ -174,7 +174,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
               <ChevronDown className="h-4 w-4 text-gray-500" />
             )}
           </button>
-          
+
           {expandedSections.categories && (
             <div className="mt-3 space-y-2 max-h-48 overflow-y-auto">
               {categories.map((category) => (
@@ -213,7 +213,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
               <ChevronDown className="h-4 w-4 text-gray-500" />
             )}
           </button>
-          
+
           {expandedSections.price && (
             <div className="mt-3 space-y-4">
               <Slider
@@ -247,7 +247,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
               <ChevronDown className="h-4 w-4 text-gray-500" />
             )}
           </button>
-          
+
           {expandedSections.rating && (
             <div className="mt-3 space-y-2">
               {[5, 4, 3, 2, 1].map((rating) => (
@@ -297,7 +297,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
               <ChevronDown className="h-4 w-4 text-gray-500" />
             )}
           </button>
-          
+
           {expandedSections.availability && (
             <div className="mt-3 space-y-2">
               <div className="flex items-center space-x-2">
@@ -331,7 +331,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
               <ChevronDown className="h-4 w-4 text-gray-500" />
             )}
           </button>
-          
+
           {expandedSections.type && (
             <div className="mt-3 space-y-2">
               <div className="flex items-center space-x-2">
@@ -377,7 +377,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
               <ChevronDown className="h-4 w-4 text-gray-500" />
             )}
           </button>
-          
+
           {expandedSections.tags && (
             <div className="mt-3">
               <div className="flex flex-wrap gap-2">

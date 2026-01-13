@@ -1,41 +1,49 @@
 import { Link } from "react-router-dom";
-import flowersImg from "@/assets/category-flowers.jpg";
-import fashionImg from "@/assets/category-fashion.jpg";
-import beautyImg from "@/assets/category-beauty.jpg";
-import experiencesImg from "@/assets/category-experiences.jpg";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
-const categories = [
-  {
-    id: 1,
-    name: "Flores & Cestas",
-    image: flowersImg,
-    link: "/flores",
-    description: "Bouquets e arranjos especiais"
-  },
-  {
-    id: 2,
-    name: "Moda Premium",
-    image: fashionImg,
-    link: "/moda",
-    description: "Acessórios e peças exclusivas"
-  },
-  {
-    id: 3,
-    name: "Beleza & Bem-estar",
-    image: beautyImg,
-    link: "/beleza",
-    description: "Produtos e tratamentos de luxo"
-  },
-  {
-    id: 4,
-    name: "Experiências",
-    image: experiencesImg,
-    link: "/experiencias",
-    description: "Momentos inesquecíveis"
-  },
-];
+interface Category {
+  id: string;
+  name: string;
+  image: string;
+  slug: string;
+  description?: string;
+}
 
 const Categories = () => {
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('categories')
+          .select('*')
+          .eq('is_active', true)
+          .limit(4)
+          .order('name');
+
+        if (error) throw error;
+
+        setCategories((data || []).map((cat: any) => ({
+          id: cat.id,
+          name: cat.name,
+          slug: cat.slug || '',
+          image: cat.image_url || 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?q=80&w=2000',
+          description: cat.description
+        })));
+      } catch (error) {
+        console.error('Error loading home categories:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadCategories();
+  }, []);
+
+  if (isLoading) return <div className="py-20 text-center">Carregando categorias...</div>;
   return (
     <section className="py-20 bg-background">
       <div className="container mx-auto px-4">
@@ -52,19 +60,19 @@ const Categories = () => {
           {categories.map((category, index) => (
             <Link
               key={category.id}
-              to={category.link}
+              to={`/categories/${category.slug}`}
               className="group relative overflow-hidden rounded-2xl aspect-square shadow-md hover:shadow-wine transition-all duration-500 animate-fade-in"
               style={{ animationDelay: `${index * 100}ms` }}
             >
               {/* Image */}
-              <div 
+              <div
                 className="absolute inset-0 bg-cover bg-center transform group-hover:scale-110 transition-transform duration-700"
                 style={{ backgroundImage: `url(${category.image})` }}
               />
-              
+
               {/* Overlay */}
               <div className="absolute inset-0 bg-gradient-to-t from-graphite/90 via-graphite/40 to-transparent" />
-              
+
               {/* Content */}
               <div className="absolute inset-0 p-6 flex flex-col justify-end">
                 <h3 className="text-2xl font-serif font-bold text-white mb-2 transform group-hover:translate-y-[-4px] transition-transform duration-300">

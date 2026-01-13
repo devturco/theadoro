@@ -10,7 +10,7 @@ interface UseProductsOptions {
 
 export const useProducts = (options: UseProductsOptions = {}) => {
   const { initialFilters = {}, autoFetch = true } = options;
-  
+
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,22 +34,42 @@ export const useProducts = (options: UseProductsOptions = {}) => {
         .from('products')
         .select(`
           *,
-          categories (
+          category:categories!fk_products_categories (
             id,
             name,
             slug,
             description,
-            image
+            image_url
           ),
-          profiles (
+          seller:profiles!fk_products_profiles (
             id,
             full_name,
             avatar_url,
-            location
+            city,
+            state
           )
         `, { count: 'exact' });
 
       // Apply filters
+      if (currentFilters.category) {
+        query = query.eq('category_id', currentFilters.category);
+      }
+
+      // ... (keep middle unchanged if allowed, or just update the query part)
+
+      // I will only update the select and the map because replace_file_content works on contiguous block.
+      // But the map is far down. I should use multi_replace or split.
+      // Wait, replacement content must match target content.
+      // The instruction says "Replace usages".
+      // I will use replace_file_content for the query first.
+
+
+      // Apply filters
+      if (currentFilters.search) {
+        const searchTerm = currentFilters.search;
+        query = query.or(`name.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
+      }
+
       if (currentFilters.category) {
         query = query.eq('category_id', currentFilters.category);
       }
@@ -128,19 +148,21 @@ export const useProducts = (options: UseProductsOptions = {}) => {
         in_stock: item.in_stock,
         stock_quantity: item.stock_quantity || 0,
         tags: item.tags || [],
+        is_active: item.is_active,
         is_service: item.is_service,
         created_at: item.created_at,
         updated_at: item.updated_at,
-        category: item.categories || {
-          id: '',
-          name: 'Sem categoria',
-          slug: 'sem-categoria',
+        category: {
+          id: item.category?.id || '',
+          name: item.category?.name || 'Sem categoria',
+          slug: item.category?.slug || 'sem-categoria',
+          image: item.category?.image_url,
         },
         seller: {
-          id: item.profiles?.id || '',
-          name: item.profiles?.full_name || 'Vendedor',
-          avatar: item.profiles?.avatar_url,
-          location: item.profiles?.location || '',
+          id: item.seller?.id || '',
+          name: item.seller?.full_name || 'Vendedor',
+          avatar: item.seller?.avatar_url,
+          location: item.seller?.city ? `${item.seller.city}, ${item.seller.state || ''}` : '',
           rating: 0,
           reviewCount: 0,
           verified: false,
@@ -215,6 +237,75 @@ export const useProducts = (options: UseProductsOptions = {}) => {
     }
   }, [autoFetch, fetchProducts]);
 
+  const createProduct = useCallback(async (productData: any) => {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .insert(productData)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (err) {
+      throw err;
+    }
+  }, []);
+
+  const updateProduct = useCallback(async (id: string, productData: any) => {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .update(productData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (err) {
+      throw err;
+    }
+  }, []);
+
+  const deleteProduct = useCallback(async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    } catch (err) {
+      throw err;
+    }
+  }, []);
+
+  const toggleProductStatus = useCallback(async (id: string) => {
+    try {
+      // First get current status
+      const { data: current, error: fetchError } = await supabase
+        .from('products')
+        .select('is_active')
+        .eq('id', id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const { data, error } = await supabase
+        .from('products')
+        .update({ is_active: !current.is_active })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (err) {
+      throw err;
+    }
+  }, []);
+
   return {
     products,
     loading,
@@ -227,5 +318,9 @@ export const useProducts = (options: UseProductsOptions = {}) => {
     goToPage,
     refetch,
     fetchProducts,
+    createProduct,
+    updateProduct,
+    deleteProduct,
+    toggleProductStatus
   };
 };

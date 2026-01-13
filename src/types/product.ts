@@ -1,84 +1,54 @@
-export interface Category {
-  id: string;
-  name: string;
-  slug: string;
-  description?: string;
-  image?: string;
-  parent_id?: string;
-  created_at?: string;
-  updated_at?: string;
-}
-
-export interface Seller {
-  id: string;
-  name: string;
-  avatar?: string;
-  location: string;
-  rating: number;
-  reviewCount: number;
-  verified: boolean;
-  specialties: string[];
-  responseTime: string;
-  joinedAt: string;
-  description: string;
-}
-
-export interface ProductImage {
-  id: string;
-  url: string;
-  alt?: string;
-  order: number;
-}
-
-export interface ProductReview {
-  id: string;
-  userId: string;
-  userName: string;
-  userAvatar?: string;
-  rating: number;
-  comment: string;
-  createdAt: string;
-  helpful: number;
-  images?: string[];
-}
-
 export interface Product {
   id: string;
   name: string;
-  description: string;
+  description?: string;
   price: number;
   original_price?: number;
   images: string[];
   rating: number;
   review_count: number;
-  in_stock: boolean;
   stock_quantity: number;
-  tags: string[];
+  in_stock: boolean;
+  is_active: boolean;
   is_service: boolean;
-  created_at: string;
-  updated_at: string;
-  category: Category;
-  seller: Seller;
-  reviews?: ProductReview[];
-  specifications?: Record<string, string>;
-  variants?: ProductVariant[];
-  shipping?: ShippingInfo;
+  tags: string[];
+  created_at?: string;
+  updated_at?: string;
+  category: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+  seller: {
+    id: string;
+    name: string;
+    avatar?: string;
+    location?: string;
+    rating?: number;
+    reviewCount?: number;
+    verified?: boolean;
+    specialties?: string[];
+    responseTime?: string;
+    joinedAt?: string;
+    description?: string;
+  };
+  isWishlisted?: boolean;
 }
 
-export interface ProductVariant {
+export interface Category {
   id: string;
   name: string;
-  value: string;
-  price_modifier: number;
-  stock_quantity: number;
-  sku?: string;
-}
-
-export interface ShippingInfo {
-  free_shipping: boolean;
-  shipping_cost?: number;
-  estimated_delivery: string;
-  available_methods: string[];
+  slug: string;
+  description?: string;
+  image?: string; // UI prop
+  image_url?: string; // DB prop
+  productCount: number;
+  product_count?: number; // DB prop maybe
+  is_active?: boolean; // DB prop
+  parentId?: string;
+  subcategories?: Category[];
+  parent?: Category;
+  created_at?: string;
 }
 
 export interface ProductFilters {
@@ -89,47 +59,10 @@ export interface ProductFilters {
   inStock?: boolean;
   isService?: boolean;
   tags?: string[];
+  search?: string;
+  sellerId?: string;
+  sortBy?: string;
   seller?: string;
-  location?: string;
-  sortBy?: 'price_asc' | 'price_desc' | 'rating' | 'newest' | 'popular';
   page?: number;
   limit?: number;
-}
-
-export interface ProductSearchParams {
-  query?: string;
-  filters?: ProductFilters;
-}
-
-export interface ProductsResponse {
-  products: Product[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-  hasNextPage: boolean;
-  hasPrevPage: boolean;
-}
-
-export interface CartItem {
-  id: string;
-  product: Product;
-  quantity: number;
-  variant?: ProductVariant;
-  addedAt: string;
-}
-
-export interface Cart {
-  items: CartItem[];
-  total: number;
-  subtotal: number;
-  shipping: number;
-  tax: number;
-  itemCount: number;
-}
-
-export interface WishlistItem {
-  id: string;
-  product: Product;
-  addedAt: string;
 }

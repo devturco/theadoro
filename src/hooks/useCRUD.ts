@@ -47,7 +47,6 @@ export const useCRUD = <T extends { id: string }>({
       let query = supabase
         .from(table)
         .select(select, { count: 'exact' })
-        .select(select, { count: 'exact' })
         .range(from, to)
         .order(stableOrderBy.column, { ascending: stableOrderBy.ascending });
 
@@ -65,7 +64,10 @@ export const useCRUD = <T extends { id: string }>({
 
       const { data: result, error, count } = await query;
 
-      if (error) throw error;
+      if (error) {
+        console.error(`Error fetching ${table}:`, error);
+        throw error;
+      }
 
       setData(result || []);
       setPagination({
@@ -74,10 +76,12 @@ export const useCRUD = <T extends { id: string }>({
         total: count || 0,
         totalPages: Math.ceil((count || 0) / pageSize)
       });
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Erro ao carregar dados';
-      setError(errorMessage);
-      toast.error(errorMessage);
+    } catch (err: any) {
+      const errorMessage = err.message || 'Erro ao carregar dados';
+      const technicalDetails = err.details || err.hint || '';
+      console.error('Full error object:', err);
+      setError(`${errorMessage} ${technicalDetails}`);
+      toast.error(`Erro: ${errorMessage} ${technicalDetails ? `(${technicalDetails})` : ''}`);
     } finally {
       setLoading(false);
     }

@@ -43,6 +43,7 @@ export default function Categories() {
         // Transform data slightly to match UI expectations (productCount placeholder)
         const transformedData = (data || []).map((cat: any) => ({
           ...cat,
+          image: cat.image_url || 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?q=80&w=2000&auto=format&fit=crop', // Fallback image
           productCount: 0, // TODO: Implement real count later
           subcategories: [] // TODO: Implement hierarchy later
         }));

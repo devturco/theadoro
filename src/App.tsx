@@ -84,6 +84,7 @@ function App() {
 
               {/* Public Marketplace Routes */}
               <Route path="/products" element={<MaintenanceGuard><PublicLayout><Products /></PublicLayout></MaintenanceGuard>} />
+              <Route path="/product/:id" element={<MaintenanceGuard><PublicLayout><ProductDetail /></PublicLayout></MaintenanceGuard>} />
               <Route path="/products/:id" element={<MaintenanceGuard><PublicLayout><ProductDetail /></PublicLayout></MaintenanceGuard>} />
               <Route path="/categories" element={<MaintenanceGuard><PublicLayout><Categories /></PublicLayout></MaintenanceGuard>} />
               <Route path="/categories/:slug" element={<MaintenanceGuard><PublicLayout><CategoryProducts /></PublicLayout></MaintenanceGuard>} />

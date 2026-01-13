@@ -60,13 +60,14 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               name,
               slug,
               description,
-              image
+              image_url
             ),
             profiles (
               id,
               full_name,
               avatar_url,
-              location
+              city,
+              state
             )
           )
         `)
@@ -74,23 +75,28 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       if (error) throw error;
 
-      const products = data?.map(item => ({
-        ...item.products,
-        category: item.products.categories,
-        seller: {
-          id: item.products.profiles?.id || '',
-          name: item.products.profiles?.full_name || '',
-          avatar: item.products.profiles?.avatar_url,
-          location: item.products.profiles?.location || '',
-          rating: 0,
-          reviewCount: 0,
-          verified: false,
-          specialties: [],
-          responseTime: '',
-          joinedAt: '',
-          description: '',
-        }
-      })) || [];
+      const products = data
+        ?.filter(item => item.products)
+        .map(item => ({
+          ...item.products,
+          category: {
+            ...item.products.categories,
+            image: item.products.categories?.image_url
+          },
+          seller: {
+            id: item.products.profiles?.id || '',
+            name: item.products.profiles?.full_name || 'Vendedor',
+            avatar: item.products.profiles?.avatar_url,
+            location: item.products.profiles?.city ? `${item.products.profiles.city}, ${item.products.profiles.state}` : '',
+            rating: 0,
+            reviewCount: 0,
+            verified: false,
+            specialties: [],
+            responseTime: '',
+            joinedAt: '',
+            description: '',
+          }
+        })) || [];
 
       setWishlist(products);
     } catch (error) {

@@ -14,11 +14,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRole } from '@/hooks/useRole';
 import { useCRUD } from '@/hooks/useCRUD';
-import { 
-  BarChart3, 
-  TrendingUp, 
+import {
+  BarChart3,
+  TrendingUp,
   TrendingDown,
-  Users, 
+  Users,
   Package,
   ShoppingCart,
   DollarSign,
@@ -50,72 +50,150 @@ const AdminReports = () => {
   });
   const [loading, setLoading] = useState(true);
 
-  const { data: orders } = useCRUD('orders');
-  const { data: products } = useCRUD('products');
-  const { data: users } = useCRUD('users');
-  const { data: categories } = useCRUD('categories');
+  const { data: orders } = useCRUD({ table: 'orders' });
+  const { data: products } = useCRUD({ table: 'products' });
+  const { data: users } = useCRUD({ table: 'profiles' });
+  const { data: categories } = useCRUD({ table: 'categories' });
+  const { data: orderItems } = useCRUD({ table: 'order_items' });
 
   useEffect(() => {
     if (!isAdmin) {
       toast.error('Acesso negado. Apenas administradores podem acessar esta página.');
       return;
     }
-    
-    generateReports();
-  }, [isAdmin, orders, products, users, categories, selectedPeriod]);
+
+    if (orders && products && users && categories && orderItems) {
+      generateReports();
+    }
+  }, [isAdmin, orders, products, users, categories, orderItems, selectedPeriod]);
 
   const generateReports = async () => {
     try {
       setLoading(true);
-      
-      // Simulated report data generation
-      // In a real app, this would be calculated from actual data
-      
-      const salesByMonth = [
-        { month: 'Jan', sales: 45, revenue: 12500 },
-        { month: 'Fev', sales: 52, revenue: 15200 },
-        { month: 'Mar', sales: 48, revenue: 13800 },
-        { month: 'Abr', sales: 61, revenue: 18900 },
-        { month: 'Mai', sales: 55, revenue: 16700 },
-        { month: 'Jun', sales: 67, revenue: 21300 }
-      ];
 
-      const topProducts = products?.slice(0, 5).map((product: any, index: number) => ({
-        name: product.name,
-        sales: Math.floor(Math.random() * 50) + 10,
-        revenue: Math.floor(Math.random() * 5000) + 1000
-      })) || [];
+      // --- 1. Sales & Revenue by Month ---
+      // Group orders by month/year and sum total_amount
+      const salesMap = new Map<string, { sales: number; revenue: number }>();
+      const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
-      const topSellers = users?.filter((user: any) => 
-        user.roles?.some((role: any) => role.role === 'seller')
-      ).slice(0, 5).map((seller: any, index: number) => ({
-        name: seller.name || seller.email,
-        sales: Math.floor(Math.random() * 30) + 5,
-        revenue: Math.floor(Math.random() * 3000) + 500
-      })) || [];
+      // Initialize last 6 months (or based on selectedPeriod - simplified for now to last 6 months fixed or all available)
+      // For improved UX we could filter by selectedPeriod date range.
+      // Let's iterate all orders and sort them later.
+      orders?.forEach((order: any) => {
+        const date = new Date(order.created_at);
+        const monthKey = `${months[date.getMonth()]}`; // Simple grouping by month name
 
-      const userGrowth = [
-        { month: 'Jan', users: 120 },
-        { month: 'Fev', users: 145 },
-        { month: 'Mar', users: 162 },
-        { month: 'Abr', users: 189 },
-        { month: 'Mai', users: 205 },
-        { month: 'Jun', users: 234 }
-      ];
+        const current = salesMap.get(monthKey) || { sales: 0, revenue: 0 };
+        salesMap.set(monthKey, {
+          sales: current.sales + 1,
+          revenue: current.revenue + Number(order.total_amount || 0)
+        });
+      });
 
-      const categoryPerformance = categories?.map((category: any) => ({
-        category: category.name,
-        products: Math.floor(Math.random() * 20) + 5,
-        sales: Math.floor(Math.random() * 100) + 10
+      // Convert map to array and sort (logic implies current year for simplicity)
+      // For a production app, handling Years is crucial.
+      const salesByMonth = Array.from(salesMap.entries()).map(([month, data]) => ({
+        month,
+        ...data
+      }));
+
+      // --- 2. Top Products ---
+      // Count frequency of product_id in orderItems
+      const productSales = new Map<string, { qty: number; revenue: number }>();
+      orderItems?.forEach((item: any) => {
+        const current = productSales.get(item.product_id) || { qty: 0, revenue: 0 };
+        productSales.set(item.product_id, {
+          qty: current.qty + (item.quantity || 1),
+          revenue: current.revenue + (item.price * (item.quantity || 1))
+        });
+      });
+
+      const topProducts = products?.map((p: any) => {
+        const stats = productSales.get(p.id) || { qty: 0, revenue: 0 };
+        return {
+          name: p.name,
+          sales: stats.qty,
+          revenue: stats.revenue
+        };
+      })
+        .sort((a: any, b: any) => b.revenue - a.revenue)
+        .slice(0, 5) || [];
+
+      // --- 3. Top Sellers ---
+      // Aggregate sales by seller_id in orders (assuming orders have seller_id or we link via products)
+      // If marketplace, orders might be split. Assuming 'orders' table has 'seller_id' in simple marketplace or we derive from products.
+      // Let's allow for orders to have seller_id OR derive from items.
+      const sellerStats = new Map<string, { sales: number; revenue: number }>();
+
+      // Using orderItems to attribute sales to sellers (since products have seller_id)
+      orderItems?.forEach((item: any) => {
+        // We need to find the product to get the seller
+        const product = products?.find((p: any) => p.id === item.product_id);
+        if (product && product.seller_id) {
+          const current = sellerStats.get(product.seller_id) || { sales: 0, revenue: 0 };
+          sellerStats.set(product.seller_id, {
+            sales: current.sales + (item.quantity || 1),
+            revenue: current.revenue + (item.price * (item.quantity || 1))
+          });
+        }
+      });
+
+      const topSellers = users?.filter((u: any) => sellerStats.has(u.id))
+        .map((u: any) => {
+          const stats = sellerStats.get(u.id);
+          return {
+            name: u.full_name || u.email || 'Desconhecido',
+            sales: stats?.sales || 0,
+            revenue: stats?.revenue || 0
+          };
+        })
+        .sort((a: any, b: any) => b.revenue - a.revenue)
+        .slice(0, 5) || [];
+
+      // --- 4. User Growth ---
+      // Group users by creation month
+      const userGrowMap = new Map<string, number>();
+      users?.forEach((u: any) => {
+        const date = new Date(u.created_at);
+        const monthKey = `${months[date.getMonth()]}`;
+        userGrowMap.set(monthKey, (userGrowMap.get(monthKey) || 0) + 1);
+      });
+      const userGrowth = Array.from(userGrowMap.entries()).map(([month, count]) => ({
+        month,
+        users: count
+      }));
+
+      // --- 5. Category Performance ---
+      const catStats = new Map<string, { products: number; sales: number }>();
+      // Init categories
+      categories?.forEach((cat: any) => {
+        catStats.set(cat.id, { products: 0, sales: 0 });
+      });
+      // Count products
+      products?.forEach((p: any) => {
+        if (p.category_id && catStats.has(p.category_id)) {
+          const s = catStats.get(p.category_id)!;
+          s.products++;
+          // Add sales for this product
+          const pSales = productSales.get(p.id)?.qty || 0;
+          s.sales += pSales;
+          catStats.set(p.category_id, s);
+        }
+      });
+
+      const categoryPerformance = categories?.map((cat: any) => ({
+        category: cat.name,
+        ...catStats.get(cat.id)
       })) || [];
 
       setReportData({
-        salesByMonth,
+        salesByMonth: salesByMonth.length ? salesByMonth : [{ month: 'Sem dados', sales: 0, revenue: 0 }],
         topProducts,
         topSellers,
-        userGrowth,
+        userGrowth: userGrowth.length ? userGrowth : [{ month: 'Sem dados', users: 0 }],
         categoryPerformance
       });
+
     } catch (error) {
       console.error('Erro ao gerar relatórios:', error);
       toast.error('Erro ao carregar relatórios');
@@ -159,7 +237,7 @@ const AdminReports = () => {
             Acompanhe o desempenho da plataforma e tome decisões baseadas em dados
           </p>
         </div>
-        
+
         <div className="flex gap-2">
           <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
             <SelectTrigger className="w-48">
@@ -172,7 +250,7 @@ const AdminReports = () => {
               <SelectItem value="365">Último ano</SelectItem>
             </SelectContent>
           </Select>
-          
+
           <Button variant="outline" onClick={() => exportReport('geral')}>
             <Download className="h-4 w-4 mr-2" />
             Exportar
@@ -185,33 +263,33 @@ const AdminReports = () => {
         <MetricCard
           title="Vendas do Mês"
           value={currentMonthSales}
-          icon={ShoppingCart}
-          trend={salesGrowth > 0 ? 'up' : salesGrowth < 0 ? 'down' : 'neutral'}
+          icon={<ShoppingCart className="h-4 w-4" />}
+          trend={salesGrowth > 0 ? { value: salesGrowth, label: 'vs mês anterior' } : undefined}
           description={`${salesGrowth > 0 ? '+' : ''}${salesGrowth.toFixed(1)}% vs mês anterior`}
           loading={loading}
         />
-        
+
         <MetricCard
           title="Receita do Mês"
           value={currentMonthRevenue}
-          icon={DollarSign}
+          icon={<DollarSign className="h-4 w-4" />}
           format="currency"
-          trend={revenueGrowth > 0 ? 'up' : revenueGrowth < 0 ? 'down' : 'neutral'}
+          trend={revenueGrowth > 0 ? { value: revenueGrowth, label: 'vs mês anterior' } : undefined}
           description={`${revenueGrowth > 0 ? '+' : ''}${revenueGrowth.toFixed(1)}% vs mês anterior`}
           loading={loading}
         />
-        
+
         <MetricCard
           title="Total de Usuários"
           value={users?.length || 0}
-          icon={Users}
+          icon={<Users className="h-4 w-4" />}
           loading={loading}
         />
-        
+
         <MetricCard
           title="Produtos Ativos"
           value={products?.filter((p: any) => p.is_active).length || 0}
-          icon={Package}
+          icon={<Package className="h-4 w-4" />}
           loading={loading}
         />
       </div>
@@ -331,11 +409,11 @@ const AdminReports = () => {
                       <span className="font-medium">{item.users} usuários</span>
                       {index > 0 && (
                         <Badge variant={
-                          item.users > reportData.userGrowth[index - 1].users 
-                            ? 'default' 
+                          item.users > reportData.userGrowth[index - 1].users
+                            ? 'default'
                             : 'secondary'
                         }>
-                          {item.users > reportData.userGrowth[index - 1].users 
+                          {item.users > reportData.userGrowth[index - 1].users
                             ? '+' + (item.users - reportData.userGrowth[index - 1].users)
                             : item.users - reportData.userGrowth[index - 1].users
                           }

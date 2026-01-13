@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Filter, SortAsc } from 'lucide-react';
+import { ProductFilters } from '@/types/product';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
@@ -43,6 +44,15 @@ export default function CategoryProducts() {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<ProductFilters>({});
+
+  const handleFiltersChange = (newFilters: Partial<ProductFilters>) => {
+    setFilters(prev => ({ ...prev, ...newFilters }));
+  };
+
+  const handleClearFilters = () => {
+    setFilters({});
+  };
 
   useEffect(() => {
     const loadCategoryData = async () => {
@@ -63,17 +73,25 @@ export default function CategoryProducts() {
           return;
         }
 
-        setCategory({ ...categoryData, productCount: 0 });
+        setCategory({
+          ...categoryData,
+          image: categoryData.image_url || 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?q=80&w=2000&auto=format&fit=crop',
+          productCount: 0
+        });
 
         // 2. Fetch Products for this category
-        // Note: Assuming 'products' table has 'category_id'
         const { data: productsData, error: prodError } = await supabase
           .from('products')
-          .select('*, seller:profiles(business_name)')
-          .eq('category_id', categoryData.id); // Check column name in DB!
+          .select(`
+            *,
+            profiles (
+              full_name
+            )
+          `)
+          .eq('category_id', categoryData.id);
 
         if (prodError) {
-          console.warn('Products fetch error (might be empty or wrong column):', prodError);
+          console.warn('Products fetch error:', prodError);
         } else {
           // Map to interface
           setProducts((productsData || []).map((p: any) => ({
@@ -84,7 +102,7 @@ export default function CategoryProducts() {
             rating: 5.0, // placeholder
             reviewCount: 0,
             sellerId: p.seller_id,
-            sellerName: p.seller?.business_name || 'Vendedor',
+            sellerName: p.profiles?.full_name || 'Vendedor',
             categoryId: p.category_id,
             isWishlisted: false
           })));
@@ -99,6 +117,9 @@ export default function CategoryProducts() {
 
     loadCategoryData();
   }, [slug]);
+
+  // Placeholder for related products to avoid crash
+  const relatedProducts: Product[] = [];
 
   if (isLoading) {
     return (
@@ -200,11 +221,7 @@ export default function CategoryProducts() {
             </div>
           )}
 
-          {category.description && (
-            <p className="text-lg text-gray-600 text-center max-w-2xl mx-auto">
-              {category.description}
-            </p>
-          )}
+
         </div>
 
         {/* Subcategorias */}
@@ -235,33 +252,39 @@ export default function CategoryProducts() {
             </div>
 
             <div className={`${showFilters ? 'block' : 'hidden'} lg:block`}>
-              <FilterSidebar />
+              <FilterSidebar
+                filters={filters}
+                onFiltersChange={handleFiltersChange}
+                onClearFilters={handleClearFilters}
+                className="w-full"
+              />
             </div>
           </div>
 
           {/* Conteúdo Principal */}
           <div className="flex-1">
-            {/* Header dos Produtos */}
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900">
-                  Produtos em {category.name}
-                </h2>
-                <p className="text-sm text-gray-600">
-                  {products.length} produto{products.length !== 1 ? 's' : ''} encontrado{products.length !== 1 ? 's' : ''}
-                </p>
-              </div>
+            {products.length > 0 && (
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900">
+                    Produtos em {category.name}
+                  </h2>
+                  <p className="text-sm text-gray-600">
+                    {products.length} produto{products.length !== 1 ? 's' : ''} encontrado{products.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
 
-              <div className="flex items-center gap-2">
-                <SortAsc className="h-4 w-4 text-gray-500" />
-                <select className="border rounded-md px-3 py-2 text-sm">
-                  <option value="relevance">Mais Relevantes</option>
-                  <option value="price-asc">Menor Preço</option>
-                  <option value="price-desc">Maior Preço</option>
-                  <option value="rating">Melhor Avaliação</option>
-                </select>
+                <div className="flex items-center gap-2">
+                  <SortAsc className="h-4 w-4 text-gray-500" />
+                  <select className="border rounded-md px-3 py-2 text-sm">
+                    <option value="relevance">Mais Relevantes</option>
+                    <option value="price-asc">Menor Preço</option>
+                    <option value="price-desc">Maior Preço</option>
+                    <option value="rating">Melhor Avaliação</option>
+                  </select>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Grid de Produtos */}
             {products.length > 0 ? (
