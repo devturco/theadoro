@@ -26,6 +26,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const { isInWishlist, toggleWishlist } = useWishlist();
   const { addItem } = useCart();
 
+
   const handleWishlistClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -46,7 +47,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   };
 
   const hasDiscount = product.original_price && product.original_price > product.price;
-  const discountPercentage = hasDiscount 
+  const discountPercentage = hasDiscount
     ? Math.round(((product.original_price! - product.price) / product.original_price!) * 100)
     : 0;
 
@@ -70,7 +71,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   );
 
   return (
-    <Link to={`/products/${product.id}`} className={cardClasses}>
+    <Link to={`/product/${product.slug || product.id}`} className={cardClasses}>
       {/* Image Container */}
       <div className="relative overflow-hidden">
         <img
@@ -78,7 +79,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           alt={product.name}
           className={imageClasses}
         />
-        
+
         {/* Badges */}
         <div className="absolute top-2 left-2 flex flex-col gap-1">
           {hasDiscount && (
@@ -135,7 +136,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         <div>
           {/* Category */}
           <p className="text-xs text-gray-500 mb-1">{product.category.name}</p>
-          
+
           {/* Title */}
           <h3 className="font-medium text-gray-900 mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors">
             {product.name}
@@ -173,7 +174,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               </span>
             )}
           </div>
-          
+
           {product.is_service && (
             <p className="text-xs text-gray-500 mt-1">
               A partir de

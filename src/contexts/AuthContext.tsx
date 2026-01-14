@@ -20,14 +20,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Derive roles directly from profile to avoid state sync issues
+  // Derive roles directly from profile to avoid state sync issues (Admins get all roles)
   const roles: UserRole[] = profile?.role ? [profile.role] : ['buyer'];
+  if (profile?.role === 'admin') {
+    if (!roles.includes('seller')) roles.push('seller');
+    if (!roles.includes('buyer')) roles.push('buyer');
+  }
 
   // Fetch user profile (Single Source of Truth)
   const fetchProfile = useCallback(async (userId: string) => {
     // 🚨 EMERGENCY OVERRIDE: Force Admin for this ID to unblock client demo
     if (userId === '1632d905-a236-4af8-9451-7e9a83320f21') {
-      console.log('🚨 APPLYING EMERGENCY ADMIN OVERRIDE 🚨');
+
       const fallbackProfile = {
         id: userId,
         email: 'devturco@gmail.com',
@@ -46,7 +50,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       // 1. Try RPC first (Bypasses RLS with explicit ID)
-      let { data, error } = await supabase.rpc('get_profile_explicit', { target_id: userId }).maybeSingle();
+      let { data, error }: any = await (supabase.rpc as any)('get_profile_explicit', { target_id: userId }).maybeSingle();
 
       // 2. Fallback to direct select if RPC fails
       if (error) {

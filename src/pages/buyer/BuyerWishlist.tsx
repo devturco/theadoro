@@ -7,10 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRole } from '@/hooks/useRole';
-import { 
-  Heart, 
-  ShoppingCart, 
-  Trash2, 
+import { supabase } from '@/integrations/supabase/client';
+import {
+  Heart,
+  ShoppingCart,
+  Trash2,
   Search,
   Filter,
   Star,
@@ -53,68 +54,45 @@ export default function BuyerWishlist() {
   const loadWishlist = async () => {
     try {
       setLoading(true);
-      
-      // Mock data - replace with actual API calls
-      const mockWishlistItems: WishlistItem[] = [
-        {
-          id: '1',
-          product_id: 'prod1',
-          product_name: 'Colar Personalizado com Nome',
-          product_description: 'Lindo colar personalizado em prata com gravação do nome',
-          product_price: 299.90,
-          product_image: 'https://trae-api-us.mchost.guru/api/ide/v1/text_to_image?prompt=elegant%20personalized%20silver%20necklace%20with%20name%20engraving&image_size=square',
-          seller_name: 'Artesanatos Maria',
-          seller_id: 'seller1',
-          category: 'Joias',
-          is_available: true,
-          rating: 4.8,
-          added_at: '2024-01-15T10:30:00Z'
-        },
-        {
-          id: '2',
-          product_id: 'prod2',
-          product_name: 'Pulseira Artesanal',
-          product_description: 'Pulseira feita à mão com materiais naturais',
-          product_price: 75.00,
-          product_image: 'https://trae-api-us.mchost.guru/api/ide/v1/text_to_image?prompt=handmade%20natural%20bracelet%20artisan%20jewelry&image_size=square',
-          seller_name: 'Joias Premium',
-          seller_id: 'seller2',
-          category: 'Acessórios',
-          is_available: true,
-          rating: 4.5,
-          added_at: '2024-01-14T14:20:00Z'
-        },
-        {
-          id: '3',
-          product_id: 'prod3',
-          product_name: 'Kit Presente Especial',
-          product_description: 'Kit completo com caixa personalizada e produtos exclusivos',
-          product_price: 450.00,
-          product_image: 'https://trae-api-us.mchost.guru/api/ide/v1/text_to_image?prompt=luxury%20gift%20box%20set%20personalized%20special%20occasion&image_size=square',
-          seller_name: 'Presentes Especiais',
-          seller_id: 'seller3',
-          category: 'Presentes',
-          is_available: false,
-          rating: 4.9,
-          added_at: '2024-01-13T09:15:00Z'
-        },
-        {
-          id: '4',
-          product_id: 'prod4',
-          product_name: 'Anel de Noivado Personalizado',
-          product_description: 'Anel único com design exclusivo para momentos especiais',
-          product_price: 1200.00,
-          product_image: 'https://trae-api-us.mchost.guru/api/ide/v1/text_to_image?prompt=custom%20engagement%20ring%20unique%20design%20elegant&image_size=square',
-          seller_name: 'Joias Premium',
-          seller_id: 'seller2',
-          category: 'Joias',
-          is_available: true,
-          rating: 5.0,
-          added_at: '2024-01-12T16:45:00Z'
-        }
-      ];
 
-      setWishlistItems(mockWishlistItems);
+      const { data, error } = await supabase
+        .from('wishlist')
+        .select(`
+          id,
+          product_id,
+          created_at,
+          products (
+            id,
+            name,
+            description,
+            price,
+            images,
+            rating,
+            in_stock,
+            categories (name),
+            profiles (id, full_name)
+          )
+        `)
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+
+      const formattedItems: WishlistItem[] = data?.map(item => ({
+        id: item.id,
+        product_id: item.product_id,
+        product_name: (item.products as any)?.name || 'Produto',
+        product_description: (item.products as any)?.description || '',
+        product_price: (item.products as any)?.price || 0,
+        product_image: (item.products as any)?.images?.[0] || 'https://via.placeholder.com/150',
+        seller_name: (item.products as any)?.profiles?.full_name || 'Vendedor',
+        seller_id: (item.products as any)?.profiles?.id || '',
+        category: (item.products as any)?.categories?.name || 'Geral',
+        is_available: (item.products as any)?.in_stock || false,
+        rating: (item.products as any)?.rating || 0,
+        added_at: item.created_at
+      })) || [];
+
+      setWishlistItems(formattedItems);
     } catch (error) {
       console.error('Error loading wishlist:', error);
     } finally {
@@ -124,7 +102,12 @@ export default function BuyerWishlist() {
 
   const handleRemoveFromWishlist = async (itemId: string) => {
     try {
-      // Remove from wishlist - replace with actual API call
+      const { error } = await supabase
+        .from('wishlist')
+        .delete()
+        .eq('id', itemId);
+
+      if (error) throw error;
       setWishlistItems(prev => prev.filter(item => item.id !== itemId));
     } catch (error) {
       console.error('Error removing from wishlist:', error);
@@ -133,9 +116,8 @@ export default function BuyerWishlist() {
 
   const handleAddToCart = async (productId: string) => {
     try {
-      // Add to cart - replace with actual API call
+      // Logic for adding to cart
       console.log('Adding to cart:', productId);
-      // Show success message
     } catch (error) {
       console.error('Error adding to cart:', error);
     }
@@ -158,12 +140,12 @@ export default function BuyerWishlist() {
 
   const filteredItems = wishlistItems.filter(item => {
     const matchesSearch = item.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.seller_name.toLowerCase().includes(searchTerm.toLowerCase());
+      item.seller_name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter;
-    const matchesAvailability = availabilityFilter === 'all' || 
-                               (availabilityFilter === 'available' && item.is_available) ||
-                               (availabilityFilter === 'unavailable' && !item.is_available);
-    
+    const matchesAvailability = availabilityFilter === 'all' ||
+      (availabilityFilter === 'available' && item.is_available) ||
+      (availabilityFilter === 'unavailable' && !item.is_available);
+
     return matchesSearch && matchesCategory && matchesAvailability;
   });
 
@@ -197,7 +179,7 @@ export default function BuyerWishlist() {
             <div className="text-2xl font-bold">{wishlistItems.length}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Disponíveis</CardTitle>
@@ -209,7 +191,7 @@ export default function BuyerWishlist() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Valor Total</CardTitle>
@@ -221,7 +203,7 @@ export default function BuyerWishlist() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Categorias</CardTitle>
@@ -337,17 +319,17 @@ export default function BuyerWishlist() {
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
-              
+
               <CardContent className="p-4">
                 <div className="space-y-2">
                   <div className="flex items-start justify-between">
                     <h3 className="font-semibold line-clamp-2">{item.product_name}</h3>
                   </div>
-                  
+
                   <p className="text-sm text-muted-foreground line-clamp-2">
                     {item.product_description}
                   </p>
-                  
+
                   <div className="flex items-center gap-2">
                     <div className="flex items-center">
                       <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
@@ -355,14 +337,14 @@ export default function BuyerWishlist() {
                     </div>
                     <Badge variant="outline">{item.category}</Badge>
                   </div>
-                  
+
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-lg font-bold">R$ {item.product_price.toFixed(2)}</p>
                       <p className="text-sm text-muted-foreground">por {item.seller_name}</p>
                     </div>
                   </div>
-                  
+
                   <div className="flex gap-2 pt-2">
                     <Button
                       className="flex-1"
@@ -380,7 +362,7 @@ export default function BuyerWishlist() {
                       <Share2 className="h-4 w-4" />
                     </Button>
                   </div>
-                  
+
                   <p className="text-xs text-muted-foreground">
                     Adicionado em {new Date(item.added_at).toLocaleDateString('pt-BR')}
                   </p>

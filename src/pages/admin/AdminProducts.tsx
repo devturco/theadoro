@@ -49,7 +49,21 @@ interface ProductFormData {
   type: ProductType;
   is_active: boolean;
   images: string[];
+  slug: string;
 }
+
+const generateSlug = (text: string) => {
+  return text
+    .toString()
+    .toLowerCase()
+    .normalize('NFD') // decomposes accents
+    .replace(/[\u0300-\u036f]/g, '') // removes accents
+    .replace(/\s+/g, '-') // spaces to dashes
+    .replace(/[^\w\-]+/g, '') // remove non-words
+    .replace(/\-\-+/g, '-') // collapse dashes
+    .replace(/^-+/, '') // trim start
+    .replace(/-+$/, ''); // trim end
+};
 
 const AdminProducts = () => {
   const { user } = useAuth();
@@ -64,7 +78,8 @@ const AdminProducts = () => {
     category_id: '',
     type: 'physical',
     is_active: true,
-    images: []
+    images: [],
+    slug: ''
   });
 
   const {
@@ -120,7 +135,8 @@ const AdminProducts = () => {
       category_id: product.category_id || '',
       type: product.type,
       is_active: product.is_active,
-      images: product.images || []
+      images: product.images || [],
+      slug: product.slug || ''
     });
     setIsDialogOpen(true);
   };
@@ -167,7 +183,8 @@ const AdminProducts = () => {
       category_id: '',
       type: 'physical',
       is_active: true,
-      images: []
+      images: [],
+      slug: ''
     });
     setEditingProduct(null);
   };
@@ -323,8 +340,25 @@ const AdminProducts = () => {
                   <Input
                     id="name"
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(e) => {
+                      const name = e.target.value;
+                      setFormData({
+                        ...formData,
+                        name,
+                        slug: generateSlug(name)
+                      });
+                    }}
                     required
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="slug">Slug (URL Amigável)</Label>
+                  <Input
+                    id="slug"
+                    value={formData.slug}
+                    onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                    placeholder="nome-do-produto"
                   />
                 </div>
 

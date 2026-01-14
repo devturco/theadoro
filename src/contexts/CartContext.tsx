@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { Product } from '@/types/product';
 import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Interfaces
 export interface CartItem {
@@ -10,6 +11,11 @@ export interface CartItem {
   selectedOptions?: Record<string, string>;
   serviceDate?: string;
   serviceTime?: string;
+  variant?: {
+    id: string;
+    name: string;
+    price: number;
+  };
 }
 
 export interface Cart {
@@ -45,8 +51,8 @@ const cartReducer = (state: CartItem[], action: CartAction): CartItem[] => {
     case 'ADD_ITEM': {
       const { product, quantity, options } = action.payload;
       const existingItemIndex = state.findIndex(
-        item => item.product.id === product.id && 
-        JSON.stringify(item.selectedOptions) === JSON.stringify(options)
+        item => item.product.id === product.id &&
+          JSON.stringify(item.selectedOptions) === JSON.stringify(options)
       );
 
       if (existingItemIndex > -1) {
@@ -91,7 +97,7 @@ const cartReducer = (state: CartItem[], action: CartAction): CartItem[] => {
 
 // Helper functions
 const calculateSubtotal = (items: CartItem[]): number => {
-  return items.reduce((total, item) => total + (item.product.price * item.quantity), 0);
+  return items.reduce((total, item) => total + ((item.product.price || 0) * item.quantity), 0);
 };
 
 const calculateShipping = (subtotal: number): number => {
@@ -108,6 +114,7 @@ export const CartContext = createContext<CartContextType | undefined>(undefined)
 
 // Provider
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
   const [items, dispatch] = useReducer(cartReducer, []);
 
   // Load cart from localStorage on mount
@@ -143,6 +150,19 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const addToCart = (product: Product, quantity = 1, options?: Record<string, string>) => {
+    // 🛑 Restriction: Seller cannot buy their own product
+    const currentUserId = user?.id;
+    const sellerId = product.seller?.id || (product as any).seller_id;
+
+    if (currentUserId && sellerId && currentUserId === sellerId) {
+      toast({
+        variant: "destructive",
+        title: "Operação não permitida",
+        description: "Você não pode comprar um produto que você mesmo cadastrou.",
+      });
+      return;
+    }
+
     dispatch({ type: 'ADD_ITEM', payload: { product, quantity, options } });
     toast({
       title: "Produto adicionado!",

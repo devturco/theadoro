@@ -43,6 +43,7 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           products (
             id,
             name,
+            slug,
             description,
             price,
             original_price,

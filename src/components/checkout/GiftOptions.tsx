@@ -79,7 +79,7 @@ export const GiftOptions: React.FC<GiftOptionsProps> = ({ value, onChange }) => 
                             <CarouselItem key={wrap.id} className="md:basis-1/2 lg:basis-1/3">
                                 <div
                                     className={cn(
-                                        "p-1 cursor-pointer transition-all",
+                                        "p-2 cursor-pointer transition-all",
                                         value.wrap_style_id === wrap.id ? "ring-2 ring-purple-600 rounded-xl" : ""
                                     )}
                                     onClick={() => handleChange('wrap_style_id', wrap.id)}

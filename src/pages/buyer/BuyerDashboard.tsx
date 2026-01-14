@@ -6,10 +6,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRole } from '@/hooks/useRole';
 import { useCRUD } from '@/hooks/useCRUD';
 import { useNavigate } from 'react-router-dom';
-import { 
-  ShoppingCart, 
-  Calendar, 
-  Heart, 
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
+import {
+  ShoppingCart,
+  Calendar,
+  Heart,
   Package,
   Clock,
   CheckCircle,
@@ -54,54 +56,71 @@ export default function BuyerDashboard() {
   const loadBuyerMetrics = async () => {
     try {
       setLoading(true);
-      
-      // Mock data - replace with actual API calls
-      const mockMetrics: BuyerMetrics = {
-        totalOrders: 12,
-        pendingOrders: 2,
-        completedOrders: 8,
-        totalSpent: 2450.00,
-        wishlistItems: 5,
-        upcomingAppointments: 1,
-        recentOrders: [
-          {
-            id: '1',
-            seller_name: 'Artesanatos Maria',
-            total_amount: 299.90,
-            status: 'delivered',
-            created_at: new Date().toISOString(),
-            items: [{ product_name: 'Colar Personalizado', quantity: 1 }]
-          },
-          {
-            id: '2',
-            seller_name: 'Joias Premium',
-            total_amount: 150.00,
-            status: 'shipped',
-            created_at: new Date().toISOString(),
-            items: [{ product_name: 'Pulseira Artesanal', quantity: 2 }]
-          }
-        ],
-        favoriteProducts: [
-          {
-            id: '1',
-            name: 'Anel Customizado',
-            seller_name: 'Joias Exclusivas',
-            price: 450.00,
-            image_url: 'https://trae-api-us.mchost.guru/api/ide/v1/text_to_image?prompt=elegant%20custom%20ring%20jewelry%20gold&image_size=square'
-          },
-          {
-            id: '2',
-            name: 'Brincos Especiais',
-            seller_name: 'Artesanatos Únicos',
-            price: 180.00,
-            image_url: 'https://trae-api-us.mchost.guru/api/ide/v1/text_to_image?prompt=special%20earrings%20jewelry%20elegant&image_size=square'
-          }
-        ]
-      };
 
-      setMetrics(mockMetrics);
-    } catch (error) {
+      const { data: ordData, error: ordError } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items (
+            *,
+            products (*)
+          )
+        `)
+        .eq('buyer_id', user?.id)
+        .order('created_at', { ascending: false });
+
+      if (ordError) throw ordError;
+
+      const { count: wishCount, error: wishError } = await supabase
+        .from('wishlist')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user?.id);
+
+      if (wishError) throw wishError;
+
+      const { data: apptData, error: apptError } = await supabase
+        .from('appointments')
+        .select('*')
+        .eq('buyer_id', user?.id)
+        .gte('appointment_date', new Date().toISOString());
+
+      if (apptError) throw apptError;
+
+      const totalOrders = ordData?.length || 0;
+      const pendingOrders = ordData?.filter(o => o.status === 'pending').length || 0;
+      const completedOrders = ordData?.filter(o => o.status === 'delivered').length || 0;
+      const totalSpent = ordData?.reduce((acc, curr) => acc + (curr.total_amount || 0), 0) || 0;
+
+      const recentOrders = ordData?.slice(0, 5).map(order => ({
+        id: order.id,
+        seller_name: 'Vendedor', // We might need to fetch profile for each item's seller_id
+        total_amount: order.total_amount,
+        status: order.status,
+        created_at: order.created_at,
+        items: order.order_items?.map((item: any) => ({
+          product_name: item.products?.name || 'Produto',
+          quantity: item.quantity
+        })) || []
+      })) || [];
+
+      setMetrics({
+        totalOrders,
+        pendingOrders,
+        completedOrders,
+        totalSpent,
+        wishlistItems: wishCount || 0,
+        upcomingAppointments: apptData?.length || 0,
+        recentOrders,
+        favoriteProducts: [] // TODO: Fetch from wishlist with product details
+      });
+
+    } catch (error: any) {
       console.error('Error loading buyer metrics:', error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao carregar dados",
+        description: error.message
+      });
     } finally {
       setLoading(false);
     }
@@ -140,7 +159,7 @@ export default function BuyerDashboard() {
             </p>
           </CardContent>
         </Card>
-        
+
         <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate('/buyer/appointments')}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Agendamentos</CardTitle>
@@ -153,7 +172,7 @@ export default function BuyerDashboard() {
             </p>
           </CardContent>
         </Card>
-        
+
         <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate('/buyer/wishlist')}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Lista de Desejos</CardTitle>
@@ -166,7 +185,7 @@ export default function BuyerDashboard() {
             </p>
           </CardContent>
         </Card>
-        
+
         <Card className="hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Gasto</CardTitle>
@@ -207,9 +226,9 @@ export default function BuyerDashboard() {
                   <div className="text-right space-y-1">
                     <p className="font-medium">R$ {order.total_amount.toFixed(2)}</p>
                     <Badge variant={order.status === 'delivered' ? 'default' : 'secondary'}>
-                      {order.status === 'delivered' ? 'Entregue' : 
-                       order.status === 'shipped' ? 'Enviado' : 
-                       order.status === 'confirmed' ? 'Confirmado' : 'Pendente'}
+                      {order.status === 'delivered' ? 'Entregue' :
+                        order.status === 'shipped' ? 'Enviado' :
+                          order.status === 'confirmed' ? 'Confirmado' : 'Pendente'}
                     </Badge>
                   </div>
                 </div>
@@ -239,8 +258,8 @@ export default function BuyerDashboard() {
             {metrics.favoriteProducts.length > 0 ? (
               metrics.favoriteProducts.map((product) => (
                 <div key={product.id} className="flex items-center gap-4 p-4 border rounded-lg">
-                  <img 
-                    src={product.image_url} 
+                  <img
+                    src={product.image_url}
                     alt={product.name}
                     className="w-16 h-16 object-cover rounded-md"
                   />
@@ -278,7 +297,7 @@ export default function BuyerDashboard() {
             <div className="text-2xl font-bold">{metrics.pendingOrders}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Pedidos Concluídos</CardTitle>
@@ -288,7 +307,7 @@ export default function BuyerDashboard() {
             <div className="text-2xl font-bold">{metrics.completedOrders}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Avaliações Pendentes</CardTitle>

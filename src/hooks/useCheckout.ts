@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { CartItem } from '@/types/product';
+import { CartItem } from '@/contexts/CartContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
@@ -15,12 +15,15 @@ export interface CheckoutData {
   phone: string;
 
   // Shipping Address
-  address: string;
+  street: string;
+  number: string;
+  complement?: string;
   neighborhood?: string;
   city: string;
   state: string;
   zipCode: string;
   country: string;
+  address?: string; // Legacy/Composite
 
   // Billing Address (optional, if different from shipping)
   billingAddress?: {
@@ -47,6 +50,11 @@ export interface CheckoutData {
   isGift?: boolean;
   giftOptions?: any; // GiftOptions;
   deliverySchedule?: any; // DeliverySchedule;
+
+  // Save options
+  saveProfile?: boolean;
+  saveAddress?: boolean;
+  addressLabel?: string;
 }
 
 export interface Order {
@@ -137,7 +145,10 @@ export const useCheckout = () => {
     try {
       // 1. Validate Data
       const validationErrors = validateCheckoutData(checkoutData);
+      console.log('Processing order with data:', { items: items.length, checkoutData });
+
       if (validationErrors.length > 0) {
+        console.error('Validation errors:', validationErrors);
         throw new Error(validationErrors.join(', '));
       }
 
@@ -154,6 +165,7 @@ export const useCheckout = () => {
       const total = subtotal + shipping + tax;
 
       // 3. Process Payment
+      console.log('3. Processing payment...', { method: checkoutData.paymentMethod, total });
       let paymentResult;
       if (checkoutData.paymentMethod === 'credit_card' || checkoutData.paymentMethod === 'debit_card') {
         if (!checkoutData.paymentDetails?.cardNumber) throw new Error('Dados do cartão incompletos');
@@ -171,12 +183,42 @@ export const useCheckout = () => {
         // Boleto
         paymentResult = await PaymentService.generateBoleto(total);
       }
+      console.log('Payment result:', paymentResult);
 
       if (paymentResult.status === 'failed') {
         throw new Error('Pagamento recusado. Verifique os dados e tente novamente.');
       }
 
+      // 3.5 Save User Data & Address if requested
+      if (user?.id) {
+        console.log('3.5 Saving user data/address...');
+        if (checkoutData.saveProfile) {
+          const { error: profileErr } = await supabase.from('profiles').update({
+            full_name: `${checkoutData.firstName} ${checkoutData.lastName}`.trim(),
+            phone: checkoutData.phone,
+          }).eq('id', user.id);
+          if (profileErr) console.error('Error updating profile:', profileErr);
+        }
+
+        if (checkoutData.saveAddress) {
+          const { error: addressError } = await supabase.from('user_addresses' as any).insert({
+            user_id: user.id,
+            label: checkoutData.addressLabel || 'Meu Endereço',
+            zip_code: checkoutData.zipCode,
+            street: checkoutData.street,
+            number: checkoutData.number,
+            complement: checkoutData.complement || '',
+            neighborhood: checkoutData.neighborhood || '',
+            city: checkoutData.city,
+            state: checkoutData.state,
+            is_default: false
+          });
+          if (addressError) console.error('Error saving address:', addressError);
+        }
+      }
+
       // 4. Create Order in DB
+      console.log('4. Creating order in DB...');
       const notesJson = JSON.stringify({
         customer: {
           firstName: checkoutData.firstName,
@@ -196,11 +238,16 @@ export const useCheckout = () => {
       });
 
       const orderData = {
-        buyer_id: user?.id || null, // Allow guest checkout if RLS permits, else logic needs authenticating
+        buyer_id: user?.id || null,
+        seller_id: items[0]?.product.seller?.id || (items[0]?.product as any).seller_id || null,
         total_amount: total,
-        status: 'pending' as 'pending', // In real world: 'paid' if credit card success, 'pending' for pix
+        shipping_cost: shipping,
+        shipping_method: selectedShipping?.name || 'Padrão',
+        status: 'pending' as 'pending',
         shipping_address: JSON.stringify({
-          address: checkoutData.address,
+          street: checkoutData.street,
+          number: checkoutData.number,
+          complement: checkoutData.complement,
           neighborhood: checkoutData.neighborhood,
           city: checkoutData.city,
           state: checkoutData.state,
@@ -211,38 +258,70 @@ export const useCheckout = () => {
         notes: notesJson,
       };
 
-      const { data, error } = await supabase
+      const { data, error: orderError } = await supabase
         .from('orders')
         .insert(orderData)
         .select()
         .single();
 
-      if (error) throw error;
+      if (orderError) {
+        console.error('Order creation FAILED:', orderError);
+        throw orderError;
+      }
 
       // 5. Create Order Items
-      const orderItems = items.map(item => ({
-        order_id: data.id,
-        product_id: item.product.id,
-        quantity: item.quantity,
-        unit_price: item.product.price,
-        seller_id: item.product.seller?.id || '',
-        variant_id: item.variant?.id || null,
-      }));
+      const orderItems = items.map(item => {
+        const itemSellerId = item.product.seller?.id || (item.product as any).seller_id;
+
+        return {
+          order_id: data.id,
+          product_id: item.product.id,
+          quantity: item.quantity,
+          unit_price: item.product.price,
+          total_price: item.quantity * item.product.price,
+          variant_id: item.variant?.id || null,
+          seller_id: itemSellerId || '00000000-0000-0000-0000-000000000000',
+          gift_message: checkoutData.giftOptions?.message || checkoutData.giftMessage || null,
+        };
+      });
 
       const { error: itemsError } = await supabase
         .from('order_items')
         .insert(orderItems);
 
-      if (itemsError) throw itemsError;
+      if (itemsError) {
+        console.error('Order items insertion FAILED:', itemsError);
+        throw itemsError;
+      }
 
-      // 6. Update Stock
+      // 6. Create Appointments for Services
       for (const item of items) {
-        await supabase
-          .from('products')
-          .update({
-            stock_quantity: item.product.stock_quantity - item.quantity
-          })
-          .eq('id', item.product.id);
+        if (item.product.is_service) {
+          console.log('Creating appointment for service:', item.product.name);
+          const { error: apptError } = await supabase.from('appointments').insert({
+            buyer_id: user?.id,
+            seller_id: item.product.seller?.id || (item.product as any).seller_id,
+            product_id: item.product.id,
+            appointment_date: checkoutData.deliverySchedule?.scheduled_date || new Date().toISOString().split('T')[0],
+            appointment_time: checkoutData.deliverySchedule?.scheduled_slot || '09:00',
+            service_address: `${checkoutData.street}, ${checkoutData.number}${checkoutData.complement ? ', ' + checkoutData.complement : ''}`,
+            status: 'pending',
+            notes: `Agendamento automático via pedido #${data.id.slice(0, 8)}. Mensagem: ${checkoutData.giftMessage || 'N/A'}`
+          });
+          if (apptError) console.error('Error creating automatic appointment:', apptError);
+        }
+      }
+
+      // 7. Update Stock (Only for physical products)
+      for (const item of items) {
+        if (!item.product.is_service && item.product.stock_quantity !== null) {
+          await supabase
+            .from('products')
+            .update({
+              stock_quantity: Math.max(0, item.product.stock_quantity - item.quantity)
+            })
+            .eq('id', item.product.id);
+        }
       }
 
       // 7. Send Confirmation Email
@@ -341,6 +420,7 @@ export const useCheckout = () => {
           review_count: item.products.review_count || 0,
           in_stock: item.products.in_stock,
           stock_quantity: item.products.stock_quantity || 0,
+          is_active: item.products.is_active ?? true,
           tags: item.products.tags || [],
           is_service: item.products.is_service,
           created_at: item.products.created_at,
@@ -382,7 +462,9 @@ export const useCheckout = () => {
           firstName: notesData.customer?.firstName || '',
           lastName: notesData.customer?.lastName || '',
           phone: notesData.customer?.phone || '',
-          address: shippingAddressData?.address || '',
+          street: shippingAddressData?.street || '',
+          number: shippingAddressData?.number || '',
+          complement: shippingAddressData?.complement || '',
           city: shippingAddressData?.city || '',
           state: shippingAddressData?.state || '',
           zipCode: shippingAddressData?.zipCode || '',

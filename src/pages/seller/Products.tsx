@@ -53,7 +53,7 @@ const SellerProducts = () => {
         .eq('id', id);
 
       if (error) throw error;
-      
+
       toast.success(currentStatus ? 'Produto desativado' : 'Produto ativado');
       fetchProducts();
     } catch (error: any) {
@@ -71,7 +71,7 @@ const SellerProducts = () => {
         .eq('id', id);
 
       if (error) throw error;
-      
+
       toast.success('Produto excluído');
       fetchProducts();
     } catch (error: any) {
@@ -86,8 +86,8 @@ const SellerProducts = () => {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      
-      <main className="container mx-auto px-4 py-8 mt-20">
+
+      <main className="container mx-auto px-4 py-8 pt-32">
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-4xl font-serif text-wine mb-2">Meus Produtos</h1>

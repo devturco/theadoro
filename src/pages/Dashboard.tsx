@@ -36,7 +36,7 @@ const Dashboard = () => {
       </div>
       {/* End Debug Dump */}
 
-      <main className="container mx-auto px-4 py-8 mt-20">
+      <main className="container mx-auto px-4 py-8 pt-32">
         <div className="mb-8">
           <h1 className="text-4xl font-serif text-wine mb-2">Minha Conta</h1>
           <p className="text-muted-foreground">

@@ -22,14 +22,15 @@ export const useProduct = (productId: string | undefined) => {
         .from('products')
         .select(`
           *,
-          categories (
+          slug,
+          categories:categories!fk_products_categories (
             id,
             name,
             slug,
             description,
-            image
+            image_url
           ),
-          profiles (
+          profiles:profiles!fk_products_profiles (
             id,
             full_name,
             avatar_url
@@ -38,6 +39,8 @@ export const useProduct = (productId: string | undefined) => {
 
       // Check if productId is a valid UUID
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(productId);
+
+
 
       if (isUUID) {
         query = query.eq('id', productId);
@@ -57,6 +60,7 @@ export const useProduct = (productId: string | undefined) => {
       const transformedProduct: Product = {
         id: data.id,
         name: data.name,
+        slug: data.slug,
         description: data.description,
         price: data.price,
         original_price: data.original_price,
@@ -93,7 +97,7 @@ export const useProduct = (productId: string | undefined) => {
 
       // Fetch related products
       if (data.categories?.id) {
-        fetchRelatedProducts(data.categories.id, productId);
+        fetchRelatedProducts(data.categories.id, data.id);
       }
 
     } catch (err) {
@@ -120,9 +124,9 @@ export const useProduct = (productId: string | undefined) => {
             name,
             slug,
             description,
-            image
+            image_url
           ),
-          profiles (
+          profiles!fk_products_profiles (
             id,
             full_name,
             avatar_url
@@ -137,6 +141,7 @@ export const useProduct = (productId: string | undefined) => {
       const transformedProducts: Product[] = (data || []).map(item => ({
         id: item.id,
         name: item.name,
+        slug: item.slug,
         description: item.description,
         price: item.price,
         original_price: item.original_price,
@@ -149,16 +154,17 @@ export const useProduct = (productId: string | undefined) => {
         is_service: item.is_service,
         created_at: item.created_at,
         updated_at: item.updated_at,
-        category: item.categories || {
-          id: '',
-          name: 'Sem categoria',
-          slug: 'sem-categoria',
+        category: {
+          id: item.categories?.id || '',
+          name: item.categories?.name || 'Sem categoria',
+          slug: item.categories?.slug || 'sem-categoria',
+          image: item.categories?.image_url,
         },
         seller: {
           id: item.profiles?.id || '',
           name: item.profiles?.full_name || 'Vendedor',
           avatar: item.profiles?.avatar_url,
-          location: item.profiles?.location || '',
+          location: '',
           rating: 0,
           reviewCount: 0,
           verified: false,
@@ -176,36 +182,36 @@ export const useProduct = (productId: string | undefined) => {
   }, []);
 
   const fetchReviews = useCallback(async () => {
-    if (!productId) return;
+    if (!product?.id) return;
 
     setReviewsLoading(true);
 
     try {
       const { data, error } = await supabase
-        .from('product_reviews')
+        .from('reviews')
         .select(`
           *,
-          profiles (
+          profiles!reviews_buyer_id_fkey (
             id,
             full_name,
             avatar_url
           )
         `)
-        .eq('product_id', productId)
+        .eq('product_id', product.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
       const transformedReviews: ProductReview[] = (data || []).map(review => ({
         id: review.id,
-        userId: review.user_id,
+        userId: review.buyer_id, // Changed from user_id to buyer_id
         userName: review.profiles?.full_name || 'Usuário',
         userAvatar: review.profiles?.avatar_url,
         rating: review.rating,
-        comment: review.comment,
+        comment: review.comment || '',
         createdAt: review.created_at,
-        helpful: review.helpful_count || 0,
-        images: review.images || [],
+        helpful: 0, // helpful_count not in types, defaulted to 0
+        images: [], // images not in types for reviews, defaulted to empty
       }));
 
       setReviews(transformedReviews);
@@ -214,10 +220,17 @@ export const useProduct = (productId: string | undefined) => {
     } finally {
       setReviewsLoading(false);
     }
-  }, [productId]);
+  }, [product]);
 
   const addReview = useCallback(async (rating: number, comment: string, images?: string[]) => {
-    if (!productId) return;
+    if (!product?.id || !product?.seller?.id) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível identificar o vendedor para avaliar.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -232,13 +245,14 @@ export const useProduct = (productId: string | undefined) => {
       }
 
       const { error } = await supabase
-        .from('product_reviews')
+        .from('reviews')
         .insert({
-          product_id: productId,
-          user_id: user.id,
+          product_id: product.id,
+          buyer_id: user.id,
+          seller_id: product.seller.id,
           rating,
           comment,
-          images: images || [],
+          // images: images || [], // images column does not exist in reviews table type
         });
 
       if (error) throw error;
@@ -262,7 +276,7 @@ export const useProduct = (productId: string | undefined) => {
         variant: "destructive",
       });
     }
-  }, [productId, fetchReviews, fetchProduct]);
+  }, [product, fetchReviews, fetchProduct]);
 
   const markReviewHelpful = useCallback(async (reviewId: string) => {
     try {

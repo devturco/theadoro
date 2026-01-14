@@ -20,15 +20,7 @@ export const RoleGuard = ({
   fallbackPath = '/dashboard',
   showError = true
 }: RoleGuardProps) => {
-  const { user, roles, loading } = useAuth();
-
-  console.log('RoleGuard Check:', {
-    path: window.location.pathname,
-    user: user?.email,
-    roles,
-    allowedRoles,
-    hasAccess: allowedRoles.some(role => roles.includes(role))
-  });
+  const { user, profile, roles, loading } = useAuth();
 
   if (loading) {
     return (

@@ -35,13 +35,13 @@ const WishlistItem: React.FC<WishlistItemProps> = ({ product, onRemove, onAddToC
 
           {/* Product Info */}
           <div className="flex-1 min-w-0">
-            <Link 
-              to={`/products/${product.id}`}
+            <Link
+              to={`/product/${product.slug || product.id}`}
               className="block hover:text-primary transition-colors"
             >
               <h3 className="font-semibold text-lg mb-1 truncate">{product.name}</h3>
             </Link>
-            
+
             <p className="text-gray-600 text-sm mb-2 line-clamp-2">
               {product.description}
             </p>
@@ -68,7 +68,7 @@ const WishlistItem: React.FC<WishlistItemProps> = ({ product, onRemove, onAddToC
                   <ShoppingCart className="w-4 h-4" />
                   Adicionar
                 </Button>
-                
+
                 <Button
                   variant="outline"
                   size="sm"
@@ -92,19 +92,19 @@ const EmptyWishlist: React.FC = () => {
       <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
         <Heart className="w-12 h-12 text-gray-400" />
       </div>
-      
+
       <h2 className="text-2xl font-semibold mb-2">Sua lista de favoritos está vazia</h2>
       <p className="text-gray-600 mb-6 max-w-md mx-auto">
         Explore nossos produtos e adicione seus favoritos para encontrá-los facilmente depois.
       </p>
-      
+
       <div className="flex gap-4 justify-center">
         <Button asChild>
           <Link to="/products">
             Explorar Produtos
           </Link>
         </Button>
-        
+
         <Button variant="outline" asChild>
           <Link to="/categories">
             Ver Categorias
@@ -136,19 +136,19 @@ const Wishlist: React.FC = () => {
             <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <Heart className="w-12 h-12 text-gray-400" />
             </div>
-            
+
             <h2 className="text-2xl font-semibold mb-2">Faça login para ver seus favoritos</h2>
             <p className="text-gray-600 mb-6 max-w-md mx-auto">
               Entre na sua conta para acessar sua lista de produtos favoritos.
             </p>
-            
+
             <div className="flex gap-4 justify-center">
               <Button asChild>
                 <Link to="/auth">
                   Fazer Login
                 </Link>
               </Button>
-              
+
               <Button variant="outline" asChild>
                 <Link to="/products">
                   Explorar Produtos
@@ -184,7 +184,7 @@ const Wishlist: React.FC = () => {
               Voltar
             </Link>
           </Button>
-          
+
           <div>
             <h1 className="text-3xl font-bold flex items-center gap-2">
               <Heart className="w-8 h-8 text-red-500" />

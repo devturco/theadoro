@@ -34,6 +34,7 @@ export const useProducts = (options: UseProductsOptions = {}) => {
         .from('products')
         .select(`
           *,
+          slug,
           category:categories!fk_products_categories (
             id,
             name,
@@ -139,6 +140,7 @@ export const useProducts = (options: UseProductsOptions = {}) => {
       const transformedProducts: Product[] = (data || []).map(item => ({
         id: item.id,
         name: item.name,
+        slug: item.slug,
         description: item.description,
         price: item.price,
         original_price: item.original_price,

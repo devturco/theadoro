@@ -17,27 +17,35 @@ const FeaturedProducts = () => {
       try {
         const { data, error } = await supabase
           .from('products')
-          .select('*, seller:profiles(full_name)')
+          .select('*, slug, seller:profiles(full_name)')
           .limit(4);
 
         if (error) throw error;
 
         setProducts((data || []).map((p: any) => ({
+          stock_quantity: p.stock_quantity || 0,
+          in_stock: p.in_stock ?? (p.stock_quantity > 0),
+          is_service: p.is_service || false,
+          is_active: p.is_active !== false,
+          tags: p.tags || [],
+          category: {
+            id: p.category_id,
+            name: 'Categoria',
+            slug: 'categoria',
+          },
+          // details
           id: p.id,
           name: p.name,
+          slug: p.slug,
           price: p.price,
-          originalPrice: p.original_price,
-          image: p.image_url || 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?q=80&w=2000',
-          seller: p.seller?.full_name || 'Vendedor',
-          rating: 5.0, // placeholder
-          reviews: 0,
-          badge: p.is_promotion ? 'Oferta' : undefined,
-          description: p.description,
+          original_price: p.original_price,
           images: p.images || [],
-          reviewCount: 0,
-          sellerId: p.seller_id,
-          sellerName: p.seller?.full_name || 'Vendedor',
-          categoryId: p.category_id,
+          rating: 5.0,
+          review_count: 0,
+          seller: {
+            id: p.seller_id,
+            name: p.seller?.full_name || 'Vendedor',
+          }
         })));
       } catch (error) {
         console.error('Error loading featured products:', error);
@@ -72,7 +80,7 @@ const FeaturedProducts = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {products.map((product, index) => (
             <Link
-              to={`/products/${product.id}`}
+              to={`/product/${product.slug || product.id}`}
               key={product.id}
               className="group bg-card rounded-2xl overflow-hidden shadow-md hover:shadow-wine transition-all duration-300 animate-fade-in hover-scale block"
               style={{ animationDelay: `${index * 100}ms` }}
@@ -80,15 +88,11 @@ const FeaturedProducts = () => {
               {/* Image */}
               <div className="relative aspect-square overflow-hidden bg-muted">
                 <img
-                  src={product.image}
+                  src={product.images[0] || 'https://placehold.co/400'}
                   alt={product.name}
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                 />
-                {product.badge && (
-                  <Badge className="absolute top-3 left-3 bg-primary text-primary-foreground">
-                    {product.badge}
-                  </Badge>
-                )}
+                {/* Badge removed as it is not in Product interface generally unless custom field */}
                 <Button
                   size="icon"
                   variant="ghost"
@@ -105,7 +109,7 @@ const FeaturedProducts = () => {
               {/* Content */}
               <div className="p-5 space-y-3">
                 {/* Seller */}
-                <p className="text-xs text-muted-foreground">{product.sellerName}</p>
+                <p className="text-xs text-muted-foreground">{product.seller.name}</p>
 
                 {/* Title */}
                 <h3 className="font-semibold text-foreground line-clamp-2 group-hover:text-primary transition-colors">
@@ -116,7 +120,7 @@ const FeaturedProducts = () => {
                 <div className="flex items-center gap-1">
                   <Star className="h-4 w-4 fill-champagne text-champagne" />
                   <span className="text-sm font-medium">{product.rating}</span>
-                  <span className="text-xs text-muted-foreground">({product.reviews})</span>
+                  <span className="text-xs text-muted-foreground">({product.review_count})</span>
                 </div>
 
                 {/* Price */}
@@ -124,9 +128,9 @@ const FeaturedProducts = () => {
                   <span className="text-2xl font-bold text-primary">
                     R$ {product.price.toFixed(2)}
                   </span>
-                  {product.originalPrice && (
+                  {product.original_price && (
                     <span className="text-sm text-muted-foreground line-through">
-                      R$ {product.originalPrice.toFixed(2)}
+                      R$ {product.original_price.toFixed(2)}
                     </span>
                   )}
                 </div>

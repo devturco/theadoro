@@ -9,12 +9,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 import { useRole } from '@/hooks/useRole';
-import { 
-  User, 
-  Mail, 
-  Phone, 
-  MapPin, 
+import {
+  User,
+  Mail,
+  Phone,
+  MapPin,
   Calendar,
   Bell,
   Shield,
@@ -76,76 +78,159 @@ export default function BuyerProfile() {
   const loadProfile = async () => {
     try {
       setLoading(true);
-      
-      // Mock data - replace with actual API calls
-      const mockProfile: UserProfile = {
-        id: user?.id || '1',
-        email: user?.email || 'comprador@example.com',
-        full_name: 'João Silva',
-        phone: '(11) 99999-9999',
-        birth_date: '1990-05-15',
+
+      const { data: profData, error: profError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user?.id)
+        .single();
+
+      if (profError) throw profError;
+
+      const { data: ordData, error: ordError } = await supabase
+        .from('orders')
+        .select('total_amount, status')
+        .eq('buyer_id', user?.id);
+
+      if (ordError) throw ordError;
+
+      const { count: wishCount, error: wishError } = await supabase
+        .from('wishlist')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user?.id);
+
+      if (wishError) throw wishError;
+
+      // Map Supabase profile to UI state
+      const mappedProfile: UserProfile = {
+        id: profData.id,
+        email: profData.email,
+        full_name: profData.full_name || '',
+        phone: profData.phone || '',
+        birth_date: (profData as any).birth_date || '',
         address: {
-          street: 'Rua das Flores',
-          number: '123',
-          complement: 'Apto 45',
-          neighborhood: 'Centro',
-          city: 'São Paulo',
-          state: 'SP',
-          zip_code: '01234-567'
+          street: profData.address || '',
+          number: (profData as any).address_number || '',
+          complement: (profData as any).address_complement || '',
+          neighborhood: (profData as any).neighborhood || '',
+          city: profData.city || '',
+          state: profData.state || '',
+          zip_code: profData.postal_code || ''
         },
-        avatar_url: 'https://trae-api-us.mchost.guru/api/ide/v1/text_to_image?prompt=professional%20avatar%20male%20friendly%20smile&image_size=square',
-        bio: 'Apaixonado por presentes únicos e artesanais. Sempre em busca de produtos especiais para momentos importantes.',
-        preferences: {
+        avatar_url: profData.avatar_url || '',
+        bio: profData.bio || '',
+        preferences: (profData as any).preferences || {
           email_notifications: true,
           sms_notifications: false,
           marketing_emails: true,
           order_updates: true
         },
         stats: {
-          total_orders: 15,
-          total_spent: 2450.80,
-          wishlist_items: 8,
-          reviews_given: 12
+          total_orders: ordData?.length || 0,
+          total_spent: ordData?.reduce((acc, curr) => acc + (curr.total_amount || 0), 0) || 0,
+          wishlist_items: wishCount || 0,
+          reviews_given: 0 // TODO: Fetch from reviews table
         }
       };
 
-      setProfile(mockProfile);
-    } catch (error) {
+      setProfile(mappedProfile);
+    } catch (error: any) {
       console.error('Error loading profile:', error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao carregar perfil",
+        description: error.message
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const handleSaveProfile = async () => {
-    if (!profile) return;
-    
+    if (!profile || !user) return;
+
     try {
       setSaving(true);
-      
-      // Save profile - replace with actual API call
-      console.log('Saving profile:', profile);
-      
+
+      const updates = {
+        full_name: profile.full_name,
+        phone: profile.phone,
+        birth_date: profile.birth_date || null,
+        address: profile.address.street,
+        address_number: profile.address.number,
+        address_complement: profile.address.complement,
+        neighborhood: profile.address.neighborhood,
+        city: profile.address.city,
+        state: profile.address.state,
+        postal_code: profile.address.zip_code,
+        bio: profile.bio,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso",
+        description: "Perfil atualizado com sucesso!"
+      });
+
       setIsEditing(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving profile:', error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao salvar",
+        description: error.message
+      });
     } finally {
       setSaving(false);
     }
   };
 
-  const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file && profile) {
-      // Handle avatar upload - replace with actual upload logic
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setProfile({
-          ...profile,
-          avatar_url: e.target?.result as string
+    if (file && profile && user) {
+      try {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${user.id}-${Math.random()}.${fileExt}`;
+        const filePath = `avatars/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('avatars')
+          .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('avatars')
+          .getPublicUrl(filePath);
+
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ avatar_url: publicUrl })
+          .eq('id', user.id);
+
+        if (updateError) throw updateError;
+
+        setProfile({ ...profile, avatar_url: publicUrl });
+
+        toast({
+          title: "Sucesso",
+          description: "Foto atualizada com sucesso!"
         });
-      };
-      reader.readAsDataURL(file);
+      } catch (error: any) {
+        console.error('Error uploading avatar:', error);
+        toast({
+          variant: "destructive",
+          title: "Erro ao enviar foto",
+          description: error.message
+        });
+      }
     }
   };
 
@@ -184,7 +269,7 @@ export default function BuyerProfile() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 container mx-auto px-4 pb-12">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Meu Perfil</h1>
@@ -221,7 +306,7 @@ export default function BuyerProfile() {
             <div className="text-2xl font-bold">{profile.stats.total_orders}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Gasto</CardTitle>
@@ -231,7 +316,7 @@ export default function BuyerProfile() {
             <div className="text-2xl font-bold">R$ {profile.stats.total_spent.toFixed(2)}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Lista de Desejos</CardTitle>
@@ -241,7 +326,7 @@ export default function BuyerProfile() {
             <div className="text-2xl font-bold">{profile.stats.wishlist_items}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Avaliações Feitas</CardTitle>

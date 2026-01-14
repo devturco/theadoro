@@ -16,10 +16,12 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useRole } from '@/hooks/useRole';
 import { useCRUD } from '@/hooks/useCRUD';
-import { 
-  ShoppingCart, 
-  Package, 
-  Truck, 
+import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
+import {
+  ShoppingCart,
+  Package,
+  Truck,
   CheckCircle,
   XCircle,
   Eye,
@@ -49,8 +51,7 @@ export default function BuyerOrders() {
     cancelled: 0
   });
   const [loading, setLoading] = useState(true);
-  const [selectedOrder, setSelectedOrder] = useState<any>(null);
-  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -65,57 +66,55 @@ export default function BuyerOrders() {
   const loadOrders = async () => {
     try {
       setLoading(true);
-      
-      // Mock data - replace with actual API calls
-      const mockOrders = [
-        {
-          id: '1',
-          seller_name: 'Artesanatos Maria',
-          seller_email: 'maria@artesanatos.com',
-          total_amount: 299.90,
-          status: 'delivered',
-          created_at: '2024-01-15T10:30:00Z',
-          delivery_date: '2024-01-20T14:00:00Z',
-          tracking_code: 'BR123456789',
-          items: [
-            { product_name: 'Colar Personalizado', quantity: 1, price: 299.90 }
-          ]
-        },
-        {
-          id: '2',
-          seller_name: 'Joias Premium',
-          seller_email: 'contato@joiaspremium.com',
-          total_amount: 150.00,
-          status: 'shipped',
-          created_at: '2024-01-14T14:20:00Z',
-          tracking_code: 'BR987654321',
-          items: [
-            { product_name: 'Pulseira Artesanal', quantity: 2, price: 75.00 }
-          ]
-        },
-        {
-          id: '3',
-          seller_name: 'Presentes Especiais',
-          seller_email: 'vendas@presentesespeciais.com',
-          total_amount: 450.00,
-          status: 'confirmed',
-          created_at: '2024-01-13T09:15:00Z',
-          items: [
-            { product_name: 'Kit Presente Especial', quantity: 1, price: 450.00 }
-          ]
-        }
-      ];
+
+      let query = supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items (
+            *,
+            products (*)
+          )
+        `)
+        .eq('buyer_id', user?.id)
+        .order('created_at', { ascending: false });
+
+      if (statusFilter !== 'all') {
+        query = query.eq('status', statusFilter as any);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      // Calculate stats based on all personal orders
+      const { data: allOrders, error: statsError } = await supabase
+        .from('orders')
+        .select('status')
+        .eq('buyer_id', user?.id);
+
+      if (statsError) throw statsError;
 
       const mockStats: OrderStats = {
-        total: mockOrders.length,
-        pending: mockOrders.filter(o => o.status === 'pending').length,
-        confirmed: mockOrders.filter(o => o.status === 'confirmed').length,
-        shipped: mockOrders.filter(o => o.status === 'shipped').length,
-        delivered: mockOrders.filter(o => o.status === 'delivered').length,
-        cancelled: mockOrders.filter(o => o.status === 'cancelled').length
+        total: allOrders?.length || 0,
+        pending: allOrders?.filter(o => o.status === 'pending').length || 0,
+        confirmed: allOrders?.filter(o => o.status === 'confirmed').length || 0,
+        shipped: allOrders?.filter(o => o.status === 'shipped').length || 0,
+        delivered: allOrders?.filter(o => o.status === 'delivered').length || 0,
+        cancelled: allOrders?.filter(o => o.status === 'cancelled').length || 0
       };
 
-      setOrders(mockOrders);
+      const formattedOrders = data?.map(order => ({
+        ...order,
+        seller_name: 'Vendedor', // Logic to fetch seller name if needed
+        items: order.order_items?.map((item: any) => ({
+          product_name: item.products?.name || 'Produto',
+          quantity: item.quantity,
+          price: item.unit_price
+        })) || []
+      })) || [];
+
+      setOrders(formattedOrders);
       setStats(mockStats);
     } catch (error) {
       console.error('Error loading orders:', error);
@@ -125,22 +124,19 @@ export default function BuyerOrders() {
   };
 
   const handleViewOrder = (order: any) => {
-    setSelectedOrder(order);
-    setIsDetailsOpen(true);
+    navigate(`/buyer/orders/${order.id}`);
   };
 
   const handleCancelOrder = async (orderId: string) => {
     try {
-      // Cancel order - replace with actual API call
-      setOrders(prev => 
-        prev.map(order => 
-          order.id === orderId 
-            ? { ...order, status: 'cancelled' }
-            : order
-        )
-      );
-      
-      // Reload stats
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: 'cancelled' })
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      // Reload everything
       loadOrders();
     } catch (error) {
       console.error('Error cancelling order:', error);
@@ -150,22 +146,22 @@ export default function BuyerOrders() {
   const orderColumns = [
     {
       key: 'id',
-      label: 'ID',
+      title: 'ID',
       render: (value: string) => `#${value.slice(0, 8)}`
     },
     {
       key: 'seller_name',
-      label: 'Vendedor',
+      title: 'Vendedor',
       render: (value: string) => value || 'N/A'
     },
     {
       key: 'total_amount',
-      label: 'Total',
+      title: 'Total',
       render: (value: number) => `R$ ${value?.toFixed(2) || '0.00'}`
     },
     {
       key: 'status',
-      label: 'Status',
+      title: 'Status',
       render: (value: string) => {
         const statusMap = {
           pending: { label: 'Pendente', variant: 'secondary' as const },
@@ -181,16 +177,16 @@ export default function BuyerOrders() {
     },
     {
       key: 'created_at',
-      label: 'Data',
+      title: 'Data',
       render: (value: string) => new Date(value).toLocaleDateString('pt-BR')
     },
     {
       key: 'actions',
-      label: 'Ações',
+      title: 'Ações',
       render: (_: any, row: any) => (
         <div className="flex gap-2">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             size="sm"
             onClick={() => handleViewOrder(row)}
           >
@@ -198,8 +194,8 @@ export default function BuyerOrders() {
             Ver
           </Button>
           {row.status === 'pending' && (
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="sm"
               onClick={() => handleCancelOrder(row.id)}
             >
@@ -208,8 +204,8 @@ export default function BuyerOrders() {
             </Button>
           )}
           {row.status === 'delivered' && (
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="sm"
             >
               <Star className="h-4 w-4 mr-1" />
@@ -224,7 +220,7 @@ export default function BuyerOrders() {
   const filteredOrders = orders.filter(order => {
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
     const matchesSearch = order.seller_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         order.id.toLowerCase().includes(searchTerm.toLowerCase());
+      order.id.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesStatus && matchesSearch;
   });
 
@@ -258,7 +254,7 @@ export default function BuyerOrders() {
             <div className="text-2xl font-bold">{stats.total}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Pendentes</CardTitle>
@@ -268,7 +264,7 @@ export default function BuyerOrders() {
             <div className="text-2xl font-bold">{stats.pending}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Confirmados</CardTitle>
@@ -278,7 +274,7 @@ export default function BuyerOrders() {
             <div className="text-2xl font-bold">{stats.confirmed}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Enviados</CardTitle>
@@ -288,7 +284,7 @@ export default function BuyerOrders() {
             <div className="text-2xl font-bold">{stats.shipped}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Entregues</CardTitle>
@@ -298,7 +294,7 @@ export default function BuyerOrders() {
             <div className="text-2xl font-bold">{stats.delivered}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Cancelados</CardTitle>
@@ -360,87 +356,10 @@ export default function BuyerOrders() {
             data={filteredOrders}
             columns={orderColumns}
             loading={loading}
-            searchable={false}
           />
         </CardContent>
       </Card>
 
-      {/* Order Details Dialog */}
-      <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Detalhes do Pedido #{selectedOrder?.id.slice(0, 8)}</DialogTitle>
-            <DialogDescription>
-              Informações completas do pedido
-            </DialogDescription>
-          </DialogHeader>
-          
-          {selectedOrder && (
-            <div className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <Label className="text-sm font-medium">Vendedor</Label>
-                  <p className="text-sm text-muted-foreground">{selectedOrder.seller_name}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium">Email do Vendedor</Label>
-                  <p className="text-sm text-muted-foreground">{selectedOrder.seller_email}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium">Status</Label>
-                  <Badge className="mt-1">
-                    {selectedOrder.status === 'delivered' ? 'Entregue' : 
-                     selectedOrder.status === 'shipped' ? 'Enviado' : 
-                     selectedOrder.status === 'confirmed' ? 'Confirmado' : 'Pendente'}
-                  </Badge>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium">Data do Pedido</Label>
-                  <p className="text-sm text-muted-foreground">
-                    {new Date(selectedOrder.created_at).toLocaleDateString('pt-BR')}
-                  </p>
-                </div>
-                {selectedOrder.tracking_code && (
-                  <div>
-                    <Label className="text-sm font-medium">Código de Rastreamento</Label>
-                    <p className="text-sm text-muted-foreground">{selectedOrder.tracking_code}</p>
-                  </div>
-                )}
-                {selectedOrder.delivery_date && (
-                  <div>
-                    <Label className="text-sm font-medium">Data de Entrega</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {new Date(selectedOrder.delivery_date).toLocaleDateString('pt-BR')}
-                    </p>
-                  </div>
-                )}
-              </div>
-              
-              <div>
-                <Label className="text-sm font-medium">Itens</Label>
-                <div className="mt-2 space-y-2">
-                  {selectedOrder.items?.map((item: any, index: number) => (
-                    <div key={index} className="flex justify-between items-center p-2 border rounded">
-                      <div>
-                        <p className="font-medium">{item.product_name}</p>
-                        <p className="text-sm text-muted-foreground">Quantidade: {item.quantity}</p>
-                      </div>
-                      <p className="font-medium">R$ {item.price.toFixed(2)}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              
-              <div className="border-t pt-4">
-                <div className="flex justify-between items-center">
-                  <span className="font-medium">Total:</span>
-                  <span className="text-lg font-bold">R$ {selectedOrder.total_amount.toFixed(2)}</span>
-                </div>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

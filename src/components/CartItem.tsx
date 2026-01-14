@@ -27,7 +27,7 @@ export const CartItem: React.FC<CartItemProps> = ({
 
   const handleQuantityChange = async (newQuantity: number) => {
     if (newQuantity < 1) return;
-    
+
     setIsUpdating(true);
     try {
       await updateQuantity(item.id, newQuantity);
@@ -49,10 +49,12 @@ export const CartItem: React.FC<CartItemProps> = ({
   const handleMoveToWishlist = async () => {
     try {
       await addToWishlist({
+        ...item.product, // Spread existing product properties first
         id: item.product.id,
         name: item.product.name,
+        slug: item.product.slug,
         price: item.product.price,
-        image: item.product.images[0]?.url || '',
+        images: item.product.images || [], // Ensure images is passed correctly
         seller: item.product.seller,
       });
       await removeFromCart(item.id);
@@ -69,9 +71,9 @@ export const CartItem: React.FC<CartItemProps> = ({
   };
 
   const totalPrice = item.product.price * item.quantity;
-  const hasDiscount = item.product.originalPrice && item.product.originalPrice > item.product.price;
-  const discountPercentage = hasDiscount 
-    ? Math.round(((item.product.originalPrice! - item.product.price) / item.product.originalPrice!) * 100)
+  const hasDiscount = item.product.original_price && item.product.original_price > item.product.price;
+  const discountPercentage = hasDiscount
+    ? Math.round(((item.product.original_price! - item.product.price) / item.product.original_price!) * 100)
     : 0;
 
   const itemClasses = cn(
@@ -86,7 +88,7 @@ export const CartItem: React.FC<CartItemProps> = ({
         {/* Product Image */}
         <div className={cn('flex-shrink-0', compact ? 'w-16 h-16' : 'w-20 h-20')}>
           <img
-            src={item.product.images[0]?.url || '/placeholder-product.jpg'}
+            src={item.product.images?.[0] || '/placeholder-product.jpg'}
             alt={item.product.name}
             className="w-full h-full object-cover rounded-md"
           />
@@ -97,12 +99,12 @@ export const CartItem: React.FC<CartItemProps> = ({
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
               <Link
-                to={`/products/${item.product.id}`}
+                to={`/product/${item.product.slug || item.product.id}`}
                 className="text-sm font-medium text-gray-900 hover:text-blue-600 line-clamp-2"
               >
                 {item.product.name}
               </Link>
-              
+
               {item.product.seller && (
                 <p className="text-xs text-gray-500 mt-1">
                   Vendido por {item.product.seller.name}
@@ -126,13 +128,13 @@ export const CartItem: React.FC<CartItemProps> = ({
               )}
 
               {/* Stock Status */}
-              {item.product.stock <= 5 && item.product.stock > 0 && (
+              {item.product.stock_quantity <= 5 && item.product.stock_quantity > 0 && (
                 <p className="text-xs text-orange-600 mt-1">
-                  Apenas {item.product.stock} em estoque
+                  Apenas {item.product.stock_quantity} em estoque
                 </p>
               )}
-              
-              {item.product.stock === 0 && (
+
+              {item.product.stock_quantity === 0 && (
                 <p className="text-xs text-red-600 mt-1">
                   Fora de estoque
                 </p>
@@ -142,12 +144,12 @@ export const CartItem: React.FC<CartItemProps> = ({
             {/* Quick Actions */}
             {!compact && (
               <div className="flex items-center gap-1 ml-2">
-                <Link to={`/products/${item.product.id}`}>
+                <Link to={`/product/${item.product.slug || item.product.id}`}>
                   <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                     <ExternalLink className="h-3 w-3" />
                   </Button>
                 </Link>
-                
+
                 {showActions && !isInWishlist(item.product.id) && (
                   <Button
                     variant="ghost"
@@ -167,9 +169,9 @@ export const CartItem: React.FC<CartItemProps> = ({
           <div className="flex items-center justify-between mt-3">
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-gray-900">
-                {formatPrice(item.product.price)}
+                {formatPrice(item.product.price || 0)}
               </span>
-              
+
               {hasDiscount && (
                 <>
                   <span className="text-xs text-gray-500 line-through">
@@ -195,16 +197,16 @@ export const CartItem: React.FC<CartItemProps> = ({
                   >
                     <Minus className="h-3 w-3" />
                   </Button>
-                  
+
                   <span className="px-3 py-1 text-sm font-medium min-w-[2rem] text-center">
                     {item.quantity}
                   </span>
-                  
+
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => handleQuantityChange(item.quantity + 1)}
-                    disabled={item.quantity >= item.product.stock || isUpdating}
+                    disabled={item.quantity >= item.product.stock_quantity || isUpdating}
                     className="h-8 w-8 p-0 rounded-none"
                   >
                     <Plus className="h-3 w-3" />
@@ -243,17 +245,17 @@ export const CartItem: React.FC<CartItemProps> = ({
                 <span className="text-gray-500">Frete:</span>
                 <span className={cn(
                   'font-medium',
-                  item.product.shippingInfo.freeShipping 
-                    ? 'text-green-600' 
+                  item.product.shippingInfo.freeShipping
+                    ? 'text-green-600'
                     : 'text-gray-700'
                 )}>
-                  {item.product.shippingInfo.freeShipping 
-                    ? 'Grátis' 
+                  {item.product.shippingInfo.freeShipping
+                    ? 'Grátis'
                     : formatPrice(item.product.shippingInfo.price)
                   }
                 </span>
               </div>
-              
+
               {item.product.shippingInfo.estimatedDays && (
                 <div className="flex items-center justify-between text-xs mt-1">
                   <span className="text-gray-500">Entrega:</span>

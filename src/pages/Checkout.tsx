@@ -11,11 +11,14 @@ import {
   Truck,
   Gift
 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/hooks/useCart';
+import { CartItem } from '@/contexts/CartContext';
 import { useCheckout } from '@/hooks/useCheckout';
 import { GiftOptions } from '@/components/checkout/GiftOptions';
 import { DeliveryScheduler } from '@/components/checkout/DeliveryScheduler';
 import { GiftOptions as GiftOptionsType, DeliverySchedule as DeliveryScheduleType } from '@/types/order';
+import { GIFT_WRAPS } from '@/data/giftWraps';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -53,7 +56,6 @@ interface CheckoutFormData {
   installments: number;
 
   // Options
-  saveAddress: boolean;
   isGift: boolean;
   giftMessage: string;
   newsletter: boolean;
@@ -61,6 +63,11 @@ interface CheckoutFormData {
   // New complex objects
   giftOptions: GiftOptionsType;
   deliverySchedule: DeliveryScheduleType;
+
+  // Save options
+  saveProfile?: boolean;
+  saveAddress?: boolean;
+  addressLabel?: string;
 }
 
 // Initial state helpers
@@ -71,6 +78,32 @@ const INITIAL_GIFT_OPTIONS: GiftOptionsType = {
 const INITIAL_DELIVERY_SCHEDULE: DeliveryScheduleType = {
   scheduled_date: '',
   scheduled_slot: '',
+};
+
+const INITIAL_STATE: CheckoutFormData = {
+  firstName: '',
+  lastName: '',
+  email: '',
+  phone: '',
+  zipCode: '',
+  street: '',
+  number: '',
+  complement: '',
+  neighborhood: '',
+  city: '',
+  state: '',
+  paymentMethod: 'credit',
+  cardNumber: '',
+  cardName: '',
+  cardExpiry: '',
+  cardCvv: '',
+  installments: 1,
+  saveAddress: false,
+  isGift: false,
+  giftMessage: '',
+  newsletter: false,
+  giftOptions: INITIAL_GIFT_OPTIONS,
+  deliverySchedule: INITIAL_DELIVERY_SCHEDULE,
 };
 
 export const Checkout: React.FC = () => {
@@ -85,57 +118,149 @@ export const Checkout: React.FC = () => {
     validateCheckoutData
   } = useCheckout();
 
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const [currentStep, setCurrentStep] = useState<number>(() => {
+    const saved = localStorage.getItem('checkoutStep');
+    if (saved) {
+      const step = parseInt(saved);
+      if (step >= 1 && step <= 4) return step;
+    }
+    return 1;
+  });
+
+  const [formData, setFormData] = useState<CheckoutFormData>(() => {
+    const saved = localStorage.getItem('checkoutFormData');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // Merge with INITIAL_STATE to ensure all fields and nested structures exist
+        return {
+          ...INITIAL_STATE,
+          ...parsed,
+          giftOptions: { ...INITIAL_STATE.giftOptions, ...(parsed.giftOptions || {}) },
+          deliverySchedule: { ...INITIAL_STATE.deliverySchedule, ...(parsed.deliverySchedule || {}) }
+        };
+      } catch (e) {
+        console.error('Error parsing saved form data', e);
+      }
+    }
+    return INITIAL_STATE;
+  });
+
+  const { profile } = useAuth();
+  const [profileAutoFilled, setProfileAutoFilled] = useState(false);
+
+  // Auto-fill from profile if logged in and data is empty
+  useEffect(() => {
+    if (profile && !profileAutoFilled) {
+      setFormData(prev => ({
+        ...prev,
+        firstName: prev.firstName || profile.full_name?.split(' ')[0] || '',
+        lastName: prev.lastName || profile.full_name?.split(' ').slice(1).join(' ') || '',
+        email: prev.email || profile.email || '',
+        phone: prev.phone || profile.phone || '',
+        zipCode: prev.zipCode || profile.postal_code || '',
+        street: prev.street || profile.address || '',
+        number: prev.number || (profile as any).address_number || '',
+        complement: prev.complement || (profile as any).address_complement || '',
+        neighborhood: prev.neighborhood || (profile as any).neighborhood || '',
+        city: prev.city || profile.city || '',
+        state: prev.state || profile.state || '',
+      }));
+      setProfileAutoFilled(true);
+    }
+  }, [profile, profileAutoFilled]);
+
+
   // Calculate summary derived from cart items
   const subtotal = cart.items.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
   const shippingCost = selectedShipping?.price || 0;
-  const discount = 0;
-  const total = subtotal + shippingCost - discount;
+
+  // Find selected gift wrap price
+  const selectedWrap = formData.giftOptions.is_gift && formData.giftOptions.wrap_style_id
+    ? GIFT_WRAPS.find(w => w.id === formData.giftOptions.wrap_style_id)
+    : null;
+  const giftWrapPrice = selectedWrap?.price || 0;
+
+  let discount = 0;
+  if (formData.paymentMethod === 'pix') {
+    discount = (subtotal + shippingCost) * 0.05;
+  } else if (formData.paymentMethod === 'boleto') {
+    discount = (subtotal + shippingCost) * 0.03;
+  }
+
+  const total = subtotal + shippingCost + giftWrapPrice - discount;
 
   const summary = {
     subtotal,
     shipping: shippingCost,
+    giftWrap: giftWrapPrice,
     discount,
     total
   };
 
-  const [currentStep, setCurrentStep] = useState(1);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const [formData, setFormData] = useState<CheckoutFormData>({
-    firstName: '',
-    lastName: '',
-    email: '',
-    phone: '',
-    zipCode: '',
-    street: '',
-    number: '',
-    complement: '',
-    neighborhood: '',
-    city: '',
-    state: '',
-    paymentMethod: 'credit',
-    cardNumber: '',
-    cardName: '',
-    cardExpiry: '',
-    cardCvv: '',
-    installments: 1,
-    saveAddress: false,
-    isGift: false,
-    giftMessage: '',
-    newsletter: false,
-    giftOptions: INITIAL_GIFT_OPTIONS,
-    deliverySchedule: INITIAL_DELIVERY_SCHEDULE,
-  });
 
 
+  // Save state to localStorage changes
+  useEffect(() => {
+    localStorage.setItem('checkoutFormData', JSON.stringify(formData));
+  }, [formData]);
 
   useEffect(() => {
-    // Redirect if cart is empty
+    localStorage.setItem('checkoutStep', currentStep.toString());
+    // Scroll to top on step change
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentStep]);
+
+  // Redirect if cart is empty
+  useEffect(() => {
     if (cart.items.length === 0) {
       navigate('/cart');
     }
   }, [cart.items.length, navigate]);
+
+
+  // CEP Autofill
+  useEffect(() => {
+    const cep = formData.zipCode.replace(/\D/g, '');
+
+    if (cep.length === 8) {
+      setIsProcessing(true); // Using existing loading state or maybe could use a local one to just show indicator
+      fetch(`https://viacep.com.br/ws/${cep}/json/`)
+        .then(res => res.json())
+        .then(data => {
+          if (!data.erro) {
+            setFormData(prev => ({
+              ...prev,
+              street: data.logradouro,
+              neighborhood: data.bairro,
+              city: data.localidade,
+              state: data.uf,
+              complement: data.complemento || prev.complement, // Keep existing if user typed or just overwrite? usually overwrite or use data.complemento if exists
+            }));
+            // Clear errors for these fields if any
+            setErrors(prev => ({
+              ...prev,
+              street: '',
+              neighborhood: '',
+              city: '',
+              state: '',
+              zipCode: ''
+            }));
+          } else {
+            setErrors(prev => ({ ...prev, zipCode: 'CEP não encontrado' }));
+          }
+        })
+        .catch(() => {
+          setErrors(prev => ({ ...prev, zipCode: 'Erro ao buscar CEP' }));
+        })
+        .finally(() => {
+          setIsProcessing(false);
+        });
+    }
+  }, [formData.zipCode]);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -182,7 +307,6 @@ export const Checkout: React.FC = () => {
         if (!formData.cardExpiry.trim()) newErrors.cardExpiry = 'Validade é obrigatória';
         if (!formData.cardCvv.trim()) newErrors.cardCvv = 'CVV é obrigatório';
       }
-      if (!formData.cardCvv.trim()) newErrors.cardCvv = 'CVV é obrigatório';
     }
 
 
@@ -253,7 +377,10 @@ export const Checkout: React.FC = () => {
       }
     } catch (error) {
       console.error('Error processing order:', error);
-      setErrors({ general: 'Erro ao processar pedido. Tente novamente.' });
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao processar pedido. Tente novamente.';
+      setErrors({ general: errorMessage });
+      // Suggestion: toast error here if toast is available in component
+      alert(errorMessage); // Temporary fallback for visibility
     } finally {
       setIsProcessing(false);
     }
@@ -279,7 +406,13 @@ export const Checkout: React.FC = () => {
             <div className="flex items-center gap-4">
               <Button
                 variant="ghost"
-                onClick={() => navigate('/cart')}
+                onClick={() => {
+                  if (currentStep > 1) {
+                    setCurrentStep(prev => prev - 1);
+                  } else {
+                    navigate('/cart');
+                  }
+                }}
                 className="p-2"
               >
                 <ArrowLeft className="h-5 w-5" />
@@ -410,6 +543,17 @@ export const Checkout: React.FC = () => {
 
                   <div className="flex items-center space-x-2">
                     <Checkbox
+                      id="saveProfile"
+                      checked={formData.saveProfile}
+                      onCheckedChange={(checked) => handleInputChange('saveProfile', checked as boolean)}
+                    />
+                    <Label htmlFor="saveProfile" className="text-sm">
+                      Salvar meus dados no perfil
+                    </Label>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
                       id="newsletter"
                       checked={formData.newsletter}
                       onCheckedChange={(checked) => handleInputChange('newsletter', checked as boolean)}
@@ -514,10 +658,9 @@ export const Checkout: React.FC = () => {
                           <SelectValue placeholder="Selecione" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="SP">São Paulo</SelectItem>
-                          <SelectItem value="RJ">Rio de Janeiro</SelectItem>
-                          <SelectItem value="MG">Minas Gerais</SelectItem>
-                          {/* Add more states */}
+                          {['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'].map((uf) => (
+                            <SelectItem key={uf} value={uf}>{uf}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       {errors.state && (
@@ -538,26 +681,14 @@ export const Checkout: React.FC = () => {
                       </Label>
                     </div>
 
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="isGift"
-                        checked={formData.isGift}
-                        onCheckedChange={(checked) => handleInputChange('isGift', checked as boolean)}
-                      />
-                      <Label htmlFor="isGift" className="text-sm">
-                        Este pedido é um presente
-                      </Label>
-                    </div>
-
-                    {formData.isGift && (
+                    {formData.saveAddress && (
                       <div>
-                        <Label htmlFor="giftMessage">Mensagem do presente</Label>
-                        <Textarea
-                          id="giftMessage"
-                          value={formData.giftMessage}
-                          onChange={(e) => handleInputChange('giftMessage', e.target.value)}
-                          placeholder="Escreva uma mensagem especial..."
-                          rows={3}
+                        <Label htmlFor="addressLabel">Nome do Endereço</Label>
+                        <Input
+                          id="addressLabel"
+                          value={formData.addressLabel || ''}
+                          onChange={(e) => handleInputChange('addressLabel', e.target.value)}
+                          placeholder="Ex: Casa, Trabalho"
                         />
                       </div>
                     )}
@@ -803,11 +934,13 @@ export const Checkout: React.FC = () => {
                     {/* Personal Info Summary */}
                     <div className="p-4 bg-gray-50 rounded-lg">
                       <h3 className="font-medium text-gray-900 mb-2">Dados Pessoais</h3>
-                      <p className="text-sm text-gray-600">
-                        {formData.firstName} {formData.lastName}<br />
-                        {formData.email}<br />
-                        {formData.phone}
-                      </p>
+                      <div className="text-sm text-gray-600">
+                        <p className="font-medium">
+                          {formData.firstName || '(Nome não informado)'} {formData.lastName || ''}
+                        </p>
+                        <p>{formData.email || '(E-mail não informado)'}</p>
+                        <p>{formData.phone || '(Telefone não informado)'}</p>
+                      </div>
                     </div>
 
                     {/* Address Summary */}
@@ -816,26 +949,48 @@ export const Checkout: React.FC = () => {
                         <Truck className="h-4 w-4" />
                         Endereço de Entrega
                       </h3>
-                      <p className="text-sm text-gray-600">
-                        {formData.street}, {formData.number}
-                        {formData.complement && `, ${formData.complement}`}<br />
-                        {formData.neighborhood} - {formData.city}/{formData.state}<br />
-                        CEP: {formData.zipCode}
-                      </p>
+                      <div className="text-sm text-gray-600">
+                        <p>
+                          {formData.street ? (
+                            <>
+                              {formData.street}, {formData.number}
+                              {formData.complement && `, ${formData.complement}`}
+                            </>
+                          ) : (
+                            <span className="text-red-500 italic">Endereço não informado / incompleto</span>
+                          )}
+                        </p>
+                        {formData.neighborhood && (
+                          <p>{formData.neighborhood} - {formData.city}/{formData.state}</p>
+                        )}
+                        <p>CEP: {formData.zipCode || '(Não informado)'}</p>
+                      </div>
                     </div>
 
                     {/* Delivery Schedule Summary */}
-                    {formData.deliverySchedule.scheduled_date && (
+                    {(formData.deliverySchedule.scheduled_date || selectedShipping) && (
                       <div className="p-4 bg-gray-50 rounded-lg">
                         <h3 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
                           <Truck className="h-4 w-4" />
-                          Agendamento de Entrega
+                          Entrega e Agendamento
                         </h3>
-                        <p className="text-sm text-gray-600">
-                          Data: {new Date(formData.deliverySchedule.scheduled_date).toLocaleDateString('pt-BR')}<br />
-                          Período: {formData.deliverySchedule.scheduled_slot === 'morning' ? 'Manhã' :
-                            formData.deliverySchedule.scheduled_slot === 'afternoon' ? 'Tarde' : 'Horário Comercial'}
-                        </p>
+                        <div className="space-y-2 text-sm text-gray-600">
+                          {selectedShipping && (
+                            <div className="pb-2 border-b border-gray-100">
+                              <p className="font-medium text-gray-900">
+                                Método: <span className="text-blue-600">{selectedShipping.name}</span>
+                              </p>
+                              <p className="text-xs">Prazo: {selectedShipping.delivery_days} dias úteis</p>
+                            </div>
+                          )}
+                          {formData.deliverySchedule.scheduled_date && (
+                            <p>
+                              Data Agendada: {new Date(formData.deliverySchedule.scheduled_date).toLocaleDateString('pt-BR')}<br />
+                              Período: {formData.deliverySchedule.scheduled_slot === 'morning' ? 'Manhã' :
+                                formData.deliverySchedule.scheduled_slot === 'afternoon' ? 'Tarde' : 'Horário Comercial'}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     )}
 
@@ -853,7 +1008,7 @@ export const Checkout: React.FC = () => {
                       </p>
                     </div>
 
-                    {formData.isGift && (
+                    {(formData.isGift || formData.giftOptions.is_gift) && (
                       <div className="p-4 bg-blue-50 rounded-lg">
                         <h3 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
                           <Gift className="h-4 w-4" />
@@ -861,16 +1016,17 @@ export const Checkout: React.FC = () => {
                         </h3>
                         <p className="text-sm text-gray-600">
                           Este pedido será enviado como presente.
-                          {formData.giftMessage && (
+                          {(formData.giftMessage || formData.giftOptions.message) && (
                             <>
                               <br />
-                              <strong>Mensagem:</strong> {formData.giftMessage}
+                              <strong>Mensagem:</strong> {formData.giftMessage || formData.giftOptions.message}
                             </>
                           )}
                         </p>
                       </div>
                     )}
                   </div>
+
 
                   {errors.general && (
                     <Alert className="border-red-200 bg-red-50">
@@ -961,6 +1117,16 @@ export const Checkout: React.FC = () => {
                       {summary.shipping === 0 ? 'Grátis' : formatPrice(summary.shipping)}
                     </span>
                   </div>
+
+                  {summary.giftWrap > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600 font-medium flex items-center gap-1">
+                        <Gift className="h-3 w-3 text-purple-600" />
+                        Embalagem de Presente
+                      </span>
+                      <span className="font-medium">{formatPrice(summary.giftWrap)}</span>
+                    </div>
+                  )}
 
                   {summary.discount > 0 && (
                     <div className="flex justify-between text-sm">

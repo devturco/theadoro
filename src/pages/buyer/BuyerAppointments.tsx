@@ -15,9 +15,10 @@ import {
 } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRole } from '@/hooks/useRole';
-import { 
-  Calendar, 
-  Clock, 
+import { supabase } from '@/integrations/supabase/client';
+import {
+  Calendar,
+  Clock,
   CheckCircle,
   XCircle,
   Eye,
@@ -62,59 +63,43 @@ export default function BuyerAppointments() {
   const loadAppointments = async () => {
     try {
       setLoading(true);
-      
-      // Mock data - replace with actual API calls
-      const mockAppointments = [
-        {
-          id: '1',
-          seller_name: 'Artesanatos Maria',
-          seller_email: 'maria@artesanatos.com',
-          seller_phone: '(11) 99999-9999',
-          appointment_date: '2024-01-25T14:00:00Z',
-          duration: 60,
-          status: 'confirmed',
-          type: 'consultation',
-          location: 'Loja Física - Rua das Flores, 123',
-          notes: 'Consulta para personalização de colar',
-          created_at: '2024-01-15T10:30:00Z'
-        },
-        {
-          id: '2',
-          seller_name: 'Joias Premium',
-          seller_email: 'contato@joiaspremium.com',
-          seller_phone: '(11) 88888-8888',
-          appointment_date: '2024-01-30T16:00:00Z',
-          duration: 45,
-          status: 'pending',
-          type: 'product_viewing',
-          location: 'Online - Google Meet',
-          notes: 'Visualização de anéis de noivado',
-          created_at: '2024-01-20T09:15:00Z'
-        },
-        {
-          id: '3',
-          seller_name: 'Presentes Especiais',
-          seller_email: 'vendas@presentesespeciais.com',
-          seller_phone: '(11) 77777-7777',
-          appointment_date: '2024-01-18T10:00:00Z',
-          duration: 30,
-          status: 'completed',
-          type: 'delivery',
-          location: 'Entrega em domicílio',
-          notes: 'Entrega de kit presente personalizado',
-          created_at: '2024-01-10T14:20:00Z'
-        }
-      ];
+
+      let query = supabase
+        .from('appointments')
+        .select(`
+          *,
+          seller:profiles!appointments_seller_id_fkey (*)
+        `)
+        .eq('buyer_id', user?.id)
+        .order('appointment_date', { ascending: true });
+
+      if (statusFilter !== 'all') {
+        query = query.eq('status', statusFilter as any);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
 
       const mockStats: AppointmentStats = {
-        total: mockAppointments.length,
-        pending: mockAppointments.filter(a => a.status === 'pending').length,
-        confirmed: mockAppointments.filter(a => a.status === 'confirmed').length,
-        completed: mockAppointments.filter(a => a.status === 'completed').length,
-        cancelled: mockAppointments.filter(a => a.status === 'cancelled').length
+        total: data?.length || 0,
+        pending: data?.filter(a => a.status === 'pending').length || 0,
+        confirmed: data?.filter(a => a.status === 'confirmed').length || 0,
+        completed: data?.filter(a => a.status === 'completed').length || 0,
+        cancelled: data?.filter(a => a.status === 'cancelled').length || 0
       };
 
-      setAppointments(mockAppointments);
+      const formattedAppointments = data?.map(appt => ({
+        ...appt,
+        seller_name: (appt.seller as any)?.full_name || 'Vendedor',
+        seller_email: (appt.seller as any)?.email || '',
+        seller_phone: (appt.seller as any)?.phone || '',
+        type: 'consultation', // Defaulting since it's not in schema yet
+        location: appt.service_address || 'A combinar',
+        duration: 60 // Defaulting
+      })) || [];
+
+      setAppointments(formattedAppointments);
       setStats(mockStats);
     } catch (error) {
       console.error('Error loading appointments:', error);
@@ -130,16 +115,13 @@ export default function BuyerAppointments() {
 
   const handleCancelAppointment = async (appointmentId: string) => {
     try {
-      // Cancel appointment - replace with actual API call
-      setAppointments(prev => 
-        prev.map(appointment => 
-          appointment.id === appointmentId 
-            ? { ...appointment, status: 'cancelled' }
-            : appointment
-        )
-      );
-      
-      // Reload stats
+      const { error } = await supabase
+        .from('appointments')
+        .update({ status: 'cancelled' })
+        .eq('id', appointmentId);
+
+      if (error) throw error;
+
       loadAppointments();
     } catch (error) {
       console.error('Error cancelling appointment:', error);
@@ -149,17 +131,17 @@ export default function BuyerAppointments() {
   const appointmentColumns = [
     {
       key: 'id',
-      label: 'ID',
+      title: 'ID',
       render: (value: string) => `#${value.slice(0, 8)}`
     },
     {
       key: 'seller_name',
-      label: 'Vendedor',
+      title: 'Vendedor',
       render: (value: string) => value || 'N/A'
     },
     {
       key: 'appointment_date',
-      label: 'Data/Hora',
+      title: 'Data/Hora',
       render: (value: string) => {
         const date = new Date(value);
         return (
@@ -174,7 +156,7 @@ export default function BuyerAppointments() {
     },
     {
       key: 'type',
-      label: 'Tipo',
+      title: 'Tipo',
       render: (value: string) => {
         const typeMap = {
           consultation: 'Consulta',
@@ -187,7 +169,7 @@ export default function BuyerAppointments() {
     },
     {
       key: 'status',
-      label: 'Status',
+      title: 'Status',
       render: (value: string) => {
         const statusMap = {
           pending: { label: 'Pendente', variant: 'secondary' as const },
@@ -201,11 +183,11 @@ export default function BuyerAppointments() {
     },
     {
       key: 'actions',
-      label: 'Ações',
+      title: 'Ações',
       render: (_: any, row: any) => (
         <div className="flex gap-2">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             size="sm"
             onClick={() => handleViewAppointment(row)}
           >
@@ -213,8 +195,8 @@ export default function BuyerAppointments() {
             Ver
           </Button>
           {(row.status === 'pending' || row.status === 'confirmed') && (
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="sm"
               onClick={() => handleCancelAppointment(row.id)}
             >
@@ -230,7 +212,7 @@ export default function BuyerAppointments() {
   const filteredAppointments = appointments.filter(appointment => {
     const matchesStatus = statusFilter === 'all' || appointment.status === statusFilter;
     const matchesSearch = appointment.seller_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         appointment.id.toLowerCase().includes(searchTerm.toLowerCase());
+      appointment.id.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesStatus && matchesSearch;
   });
 
@@ -268,7 +250,7 @@ export default function BuyerAppointments() {
             <div className="text-2xl font-bold">{stats.total}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Pendentes</CardTitle>
@@ -278,7 +260,7 @@ export default function BuyerAppointments() {
             <div className="text-2xl font-bold">{stats.pending}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Confirmados</CardTitle>
@@ -288,7 +270,7 @@ export default function BuyerAppointments() {
             <div className="text-2xl font-bold">{stats.confirmed}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Concluídos</CardTitle>
@@ -298,7 +280,7 @@ export default function BuyerAppointments() {
             <div className="text-2xl font-bold">{stats.completed}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Cancelados</CardTitle>
@@ -358,7 +340,6 @@ export default function BuyerAppointments() {
             data={filteredAppointments}
             columns={appointmentColumns}
             loading={loading}
-            searchable={false}
           />
         </CardContent>
       </Card>
@@ -372,7 +353,7 @@ export default function BuyerAppointments() {
               Informações completas do agendamento
             </DialogDescription>
           </DialogHeader>
-          
+
           {selectedAppointment && (
             <div className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
@@ -391,9 +372,9 @@ export default function BuyerAppointments() {
                 <div>
                   <Label className="text-sm font-medium">Status</Label>
                   <Badge className="mt-1">
-                    {selectedAppointment.status === 'completed' ? 'Concluído' : 
-                     selectedAppointment.status === 'confirmed' ? 'Confirmado' : 
-                     selectedAppointment.status === 'cancelled' ? 'Cancelado' : 'Pendente'}
+                    {selectedAppointment.status === 'completed' ? 'Concluído' :
+                      selectedAppointment.status === 'confirmed' ? 'Confirmado' :
+                        selectedAppointment.status === 'cancelled' ? 'Cancelado' : 'Pendente'}
                   </Badge>
                 </div>
                 <div>
@@ -405,9 +386,9 @@ export default function BuyerAppointments() {
                 <div>
                   <Label className="text-sm font-medium">Horário</Label>
                   <p className="text-sm text-muted-foreground">
-                    {new Date(selectedAppointment.appointment_date).toLocaleTimeString('pt-BR', { 
-                      hour: '2-digit', 
-                      minute: '2-digit' 
+                    {new Date(selectedAppointment.appointment_date).toLocaleTimeString('pt-BR', {
+                      hour: '2-digit',
+                      minute: '2-digit'
                     })}
                   </p>
                 </div>
@@ -419,24 +400,24 @@ export default function BuyerAppointments() {
                   <Label className="text-sm font-medium">Tipo</Label>
                   <p className="text-sm text-muted-foreground">
                     {selectedAppointment.type === 'consultation' ? 'Consulta' :
-                     selectedAppointment.type === 'product_viewing' ? 'Visualização' :
-                     selectedAppointment.type === 'delivery' ? 'Entrega' : 'Reunião'}
+                      selectedAppointment.type === 'product_viewing' ? 'Visualização' :
+                        selectedAppointment.type === 'delivery' ? 'Entrega' : 'Reunião'}
                   </p>
                 </div>
               </div>
-              
+
               <div>
                 <Label className="text-sm font-medium">Local</Label>
                 <p className="text-sm text-muted-foreground">{selectedAppointment.location}</p>
               </div>
-              
+
               {selectedAppointment.notes && (
                 <div>
                   <Label className="text-sm font-medium">Observações</Label>
                   <p className="text-sm text-muted-foreground">{selectedAppointment.notes}</p>
                 </div>
               )}
-              
+
               <div className="border-t pt-4">
                 <div className="flex justify-between items-center text-sm text-muted-foreground">
                   <span>Agendado em:</span>

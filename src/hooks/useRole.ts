@@ -6,20 +6,23 @@ export const useRole = () => {
   const { roles } = useAuth();
 
   const hasRole = (role: UserRole): boolean => {
+    if (roles.includes('admin')) return true; // Admins have all roles
     return roles.includes(role);
   };
 
   const hasAnyRole = (requiredRoles: UserRole[]): boolean => {
+    if (roles.includes('admin')) return true;
     return requiredRoles.some(role => roles.includes(role));
   };
 
   const hasAllRoles = (requiredRoles: UserRole[]): boolean => {
+    if (roles.includes('admin')) return true;
     return requiredRoles.every(role => roles.includes(role));
   };
 
-  const isAdmin = useMemo(() => hasRole('admin'), [roles]);
-  const isSeller = useMemo(() => hasRole('seller'), [roles]);
-  const isBuyer = useMemo(() => hasRole('buyer'), [roles]);
+  const isAdmin = useMemo(() => roles.includes('admin'), [roles]);
+  const isSeller = useMemo(() => roles.includes('admin') || roles.includes('seller'), [roles]);
+  const isBuyer = useMemo(() => roles.includes('admin') || roles.includes('buyer'), [roles]);
 
   const canManageUsers = useMemo(() => isAdmin, [isAdmin]);
   const canManageProducts = useMemo(() => isAdmin || isSeller, [isAdmin, isSeller]);

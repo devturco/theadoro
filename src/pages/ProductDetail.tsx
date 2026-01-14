@@ -36,6 +36,8 @@ export const ProductDetail: React.FC = () => {
   const { addToCart } = useCart();
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
 
+
+
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
@@ -102,11 +104,7 @@ export const ProductDetail: React.FC = () => {
   const handleAddToCart = async () => {
     setIsAddingToCart(true);
     try {
-      await addToCart({
-        productId: product.id,
-        quantity,
-        variantId: selectedVariant || undefined,
-      });
+      await addToCart(product, quantity, selectedVariant ? { variantId: selectedVariant } : undefined);
     } catch (error) {
       console.error('Error adding to cart:', error);
     } finally {
@@ -123,7 +121,7 @@ export const ProductDetail: React.FC = () => {
           id: product.id,
           name: product.name,
           price: product.price,
-          image: product.images[0]?.url || '',
+          image: product.images[0] || '',
           seller: product.seller,
         });
       }
@@ -174,7 +172,7 @@ export const ProductDetail: React.FC = () => {
             {/* Main Image */}
             <div className="aspect-square bg-white rounded-lg border border-gray-200 overflow-hidden">
               <img
-                src={product.images[selectedImageIndex]?.url || '/placeholder-product.jpg'}
+                src={product.images[selectedImageIndex] || '/placeholder-product.jpg'}
                 alt={product.name}
                 className="w-full h-full object-cover"
               />
@@ -195,7 +193,7 @@ export const ProductDetail: React.FC = () => {
                     )}
                   >
                     <img
-                      src={image.url}
+                      src={image}
                       alt={`${product.name} ${index + 1}`}
                       className="w-full h-full object-cover"
                     />

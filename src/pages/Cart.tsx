@@ -362,18 +362,19 @@ export const Cart: React.FC = () => {
                 </div>
 
                 {/* Recommended Products */}
+                {/* Recommended Products - TODO: Implement recommendation logic
                 <div className="mt-6 bg-white rounded-lg border border-gray-200 p-6">
                   <h4 className="font-medium text-gray-900 mb-4">
                     Você também pode gostar
                   </h4>
 
                   <div className="space-y-3">
-                    {/* This would be populated with recommended products */}
                     <div className="text-center text-sm text-gray-500 py-4">
                       Carregando recomendações...
                     </div>
                   </div>
                 </div>
+                */}
               </div>
             </div>
           </div>

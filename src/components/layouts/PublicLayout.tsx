@@ -11,17 +11,13 @@ interface PublicLayoutProps {
 
 export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
   return (
-    <CartProvider>
-      <WishlistProvider>
-        <div className="min-h-screen flex flex-col">
-          <Header />
-          <main className="flex-1">
-            {children || <Outlet />}
-          </main>
-          <Footer />
-        </div>
-      </WishlistProvider>
-    </CartProvider>
+    <div className="min-h-screen flex flex-col">
+      <Header />
+      <main className="container mx-auto px-4 py-8 pt-32">
+        {children || <Outlet />}
+      </main>
+      <Footer />
+    </div>
   );
 };
 

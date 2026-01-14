@@ -26,7 +26,8 @@ import {
   LogOut,
   Gift,
   LayoutTemplate,
-  Settings
+  Settings,
+  ShieldCheck
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -43,6 +44,11 @@ const adminMenuItems = [
     title: 'Usuários',
     url: '/admin/users',
     icon: Users,
+  },
+  {
+    title: 'Aprovações',
+    url: '/admin/approvals',
+    icon: ShieldCheck,
   },
   {
     title: 'Produtos',

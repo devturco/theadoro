@@ -95,16 +95,31 @@ export default function CategoryProducts() {
         } else {
           // Map to interface
           setProducts((productsData || []).map((p: any) => ({
+            stock_quantity: p.stock_quantity || 0,
+            in_stock: p.in_stock ?? (p.stock_quantity > 0),
+            is_service: p.is_service || false,
+            tags: p.tags || [],
+            category: {
+              id: p.category_id,
+              name: categoryData.name,
+              slug: categoryData.slug
+            },
             id: p.id,
             name: p.name,
             price: p.price,
+            original_price: p.original_price,
             image: p.image_url || 'https://placehold.co/400',
+            images: p.images || [],
             rating: 5.0, // placeholder
-            reviewCount: 0,
+            review_count: 0,
             sellerId: p.seller_id,
             sellerName: p.profiles?.full_name || 'Vendedor',
             categoryId: p.category_id,
-            isWishlisted: false
+            isWishlisted: false,
+            seller: {
+              id: p.seller_id,
+              name: p.profiles?.full_name || 'Vendedor',
+            }
           })));
         }
 
