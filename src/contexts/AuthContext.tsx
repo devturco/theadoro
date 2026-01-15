@@ -1,5 +1,5 @@
 
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, ReactNode, useMemo } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -20,110 +20,134 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Derive roles directly from profile to avoid state sync issues (Admins get all roles)
-  const roles: UserRole[] = profile?.role ? [profile.role] : ['buyer'];
-  if (profile?.role === 'admin') {
-    if (!roles.includes('seller')) roles.push('seller');
-    if (!roles.includes('buyer')) roles.push('buyer');
-  }
+  // Derive roles directly from profile AND user_roles table
+  const [dbRoles, setDbRoles] = useState<UserRole[]>(() => {
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem('auth_db_roles');
+      if (cached) {
+        try {
+          return JSON.parse(cached);
+        } catch (e) {
+          return [];
+        }
+      }
+    }
+    return [];
+  });
+
+  const roles: UserRole[] = useMemo(() => {
+    const r = new Set<UserRole>();
+    if (profile?.role) r.add(profile.role);
+    dbRoles.forEach(role => r.add(role));
+
+    // Admins get everything
+    if (r.has('admin')) {
+      r.add('seller');
+      r.add('buyer');
+    }
+
+    // Default fallback
+    if (r.size === 0) r.add('buyer');
+
+    return Array.from(r);
+  }, [profile?.role, dbRoles]);
 
   // Fetch user profile (Single Source of Truth)
   const fetchProfile = useCallback(async (userId: string) => {
-    // 🚨 EMERGENCY OVERRIDE: Force Admin for this ID to unblock client demo
-    if (userId === '1632d905-a236-4af8-9451-7e9a83320f21') {
-
-      const fallbackProfile = {
-        id: userId,
-        email: 'devturco@gmail.com',
-        full_name: 'Admin Master',
-        role: 'admin' as UserRole,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        address: '', avatar_url: '', bio: '', city: '', phone: '', postal_code: '', state: ''
-      };
-      setProfile(fallbackProfile as UserProfile);
-      return;
-    }
+    // normal fetch flow...
 
 
 
 
-    try {
-      // 1. Try RPC first (Bypasses RLS with explicit ID)
-      let { data, error }: any = await (supabase.rpc as any)('get_profile_explicit', { target_id: userId }).maybeSingle();
 
-      // 2. Fallback to direct select if RPC fails
-      if (error) {
-        console.warn('RPC get_profile_explicit failed, falling back:', error.message);
-        const result = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', userId)
-          .maybeSingle();
-        data = result.data;
-        error = result.error;
+
+    // 🚀 ASYNC FETCH: Both happen in background and update state when ready
+    console.log('[AuthContext] Starting background fetches for:', userId);
+
+    // Roles fetch (Priority 1)
+    const fetchRoles = async () => {
+      try {
+        const { data } = await supabase.from('user_roles').select('role').eq('user_id', userId);
+        if (data && data.length > 0) {
+          const rolesArray = data.map((r: any) => r.role as UserRole);
+          console.log('[AuthContext] Roles received:', rolesArray);
+          setDbRoles(rolesArray);
+          localStorage.setItem('auth_db_roles', JSON.stringify(rolesArray));
+        }
+      } catch (e: any) {
+        console.error('[AuthContext] Roles fetch failed:', e.message);
       }
+    };
 
-      // 🚨 EMERGENCY OVERRIDE: Force Admin for this ID to unblock client demo
+    fetchRoles();
 
-
-      if (error) {
-        console.error('Error fetching profile:', error);
-        toast.error(`Erro ao carregar perfil: ${error.message}`);
-        return;
+    // Profile fetch (Priority 2)
+    const fetchProfileTask = async () => {
+      try {
+        let { data, error }: any = await (supabase.rpc as any)('get_profile_explicit', { target_id: userId }).maybeSingle();
+        if (error) {
+          const result = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+          data = result.data;
+        }
+        if (data) setProfile(data as UserProfile);
+      } catch (e: any) {
+        console.warn('[AuthContext] Profile fetch ignored during timeout/fail:', e.message);
+      } finally {
+        console.log('[AuthContext] Profile background task finished');
       }
+    };
 
-      // Cast data to any to avoid TS errors if types aren't updated
-      const profileData = data as any;
-
-      if (profileData && profileData.role) {
-        setProfile(profileData);
-      } else {
-        setProfile(data as UserProfile);
-      }
-
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-    }
+    fetchProfileTask();
   }, []);
+
+  const refreshProfile = useCallback(async () => {
+    if (user?.id) {
+      console.log('[AuthContext] Manually refreshing profile for:', user.id);
+      await fetchProfile(user.id);
+    }
+  }, [user?.id, fetchProfile]);
 
   // Listen to auth changes
   useEffect(() => {
     let mounted = true;
 
-    // Safety timeout
+    // Safety timeout - IF we have roles, we can unblock loading even if profile is slow
     const safetyTimeout = setTimeout(() => {
       if (mounted && loading) {
+        console.log('[AuthContext] Safety timeout reached. Loading = false');
         setLoading(false);
       }
-    }, 5000);
+    }, 8000); // Increased to 8s to give parallel fetch a better chance
 
     // Initial Load
     const initAuth = async () => {
+      console.log('[AuthContext] initAuth started');
       try {
-
         const { data: { session }, error } = await supabase.auth.getSession();
+        console.log('[AuthContext] getSession done', { hasSession: !!session, error });
 
         if (error) throw error;
 
         if (mounted) {
           if (session?.user) {
-
             setUser(session.user as AuthUser);
-            // Critical: Wait for profile fetch
+            console.log('[AuthContext] user found, fetching profile...');
             await fetchProfile(session.user.id);
+            console.log('[AuthContext] fetchProfile done');
           } else {
-
+            console.log('[AuthContext] no session found');
             setUser(null);
             setProfile(null);
           }
         }
       } catch (error) {
-        console.error('Auth init error:', error);
+        console.error('[AuthContext] Auth init error:', error);
       } finally {
         if (mounted) {
-
+          console.log('[AuthContext] setLoading(false)');
           setLoading(false);
+        } else {
+          console.warn('[AuthContext] initAuth finished but component unmounted');
         }
       }
     };
@@ -188,13 +212,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Sign out
   const signOut = useCallback(async () => {
-    const { error } = await supabase.auth.signOut();
+    console.log('[AuthContext] signOut triggered');
 
-    if (error) throw error;
+    // Internal helper to clear everything
+    const performLocalCleanup = () => {
+      console.log('[AuthContext] Performing local state cleanup...');
+      setUser(null);
+      setProfile(null);
+      setDbRoles([]);
+      localStorage.removeItem('auth_db_roles');
+      localStorage.removeItem('supabase.auth.token');
+      localStorage.clear(); // Nuclear option since user is stuck
+      sessionStorage.clear();
+      console.log('[AuthContext] Local state cleared successfully');
+      toast.success('Logout realizado localmente.');
+    };
 
-    setUser(null);
-    setProfile(null);
-    toast.success('Logout realizado com sucesso!');
+    try {
+      // Race the Supabase call against a 2s timeout
+      const signOutTask = supabase.auth.signOut();
+      const timeoutTask = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('SignOut Network Timeout')), 2000)
+      );
+
+      await Promise.race([signOutTask, timeoutTask]);
+      console.log('[AuthContext] Supabase signOut returned');
+    } catch (e: any) {
+      console.warn('[AuthContext] SignOut Supabase call failed or timed out:', e.message);
+    } finally {
+      performLocalCleanup();
+    }
   }, []);
 
   // Update profile
@@ -236,12 +283,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Refresh session
   const refreshSession = useCallback(async () => {
-    const { data, error } = await supabase.auth.refreshSession();
-
-    if (error) throw error;
+    try {
+      const { data, error } = await supabase.auth.refreshSession();
+      if (error) throw error;
+    } catch (error) {
+      console.error('[AuthContext] Refresh session error:', error);
+    }
   }, []);
-
-
 
   return (
     <AuthContext.Provider value={{
@@ -255,9 +303,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       updateProfile,
       resetPassword,
       updatePassword,
-      refreshSession
+      refreshSession,
+      refreshProfile,
+      dbRoles // Expose this for low-level checks if needed
     }}>
       {children}
     </AuthContext.Provider>
   );
 };
+
+// Emergency Logout Helper (can be used via console if UI is totally stuck)
+if (typeof window !== 'undefined') {
+  (window as any).__logout = () => {
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.href = '/auth';
+  };
+}

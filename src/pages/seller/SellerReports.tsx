@@ -7,16 +7,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRole } from '@/hooks/useRole';
 import { useCRUD } from '@/hooks/useCRUD';
-import { 
-  BarChart3, 
-  TrendingUp, 
-  DollarSign, 
+import {
+  BarChart3,
+  TrendingUp,
+  DollarSign,
   Package,
   ShoppingBag,
   Calendar,
   Download,
   Filter
 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ReportData {
   salesByMonth: Array<{ month: string; sales: number; revenue: number }>;
@@ -48,40 +49,91 @@ export default function SellerReports() {
   const loadReportData = async () => {
     try {
       setLoading(true);
-      
-      // Mock data - replace with actual API calls
-      const mockReportData: ReportData = {
-        salesByMonth: [
-          { month: 'Jan 2024', sales: 15, revenue: 4500.00 },
-          { month: 'Fev 2024', sales: 22, revenue: 6600.00 },
-          { month: 'Mar 2024', sales: 18, revenue: 5400.00 },
-          { month: 'Abr 2024', sales: 25, revenue: 7500.00 },
-          { month: 'Mai 2024', sales: 30, revenue: 9000.00 },
-          { month: 'Jun 2024', sales: 28, revenue: 8400.00 }
-        ],
-        topProducts: [
-          { name: 'Colar Personalizado', sales: 45, revenue: 13500.00 },
-          { name: 'Pulseira Artesanal', sales: 38, revenue: 11400.00 },
-          { name: 'Kit Presente Especial', sales: 25, revenue: 11250.00 },
-          { name: 'Anel Customizado', sales: 22, revenue: 8800.00 },
-          { name: 'Brincos Exclusivos', sales: 18, revenue: 5400.00 }
-        ],
-        revenueByCategory: [
-          { category: 'Joias', revenue: 25000.00, percentage: 45 },
-          { category: 'Acessórios', revenue: 18000.00, percentage: 32 },
-          { category: 'Presentes', revenue: 12800.00, percentage: 23 }
-        ],
-        appointmentStats: [
-          { month: 'Jan 2024', appointments: 12, conversion: 75 },
-          { month: 'Fev 2024', appointments: 18, conversion: 83 },
-          { month: 'Mar 2024', appointments: 15, conversion: 80 },
-          { month: 'Abr 2024', appointments: 20, conversion: 85 },
-          { month: 'Mai 2024', appointments: 25, conversion: 88 },
-          { month: 'Jun 2024', appointments: 22, conversion: 86 }
-        ]
-      };
 
-      setReportData(mockReportData);
+      const { data: orderItems, error: salesError } = await supabase
+        .from('order_items')
+        .select(`
+          unit_price,
+          quantity,
+          created_at,
+          products (name, categories (name))
+        `)
+        .eq('seller_id', user?.id);
+
+      if (salesError) throw salesError;
+
+      const { data: appointments, error: apptError } = await supabase
+        .from('appointments')
+        .select('status, appointment_date')
+        .eq('seller_id', user?.id);
+
+      if (apptError) throw apptError;
+
+      // 1. Sales by Month
+      const salesByMonthMap = new Map();
+      const productsMap = new Map();
+      const categoriesMap = new Map();
+
+      orderItems?.forEach(item => {
+        const date = new Date(item.created_at);
+        const monthKey = `${date.toLocaleString('pt-BR', { month: 'short' })} ${date.getFullYear()}`;
+        const amount = Number(item.unit_price) * Number(item.quantity);
+
+        if (!salesByMonthMap.has(monthKey)) {
+          salesByMonthMap.set(monthKey, { month: monthKey, sales: 0, revenue: 0 });
+        }
+        const monthData = salesByMonthMap.get(monthKey);
+        monthData.sales += item.quantity;
+        monthData.revenue += amount;
+
+        const prodName = (item.products as any)?.name || 'Desconhecido';
+        if (!productsMap.has(prodName)) {
+          productsMap.set(prodName, { name: prodName, sales: 0, revenue: 0 });
+        }
+        const prodData = productsMap.get(prodName);
+        prodData.sales += item.quantity;
+        prodData.revenue += amount;
+
+        const catName = (item.products as any)?.categories?.name || 'Geral';
+        if (!categoriesMap.has(catName)) {
+          categoriesMap.set(catName, { category: catName, revenue: 0 });
+        }
+        categoriesMap.get(catName).revenue += amount;
+      });
+
+      // 2. Appointment Stats by Month
+      const apptMonthMap = new Map();
+      appointments?.forEach(appt => {
+        const date = new Date(appt.appointment_date);
+        const monthKey = `${date.toLocaleString('pt-BR', { month: 'short' })} ${date.getFullYear()}`;
+
+        if (!apptMonthMap.has(monthKey)) {
+          apptMonthMap.set(monthKey, { month: monthKey, appointments: 0, completed: 0 });
+        }
+        const monthData = apptMonthMap.get(monthKey);
+        monthData.appointments += 1;
+        if (appt.status === 'completed') monthData.completed += 1;
+      });
+
+      const totalRevenue = orderItems?.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0) || 0;
+
+      setReportData({
+        salesByMonth: Array.from(salesByMonthMap.values()).slice(-6),
+        topProducts: Array.from(productsMap.values())
+          .sort((a, b) => b.revenue - a.revenue)
+          .slice(0, 5),
+        revenueByCategory: Array.from(categoriesMap.values())
+          .map(cat => ({
+            ...cat,
+            percentage: totalRevenue > 0 ? Math.round((cat.revenue / totalRevenue) * 100) : 0
+          }))
+          .sort((a, b) => b.revenue - a.revenue),
+        appointmentStats: Array.from(apptMonthMap.values()).map(item => ({
+          month: item.month,
+          appointments: item.appointments,
+          conversion: item.appointments > 0 ? Math.round((item.completed / item.appointments) * 100) : 0
+        })).slice(-6)
+      });
     } catch (error) {
       console.error('Error loading report data:', error);
     } finally {
@@ -147,7 +199,7 @@ export default function SellerReports() {
             <div className="text-2xl font-bold">R$ {totalRevenue.toLocaleString()}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total de Vendas</CardTitle>
@@ -157,7 +209,7 @@ export default function SellerReports() {
             <div className="text-2xl font-bold">{totalSales}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Ticket Médio</CardTitle>
@@ -167,7 +219,7 @@ export default function SellerReports() {
             <div className="text-2xl font-bold">R$ {averageOrderValue.toFixed(2)}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Agendamentos</CardTitle>
@@ -271,8 +323,8 @@ export default function SellerReports() {
                       </div>
                     </div>
                     <div className="w-full bg-muted rounded-full h-2">
-                      <div 
-                        className="bg-wine h-2 rounded-full" 
+                      <div
+                        className="bg-wine h-2 rounded-full"
                         style={{ width: `${category.percentage}%` }}
                       />
                     </div>

@@ -611,7 +611,7 @@ export default function SellerOnboarding() {
                             </p>
                             <div className="pt-8">
                                 <Button className="w-full h-12 bg-wine hover:bg-wine-dark" onClick={() => navigate('/buyer/dashboard')}>
-                                    Voltar para o Painel
+                                    Ir para o Painel
                                 </Button>
                             </div>
                         </CardContent>

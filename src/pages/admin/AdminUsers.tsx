@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
   DialogContent,
@@ -64,7 +65,10 @@ const AdminUsers = () => {
     updateItem,
     deleteItem,
     refetch
-  } = useCRUD({ table: 'profiles' });
+  } = useCRUD({
+    table: 'profiles',
+    select: '*, user_roles(role)'
+  });
 
   useEffect(() => {
     if (!isAdmin) {
@@ -129,14 +133,23 @@ const AdminUsers = () => {
 
   const handleToggleStatus = async (user: any) => {
     // Logic adapted: If 'buyer', promote to 'seller'. If 'seller', demote to 'buyer'.
-    // This replaces the old 'status' approval flow.
-    const currentRole = user.role || 'buyer';
+    const dbRoles = user.user_roles?.map((r: any) => r.role) || [];
+    const currentRole = dbRoles.includes('seller') ? 'seller' : 'buyer';
     const newRole = currentRole === 'seller' ? 'buyer' : 'seller';
 
     try {
+      // 1. Update user_roles table (Atomic Source of Truth)
+      if (newRole === 'seller') {
+        await supabase.from('user_roles').upsert({ user_id: user.id, role: 'seller' }, { onConflict: 'user_id,role' });
+      } else {
+        await supabase.from('user_roles').delete().eq('user_id', user.id).eq('role', 'seller');
+      }
+
+      // 2. Sync profile role (Legacy Compatibility)
       await updateItem(user.id, {
         role: newRole
       });
+
       toast.success(`Usuário alterado para ${newRole === 'seller' ? 'Vendedor' : 'Comprador'} com sucesso!`);
       refetch();
     } catch (error) {
@@ -168,7 +181,13 @@ const AdminUsers = () => {
     {
       key: 'role',
       title: 'Função',
-      render: (role: string) => {
+      render: (_: string, row: any) => {
+        // Source of truth: user_roles table, fallback to profile role
+        const dbRoles = row.user_roles?.map((r: any) => r.role) || [];
+        const role = dbRoles.includes('admin') ? 'admin' :
+          dbRoles.includes('seller') ? 'seller' :
+            row.role || 'buyer';
+
         return (
           <Badge variant={role === 'admin' ? 'destructive' : role === 'seller' ? 'default' : 'secondary'}>
             {role === 'admin' ? 'Administrador' :

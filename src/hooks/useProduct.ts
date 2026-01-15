@@ -1,5 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Product, ProductReview } from '@/types/product';
+import { Product } from '@/types/product';
+
+// Temporary local interface for reviews (matching usage in ProductDetail)
+interface ProductReview {
+  id: string;
+  user: {
+    name: string;
+    avatar?: string;
+  };
+  rating: number;
+  comment: string;
+  createdAt: string;
+  helpfulCount: number;
+}
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -48,7 +61,7 @@ export const useProduct = (productId: string | undefined) => {
         query = query.eq('slug', productId);
       }
 
-      const { data, error } = await query.single();
+      const { data, error } = await query.single() as { data: any, error: any };
 
       if (error) throw error;
 
@@ -70,7 +83,9 @@ export const useProduct = (productId: string | undefined) => {
         in_stock: data.in_stock,
         stock_quantity: data.stock_quantity || 0,
         tags: data.tags || [],
+        is_active: data.is_active,
         is_service: data.is_service,
+        seller_id: Array.isArray(data.profiles) ? data.profiles[0]?.id : data.profiles?.id || '',
         created_at: data.created_at,
         updated_at: data.updated_at,
         category: data.categories || {
@@ -79,10 +94,10 @@ export const useProduct = (productId: string | undefined) => {
           slug: 'sem-categoria',
         },
         seller: {
-          id: data.profiles?.id || '',
-          name: data.profiles?.full_name || 'Vendedor',
-          avatar: data.profiles?.avatar_url,
-          location: data.profiles?.location || '',
+          id: Array.isArray(data.profiles) ? data.profiles[0]?.id : data.profiles?.id || '',
+          name: Array.isArray(data.profiles) ? data.profiles[0]?.full_name : data.profiles?.full_name || 'Vendedor',
+          avatar: Array.isArray(data.profiles) ? data.profiles[0]?.avatar_url : data.profiles?.avatar_url,
+          location: Array.isArray(data.profiles) ? data.profiles[0]?.location : data.profiles?.location || '',
           rating: 0,
           reviewCount: 0,
           verified: false,
@@ -204,14 +219,14 @@ export const useProduct = (productId: string | undefined) => {
 
       const transformedReviews: ProductReview[] = (data || []).map(review => ({
         id: review.id,
-        userId: review.buyer_id, // Changed from user_id to buyer_id
-        userName: review.profiles?.full_name || 'Usuário',
-        userAvatar: review.profiles?.avatar_url,
+        user: {
+          name: review.profiles?.full_name || 'Usuário',
+          avatar: review.profiles?.avatar_url,
+        },
         rating: review.rating,
         comment: review.comment || '',
         createdAt: review.created_at,
-        helpful: 0, // helpful_count not in types, defaulted to 0
-        images: [], // images not in types for reviews, defaulted to empty
+        helpfulCount: 0,
       }));
 
       setReviews(transformedReviews);
@@ -289,7 +304,7 @@ export const useProduct = (productId: string | undefined) => {
       // Update local state
       setReviews(prev => prev.map(review =>
         review.id === reviewId
-          ? { ...review, helpful: review.helpful + 1 }
+          ? { ...review, helpfulCount: review.helpfulCount + 1 }
           : review
       ));
 

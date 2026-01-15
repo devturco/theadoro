@@ -32,12 +32,140 @@ export default function AdminSellerApprovals() {
     const [loading, setLoading] = useState(true);
     const [selectedApp, setSelectedApp] = useState<any>(null);
     const [mediaPreview, setMediaPreview] = useState<string | null>(null);
+    const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
     useEffect(() => {
         loadApplications();
     }, []);
 
-    // ... (rest of loadApplications and handlers)
+    const loadApplications = async () => {
+        try {
+            setLoading(true);
+            const { data, error }: anyArr = await (supabase.from as any)('seller_applications')
+                .select('*, user:profiles(full_name, email), category:categories(name)')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            setApplications(data || []);
+        } catch (error: any) {
+            toast.error('Erro ao carregar solicitações: ' + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleApprove = async (app: any) => {
+        try {
+            // 1. Update Application Status
+            const { error: appError } = await (supabase.from as any)('seller_applications')
+                .update({ status: 'approved' })
+                .eq('id', app.id);
+
+            if (appError) {
+                console.error('Error updating application status:', appError);
+                throw new Error('Falha ao atualizar o status da solicitação: ' + appError.message);
+            }
+
+            // 2. Update User Role in user_roles table
+            const { error: roleError } = await (supabase.from as any)('user_roles')
+                .upsert({
+                    user_id: app.user_id,
+                    role: 'seller'
+                }, {
+                    onConflict: 'user_id,role'
+                });
+
+            if (roleError) {
+                console.error('Error updating user role table:', roleError);
+                throw new Error('Falha ao atribuir cargo de vendedor: ' + roleError.message);
+            }
+
+            // 3. Update Profile with seller role (Legacy Compatibility)
+            const { error: profileError } = await (supabase.from as any)('profiles')
+                .update({
+                    role: 'seller'
+                })
+                .eq('id', app.user_id);
+
+            if (profileError) {
+                console.error('Error updating profile role:', profileError);
+                toast.warning('Cargo atribuído na tabela mestre, mas houve um erro ao sincronizar com o perfil legado.');
+            }
+
+            toast.success('Vendedor aprovado com sucesso!');
+            setIsDetailsOpen(false);
+            loadApplications();
+        } catch (error: any) {
+            toast.error(error.message || 'Erro ao aprovar solicitação');
+        }
+    };
+
+    const handleReject = async (app: any) => {
+        const reason = prompt('Motivo da reprovação:');
+        if (!reason) return;
+
+        try {
+            const { error } = await (supabase.from as any)('seller_applications')
+                .update({
+                    status: 'rejected',
+                    admin_notes: reason
+                })
+                .eq('id', app.id);
+
+            if (error) throw error;
+
+            toast.success('Solicitação reprovada.');
+            setIsDetailsOpen(false);
+            loadApplications();
+        } catch (error: any) {
+            toast.error('Erro ao reprovar: ' + error.message);
+        }
+    };
+
+    type anyArr = { data: any[] | null, error: any };
+
+    const columns = [
+        {
+            key: 'store_name',
+            title: 'Nome da Loja',
+            render: (val: string, row: any) => (
+                <div className="flex flex-col">
+                    <span className="font-bold">{val}</span>
+                    <span className="text-xs text-muted-foreground">{row.user?.email}</span>
+                </div>
+            )
+        },
+        {
+            key: 'type',
+            title: 'Tipo',
+            render: (val: string) => (
+                <Badge variant="outline" className="capitalize">
+                    {val === 'pf' ? 'Pessoa Física' : 'Pessoa Jurídica'}
+                </Badge>
+            )
+        },
+        {
+            key: 'status',
+            title: 'Status',
+            render: (val: string) => (
+                <Badge
+                    className={cn(
+                        "capitalize",
+                        val === 'approved' ? "bg-green-100 text-green-700 hover:bg-green-200" :
+                            val === 'pending' ? "bg-amber-100 text-amber-700 hover:bg-amber-200" :
+                                "bg-red-100 text-red-700 hover:bg-red-200"
+                    )}
+                >
+                    {val === 'approved' ? 'Aprovado' : val === 'pending' ? 'Pendente' : 'Reprovado'}
+                </Badge>
+            )
+        },
+        {
+            key: 'created_at',
+            title: 'Data',
+            render: (val: string) => new Date(val).toLocaleDateString('pt-BR')
+        }
+    ];
 
     return (
         <div className="space-y-6">

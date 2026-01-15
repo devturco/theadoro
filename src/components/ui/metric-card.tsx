@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import React, { ReactNode, ComponentType } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
@@ -8,7 +8,7 @@ interface MetricCardProps {
   title: string;
   value: string | number;
   description?: string;
-  icon?: ReactNode;
+  icon?: any;
   trend?: {
     value: number;
     label?: string;
@@ -40,7 +40,7 @@ export const MetricCard = ({
           currency: 'BRL'
         }).format(val);
       }
-      
+
       // Format large numbers
       if (val >= 1000000) {
         return `${(val / 1000000).toFixed(1)}M`;
@@ -48,7 +48,7 @@ export const MetricCard = ({
       if (val >= 1000) {
         return `${(val / 1000).toFixed(1)}K`;
       }
-      
+
       return val.toLocaleString('pt-BR');
     }
     return String(val);
@@ -56,7 +56,7 @@ export const MetricCard = ({
 
   const getTrendIcon = () => {
     if (!trend) return null;
-    
+
     if (trend.value > 0) {
       return <TrendingUp className="h-3 w-3" />;
     } else if (trend.value < 0) {
@@ -67,7 +67,7 @@ export const MetricCard = ({
 
   const getTrendColor = () => {
     if (!trend) return '';
-    
+
     if (trend.value > 0) {
       return 'text-green-600';
     } else if (trend.value < 0) {
@@ -103,7 +103,15 @@ export const MetricCard = ({
           </CardTitle>
           {icon && (
             <div className="text-muted-foreground">
-              {icon}
+              {(() => {
+                if (!icon) return null;
+                if (React.isValidElement(icon)) return icon;
+                if (typeof icon === 'function' || (typeof icon === 'object' && icon !== null && ('render' in icon || '$$typeof' in icon))) {
+                  const IconComponent = icon as any;
+                  return <IconComponent className="h-4 w-4" />;
+                }
+                return null;
+              })()}
             </div>
           )}
         </CardHeader>
@@ -120,7 +128,7 @@ export const MetricCard = ({
   }
 
   return (
-    <Card 
+    <Card
       className={cn(
         'transition-all duration-200',
         onClick && 'cursor-pointer hover:shadow-md',
@@ -135,7 +143,15 @@ export const MetricCard = ({
         </CardTitle>
         {icon && (
           <div className="text-muted-foreground">
-            {icon}
+            {(() => {
+              if (!icon) return null;
+              if (React.isValidElement(icon)) return icon;
+              if (typeof icon === 'function' || (typeof icon === 'object' && icon !== null && ('render' in icon || '$$typeof' in icon))) {
+                const IconComponent = icon as any;
+                return <IconComponent className="h-4 w-4" />;
+              }
+              return null;
+            })()}
           </div>
         )}
       </CardHeader>
@@ -144,18 +160,18 @@ export const MetricCard = ({
           <div className="text-2xl font-bold">
             {formatValue(value)}
           </div>
-          
+
           <div className="flex items-center justify-between">
             {description && (
               <p className="text-xs text-muted-foreground">
                 {description}
               </p>
             )}
-            
+
             {trend && (
               <div className="flex items-center gap-1">
-                <Badge 
-                  variant="outline" 
+                <Badge
+                  variant="outline"
                   className={cn(
                     'text-xs',
                     getTrendColor()
@@ -174,7 +190,7 @@ export const MetricCard = ({
               </div>
             )}
           </div>
-          
+
           {trend?.label && (
             <p className="text-xs text-muted-foreground">
               {trend.label}

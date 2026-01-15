@@ -16,10 +16,16 @@ export const useSiteSettings = (section?: string) => {
     const [loading, setLoading] = useState(true);
 
     const fetchSettings = useCallback(async () => {
+        const timeoutId = setTimeout(() => {
+            if (loading) {
+                console.warn('[useSiteSettings] Fetch exceeding 4s, forcing load false');
+                setLoading(false);
+            }
+        }, 4000);
+
         try {
             setLoading(true);
-            let query = supabase
-                .from('site_settings')
+            let query = (supabase.from as any)('site_settings')
                 .select('*')
                 .order('created_at', { ascending: true });
 
@@ -34,16 +40,15 @@ export const useSiteSettings = (section?: string) => {
             setSettings(data || []);
         } catch (error) {
             console.error('Error fetching site settings:', error);
-            // Don't toast on fetch error to avoid spamming public users if RLS fails silently
         } finally {
             setLoading(false);
+            clearTimeout(timeoutId);
         }
     }, [section]);
 
     const updateSetting = async (id: string, value: any, options: { showToast?: boolean } = { showToast: true }) => {
         try {
-            const { error } = await supabase
-                .from('site_settings')
+            const { error } = await (supabase.from as any)('site_settings')
                 .update({ value })
                 .eq('id', id);
 

@@ -242,7 +242,7 @@ export default function BuyerProfile() {
     );
   }
 
-  if (loading || !profile) {
+  if (loading) {
     return (
       <div className="space-y-6">
         <div className="animate-pulse">
@@ -264,6 +264,17 @@ export default function BuyerProfile() {
             </Card>
           ))}
         </div>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-center">
+        <User className="h-16 w-16 text-muted-foreground mb-4" />
+        <h2 className="text-xl font-semibold mb-2">Não foi possível carregar o perfil</h2>
+        <p className="text-muted-foreground mb-4">Ocorreu um erro ao buscar seus dados ou sua conta ainda não está totalmente configurada.</p>
+        <Button onClick={loadProfile}>Tentar Novamente</Button>
       </div>
     );
   }

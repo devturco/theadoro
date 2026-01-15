@@ -16,14 +16,15 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useRole } from '@/hooks/useRole';
 import { useCRUD } from '@/hooks/useCRUD';
-import { 
-  ShoppingBag, 
-  DollarSign, 
-  TrendingUp, 
+import {
+  ShoppingBag,
+  DollarSign,
+  TrendingUp,
   Package,
   Eye,
   Filter
 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SalesStats {
   totalSales: number;
@@ -59,53 +60,88 @@ export default function SellerSales() {
   const loadSalesData = async () => {
     try {
       setLoading(true);
-      
-      // Mock data - replace with actual API calls
-      const mockSales = [
-        {
-          id: '1',
-          buyer_name: 'Maria Silva',
-          buyer_email: 'maria@email.com',
-          total_amount: 299.90,
-          status: 'delivered',
-          created_at: '2024-01-15T10:30:00Z',
-          items: [
-            { product_name: 'Colar Personalizado', quantity: 1, price: 299.90 }
-          ]
-        },
-        {
-          id: '2',
-          buyer_name: 'João Santos',
-          buyer_email: 'joao@email.com',
-          total_amount: 150.00,
-          status: 'confirmed',
-          created_at: '2024-01-14T14:20:00Z',
-          items: [
-            { product_name: 'Pulseira Artesanal', quantity: 2, price: 75.00 }
-          ]
-        },
-        {
-          id: '3',
-          buyer_name: 'Ana Costa',
-          buyer_email: 'ana@email.com',
-          total_amount: 450.00,
-          status: 'shipped',
-          created_at: '2024-01-13T09:15:00Z',
-          items: [
-            { product_name: 'Kit Presente Especial', quantity: 1, price: 450.00 }
-          ]
+
+      const { data: orderItems, error } = await supabase
+        .from('order_items')
+        .select(`
+          id,
+          order_id,
+          unit_price,
+          quantity,
+          orders (
+            id,
+            status,
+            created_at,
+            buyer_id,
+            profiles:buyer_id (full_name, email)
+          )
+        `)
+        .eq('seller_id', user?.id)
+        .order('created_at', { foreignTable: 'orders', ascending: false });
+
+      if (error) throw error;
+
+      // Group items by order
+      const ordersMap = new Map();
+      let totalRevenue = 0;
+      const now = new Date();
+      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const firstDayOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+      let currentMonthRevenue = 0;
+      let lastMonthRevenue = 0;
+
+      orderItems?.forEach(item => {
+        const order = item.orders as any;
+        if (!order) return;
+
+        const amount = Number(item.unit_price) * Number(item.quantity);
+        totalRevenue += amount;
+
+        const orderDate = new Date(order.created_at);
+        if (orderDate >= firstDayOfMonth) {
+          currentMonthRevenue += amount;
+        } else if (orderDate >= firstDayOfLastMonth) {
+          lastMonthRevenue += amount;
         }
-      ];
 
-      const mockStats: SalesStats = {
-        totalSales: mockSales.length,
-        totalRevenue: mockSales.reduce((sum, sale) => sum + sale.total_amount, 0),
-        averageOrderValue: mockSales.reduce((sum, sale) => sum + sale.total_amount, 0) / mockSales.length,
-        monthlyGrowth: 15.5
-      };
+        if (!ordersMap.has(order.id)) {
+          ordersMap.set(order.id, {
+            id: order.id,
+            buyer_name: order.profiles?.full_name || 'Cliente',
+            buyer_email: order.profiles?.email || 'N/A',
+            total_amount: 0,
+            status: order.status,
+            created_at: order.created_at,
+            items: []
+          });
+        }
 
-      setSales(mockSales);
-      setStats(mockStats);
+        const orderData = ordersMap.get(order.id);
+        orderData.total_amount += amount;
+        orderData.items.push({
+          product_name: (item as any).product_name || 'Produto', // Ideally fetch from products join if needed
+          quantity: item.quantity,
+          price: item.unit_price
+        });
+      });
+
+      const processedSales = Array.from(ordersMap.values())
+        .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      // Calculate growth
+      let monthlyGrowth = 0;
+      if (lastMonthRevenue > 0) {
+        monthlyGrowth = ((currentMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100;
+      }
+
+      setSales(processedSales);
+      setStats({
+        totalSales: ordersMap.size,
+        totalRevenue,
+        averageOrderValue: ordersMap.size > 0 ? totalRevenue / ordersMap.size : 0,
+        monthlyGrowth: Number(monthlyGrowth.toFixed(1))
+      });
     } catch (error) {
       console.error('Error loading sales data:', error);
     } finally {
@@ -121,27 +157,27 @@ export default function SellerSales() {
   const salesColumns = [
     {
       key: 'id',
-      label: 'ID',
+      title: 'ID',
       render: (value: string) => `#${value.slice(0, 8)}`
     },
     {
       key: 'buyer_name',
-      label: 'Cliente',
+      title: 'Cliente',
       render: (value: string) => value || 'N/A'
     },
     {
       key: 'buyer_email',
-      label: 'Email',
+      title: 'Email',
       render: (value: string) => value || 'N/A'
     },
     {
       key: 'total_amount',
-      label: 'Total',
+      title: 'Total',
       render: (value: number) => `R$ ${value?.toFixed(2) || '0.00'}`
     },
     {
       key: 'status',
-      label: 'Status',
+      title: 'Status',
       render: (value: string) => {
         const statusMap = {
           pending: { label: 'Pendente', variant: 'secondary' as const },
@@ -157,15 +193,15 @@ export default function SellerSales() {
     },
     {
       key: 'created_at',
-      label: 'Data',
+      title: 'Data',
       render: (value: string) => new Date(value).toLocaleDateString('pt-BR')
     },
     {
       key: 'actions',
-      label: 'Ações',
+      title: 'Ações',
       render: (_: any, row: any) => (
-        <Button 
-          variant="outline" 
+        <Button
+          variant="outline"
           size="sm"
           onClick={() => handleViewOrder(row)}
         >
@@ -179,7 +215,7 @@ export default function SellerSales() {
   const filteredSales = sales.filter(sale => {
     const matchesStatus = statusFilter === 'all' || sale.status === statusFilter;
     const matchesSearch = sale.buyer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         sale.buyer_email.toLowerCase().includes(searchTerm.toLowerCase());
+      sale.buyer_email.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesStatus && matchesSearch;
   });
 
@@ -213,7 +249,7 @@ export default function SellerSales() {
             <div className="text-2xl font-bold">{stats.totalSales}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Receita Total</CardTitle>
@@ -223,7 +259,7 @@ export default function SellerSales() {
             <div className="text-2xl font-bold">R$ {stats.totalRevenue.toFixed(2)}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Ticket Médio</CardTitle>
@@ -233,7 +269,7 @@ export default function SellerSales() {
             <div className="text-2xl font-bold">R$ {stats.averageOrderValue.toFixed(2)}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Crescimento Mensal</CardTitle>
@@ -295,7 +331,6 @@ export default function SellerSales() {
             data={filteredSales}
             columns={salesColumns}
             loading={loading}
-            searchable={false}
           />
         </CardContent>
       </Card>
@@ -309,7 +344,7 @@ export default function SellerSales() {
               Informações completas da venda
             </DialogDescription>
           </DialogHeader>
-          
+
           {selectedOrder && (
             <div className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
@@ -324,9 +359,9 @@ export default function SellerSales() {
                 <div>
                   <Label className="text-sm font-medium">Status</Label>
                   <Badge className="mt-1">
-                    {selectedOrder.status === 'delivered' ? 'Entregue' : 
-                     selectedOrder.status === 'shipped' ? 'Enviado' : 
-                     selectedOrder.status === 'confirmed' ? 'Confirmado' : 'Pendente'}
+                    {selectedOrder.status === 'delivered' ? 'Entregue' :
+                      selectedOrder.status === 'shipped' ? 'Enviado' :
+                        selectedOrder.status === 'confirmed' ? 'Confirmado' : 'Pendente'}
                   </Badge>
                 </div>
                 <div>
@@ -336,7 +371,7 @@ export default function SellerSales() {
                   </p>
                 </div>
               </div>
-              
+
               <div>
                 <Label className="text-sm font-medium">Itens</Label>
                 <div className="mt-2 space-y-2">
@@ -351,7 +386,7 @@ export default function SellerSales() {
                   ))}
                 </div>
               </div>
-              
+
               <div className="border-t pt-4">
                 <div className="flex justify-between items-center">
                   <span className="font-medium">Total:</span>

@@ -45,6 +45,8 @@ export interface AuthContextType {
   resetPassword: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
   refreshSession: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
+  dbRoles: UserRole[];
 }
 
 export interface RolePermissions {

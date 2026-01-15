@@ -17,10 +17,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Search, 
+import {
+  ChevronLeft,
+  ChevronRight,
+  Search,
   Filter,
   MoreHorizontal,
   Eye,
@@ -34,7 +34,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import type { PaginationParams } from '@/types/common';
+import type { PaginationOptions } from '@/types/common';
 
 export interface Column<T> {
   key: keyof T | string;
@@ -57,7 +57,7 @@ interface DataTableProps<T> {
   data: T[];
   columns: Column<T>[];
   loading?: boolean;
-  pagination?: PaginationParams;
+  pagination?: PaginationOptions;
   onPageChange?: (page: number) => void;
   onSearch?: (query: string) => void;
   onFilter?: (filters: Record<string, any>) => void;
@@ -89,9 +89,10 @@ export function DataTable<T extends { id: string }>({
   };
 
   const renderCellValue = (column: Column<T>, item: T) => {
-    const value = column.key.includes('.') 
-      ? column.key.split('.').reduce((obj: any, key) => obj?.[key], item)
-      : (item as any)[column.key];
+    const key = column.key as string;
+    const value = typeof key === 'string' && key.includes('.')
+      ? key.split('.').reduce((obj: any, k) => obj?.[k], item)
+      : (item as any)[key];
 
     if (column.render) {
       return column.render(value, item);
@@ -112,26 +113,7 @@ export function DataTable<T extends { id: string }>({
     return String(value);
   };
 
-  const defaultActions: DataTableAction<T>[] = [
-    {
-      label: 'Visualizar',
-      icon: <Eye className="h-4 w-4" />,
-      onClick: () => {},
-    },
-    {
-      label: 'Editar',
-      icon: <Edit className="h-4 w-4" />,
-      onClick: () => {},
-    },
-    {
-      label: 'Excluir',
-      icon: <Trash2 className="h-4 w-4" />,
-      onClick: () => {},
-      variant: 'destructive' as const,
-    },
-  ];
-
-  const allActions = actions.length > 0 ? actions : defaultActions;
+  const allActions = actions;
 
   return (
     <div className={cn('space-y-4', className)}>
@@ -166,7 +148,7 @@ export function DataTable<T extends { id: string }>({
           <TableHeader>
             <TableRow>
               {columns.map((column, index) => (
-                <TableHead 
+                <TableHead
                   key={index}
                   className={cn(column.className)}
                   style={{ width: column.width }}
@@ -174,7 +156,7 @@ export function DataTable<T extends { id: string }>({
                   {column.title}
                 </TableHead>
               ))}
-              {allActions.length > 0 && (
+              {allActions && allActions.length > 0 && (
                 <TableHead className="w-[70px]">Ações</TableHead>
               )}
             </TableRow>
@@ -182,8 +164,8 @@ export function DataTable<T extends { id: string }>({
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell 
-                  colSpan={columns.length + (allActions.length > 0 ? 1 : 0)} 
+                <TableCell
+                  colSpan={columns.length + (allActions.length > 0 ? 1 : 0)}
                   className="text-center py-8"
                 >
                   <LoadingSpinner size="md" />
@@ -191,8 +173,8 @@ export function DataTable<T extends { id: string }>({
               </TableRow>
             ) : data.length === 0 ? (
               <TableRow>
-                <TableCell 
-                  colSpan={columns.length + (allActions.length > 0 ? 1 : 0)} 
+                <TableCell
+                  colSpan={columns.length + (allActions.length > 0 ? 1 : 0)}
                   className="text-center py-8 text-muted-foreground"
                 >
                   {emptyMessage}
@@ -202,14 +184,14 @@ export function DataTable<T extends { id: string }>({
               data.map((item) => (
                 <TableRow key={item.id}>
                   {columns.map((column, index) => (
-                    <TableCell 
+                    <TableCell
                       key={index}
                       className={cn(column.className)}
                     >
                       {renderCellValue(column, item)}
                     </TableCell>
                   ))}
-                  {allActions.length > 0 && (
+                  {allActions && allActions.length > 0 && (
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -225,7 +207,7 @@ export function DataTable<T extends { id: string }>({
                                 key={actionIndex}
                                 onClick={() => action.onClick(item)}
                                 className={cn(
-                                  action.variant === 'destructive' && 
+                                  action.variant === 'destructive' &&
                                   'text-destructive focus:text-destructive'
                                 )}
                               >

@@ -18,15 +18,16 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useRole } from '@/hooks/useRole';
 import { useCRUD } from '@/hooks/useCRUD';
-import { 
-  Calendar, 
-  Clock, 
-  User, 
+import {
+  Calendar,
+  Clock,
+  User,
   CheckCircle,
   XCircle,
   Eye,
   Filter
 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AppointmentStats {
   total: number;
@@ -64,51 +65,33 @@ export default function SellerAppointments() {
   const loadAppointments = async () => {
     try {
       setLoading(true);
-      
-      // Mock data - replace with actual API calls
-      const mockAppointments = [
-        {
-          id: '1',
-          buyer_name: 'Maria Silva',
-          buyer_email: 'maria@email.com',
-          buyer_phone: '(11) 99999-9999',
-          appointment_date: '2024-01-20T14:00:00Z',
-          status: 'confirmed',
-          notes: 'Interessada em produtos personalizados para casamento',
-          created_at: '2024-01-15T10:30:00Z'
-        },
-        {
-          id: '2',
-          buyer_name: 'João Santos',
-          buyer_email: 'joao@email.com',
-          buyer_phone: '(11) 88888-8888',
-          appointment_date: '2024-01-22T10:00:00Z',
-          status: 'pending',
-          notes: 'Consulta sobre produtos corporativos',
-          created_at: '2024-01-16T09:15:00Z'
-        },
-        {
-          id: '3',
-          buyer_name: 'Ana Costa',
-          buyer_email: 'ana@email.com',
-          buyer_phone: '(11) 77777-7777',
-          appointment_date: '2024-01-18T16:00:00Z',
-          status: 'completed',
-          notes: 'Reunião para definir detalhes do pedido especial',
-          created_at: '2024-01-12T14:20:00Z'
-        }
-      ];
 
-      const mockStats: AppointmentStats = {
-        total: mockAppointments.length,
-        pending: mockAppointments.filter(a => a.status === 'pending').length,
-        confirmed: mockAppointments.filter(a => a.status === 'confirmed').length,
-        completed: mockAppointments.filter(a => a.status === 'completed').length,
-        cancelled: mockAppointments.filter(a => a.status === 'cancelled').length
-      };
+      const { data, error } = await supabase
+        .from('appointments')
+        .select(`
+          *,
+          profiles:buyer_id (full_name, email)
+        `)
+        .eq('seller_id', user?.id)
+        .order('appointment_date', { ascending: false });
 
-      setAppointments(mockAppointments);
-      setStats(mockStats);
+      if (error) throw error;
+
+      const processedAppointments = data?.map(app => ({
+        ...app,
+        buyer_name: (app.profiles as any)?.full_name || 'Cliente',
+        buyer_email: (app.profiles as any)?.email || 'N/A'
+      })) || [];
+
+      // Calculate stats
+      setAppointments(processedAppointments);
+      setStats({
+        total: processedAppointments.length,
+        pending: processedAppointments.filter(a => a.status === 'pending').length,
+        confirmed: processedAppointments.filter(a => a.status === 'confirmed').length,
+        completed: processedAppointments.filter(a => a.status === 'completed').length,
+        cancelled: processedAppointments.filter(a => a.status === 'cancelled').length
+      });
     } catch (error) {
       console.error('Error loading appointments:', error);
     } finally {
@@ -124,14 +107,14 @@ export default function SellerAppointments() {
   const handleUpdateStatus = async (appointmentId: string, newStatus: string) => {
     try {
       // Update appointment status - replace with actual API call
-      setAppointments(prev => 
-        prev.map(appointment => 
-          appointment.id === appointmentId 
+      setAppointments(prev =>
+        prev.map(appointment =>
+          appointment.id === appointmentId
             ? { ...appointment, status: newStatus }
             : appointment
         )
       );
-      
+
       // Reload stats
       loadAppointments();
     } catch (error) {
@@ -142,12 +125,12 @@ export default function SellerAppointments() {
   const appointmentColumns = [
     {
       key: 'buyer_name',
-      label: 'Cliente',
+      title: 'Cliente',
       render: (value: string) => value || 'N/A'
     },
     {
       key: 'appointment_date',
-      label: 'Data/Hora',
+      title: 'Data/Hora',
       render: (value: string) => {
         const date = new Date(value);
         return `${date.toLocaleDateString('pt-BR')} às ${date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
@@ -155,7 +138,7 @@ export default function SellerAppointments() {
     },
     {
       key: 'status',
-      label: 'Status',
+      title: 'Status',
       render: (value: string) => {
         const statusMap = {
           pending: { label: 'Pendente', variant: 'secondary' as const },
@@ -169,11 +152,11 @@ export default function SellerAppointments() {
     },
     {
       key: 'actions',
-      label: 'Ações',
+      title: 'Ações',
       render: (_: any, row: any) => (
         <div className="flex gap-2">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             size="sm"
             onClick={() => handleViewAppointment(row)}
           >
@@ -182,16 +165,16 @@ export default function SellerAppointments() {
           </Button>
           {row.status === 'pending' && (
             <>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={() => handleUpdateStatus(row.id, 'confirmed')}
               >
                 <CheckCircle className="h-4 w-4 mr-1" />
                 Confirmar
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={() => handleUpdateStatus(row.id, 'cancelled')}
               >
@@ -201,8 +184,8 @@ export default function SellerAppointments() {
             </>
           )}
           {row.status === 'confirmed' && (
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="sm"
               onClick={() => handleUpdateStatus(row.id, 'completed')}
             >
@@ -218,7 +201,7 @@ export default function SellerAppointments() {
   const filteredAppointments = appointments.filter(appointment => {
     const matchesStatus = statusFilter === 'all' || appointment.status === statusFilter;
     const matchesSearch = appointment.buyer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         appointment.buyer_email.toLowerCase().includes(searchTerm.toLowerCase());
+      appointment.buyer_email.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesStatus && matchesSearch;
   });
 
@@ -252,7 +235,7 @@ export default function SellerAppointments() {
             <div className="text-2xl font-bold">{stats.total}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Pendentes</CardTitle>
@@ -262,7 +245,7 @@ export default function SellerAppointments() {
             <div className="text-2xl font-bold">{stats.pending}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Confirmados</CardTitle>
@@ -272,7 +255,7 @@ export default function SellerAppointments() {
             <div className="text-2xl font-bold">{stats.confirmed}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Concluídos</CardTitle>
@@ -282,7 +265,7 @@ export default function SellerAppointments() {
             <div className="text-2xl font-bold">{stats.completed}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Cancelados</CardTitle>
@@ -342,7 +325,6 @@ export default function SellerAppointments() {
             data={filteredAppointments}
             columns={appointmentColumns}
             loading={loading}
-            searchable={false}
           />
         </CardContent>
       </Card>
@@ -356,7 +338,7 @@ export default function SellerAppointments() {
               Informações completas do agendamento
             </DialogDescription>
           </DialogHeader>
-          
+
           {selectedAppointment && (
             <div className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
@@ -375,9 +357,9 @@ export default function SellerAppointments() {
                 <div>
                   <Label className="text-sm font-medium">Status</Label>
                   <Badge className="mt-1">
-                    {selectedAppointment.status === 'pending' ? 'Pendente' : 
-                     selectedAppointment.status === 'confirmed' ? 'Confirmado' : 
-                     selectedAppointment.status === 'completed' ? 'Concluído' : 'Cancelado'}
+                    {selectedAppointment.status === 'pending' ? 'Pendente' :
+                      selectedAppointment.status === 'confirmed' ? 'Confirmado' :
+                        selectedAppointment.status === 'completed' ? 'Concluído' : 'Cancelado'}
                   </Badge>
                 </div>
                 <div>
@@ -394,7 +376,7 @@ export default function SellerAppointments() {
                   </p>
                 </div>
               </div>
-              
+
               <div>
                 <Label className="text-sm font-medium">Observações</Label>
                 <p className="text-sm text-muted-foreground mt-1 p-3 bg-muted rounded-md">
@@ -403,7 +385,7 @@ export default function SellerAppointments() {
               </div>
             </div>
           )}
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDetailsOpen(false)}>
               Fechar

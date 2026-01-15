@@ -30,7 +30,7 @@ export const useOrders = () => {
       *,
       buyer:profiles!buyer_id(id, full_name, email, phone),
       seller:profiles!seller_id(id, full_name, email, phone),
-      order_items(
+      items:order_items(
         id,
         quantity,
         unit_price,
@@ -108,8 +108,8 @@ export const useOrders = () => {
       const statusMessages = {
         pending: 'Pedido marcado como pendente',
         confirmed: 'Pedido confirmado',
-        preparing: 'Pedido em preparação',
-        ready: 'Pedido pronto para entrega',
+        processing: 'Pedido em processamento',
+        shipped: 'Pedido enviado',
         delivered: 'Pedido entregue',
         cancelled: 'Pedido cancelado'
       };
@@ -128,7 +128,7 @@ export const useOrders = () => {
         .select(`
           *,
           seller:profiles!seller_id(id, full_name, email, phone),
-          order_items(
+          items:order_items(
             id,
             quantity,
             unit_price,
@@ -157,7 +157,7 @@ export const useOrders = () => {
         .select(`
           *,
           buyer:profiles!buyer_id(id, full_name, email, phone),
-          order_items(
+          items:order_items(
             id,
             quantity,
             unit_price,

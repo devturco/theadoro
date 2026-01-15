@@ -15,12 +15,16 @@ import {
   MapPin,
   Store,
   MessageCircle,
-  ThumbsUp
+  ThumbsUp,
+  Eye
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { useProduct } from '@/hooks/useProduct';
 import { useCart } from '@/hooks/useCart';
 import { useWishlist } from '@/hooks/useWishlist';
 import { useShipping } from '@/hooks/useShipping';
+import { useAnalytics } from '@/hooks/useAnalytics';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -35,6 +39,8 @@ export const ProductDetail: React.FC = () => {
   const navigate = useNavigate();
   const { addToCart } = useCart();
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
+  const { trackEvent } = useAnalytics();
+
 
 
 
@@ -70,11 +76,35 @@ export const ProductDetail: React.FC = () => {
     markReviewHelpful,
   } = useProduct(id!);
 
+  // Fetch Total Views
+  const { data: totalViews } = useQuery({
+    queryKey: ['product-total-views', product?.id],
+    queryFn: async () => {
+      if (!product?.id) return 0;
+      const { count, error } = await (supabase.from as any)('product_analytics')
+        .select('*', { count: 'exact', head: true })
+        .eq('product_id', product.id)
+        .eq('event_type', 'view');
+
+      if (error) {
+        console.error('[Analytics] Error fetching views:', error);
+        return 0;
+      }
+      return count || 0;
+    },
+    enabled: !!product?.id
+  });
+
   useEffect(() => {
     if (product && product.variants && product.variants.length > 0) {
       setSelectedVariant(product.variants[0].id);
     }
-  }, [product]);
+
+    // Track product view
+    if (product) {
+      trackEvent(product.id, product.seller_id, 'view');
+    }
+  }, [product, trackEvent]);
 
   if (loading) {
     return (
@@ -104,6 +134,10 @@ export const ProductDetail: React.FC = () => {
   const handleAddToCart = async () => {
     setIsAddingToCart(true);
     try {
+      if (product) {
+        const eventType = product.is_service ? 'appointment_start' : 'click_buy';
+        await trackEvent(product.id, product.seller_id, eventType);
+      }
       await addToCart(product, quantity, selectedVariant ? { variantId: selectedVariant } : undefined);
     } catch (error) {
       console.error('Error adding to cart:', error);
@@ -117,13 +151,7 @@ export const ProductDetail: React.FC = () => {
       if (isInWishlist(product.id)) {
         await removeFromWishlist(product.id);
       } else {
-        await addToWishlist({
-          id: product.id,
-          name: product.name,
-          price: product.price,
-          image: product.images[0] || '',
-          seller: product.seller,
-        });
+        await addToWishlist(product);
       }
     } catch (error) {
       console.error('Error toggling wishlist:', error);
@@ -137,9 +165,9 @@ export const ProductDetail: React.FC = () => {
     }).format(price);
   };
 
-  const hasDiscount = product.originalPrice && product.originalPrice > product.price;
+  const hasDiscount = product.original_price && product.original_price > product.price;
   const discountPercentage = hasDiscount
-    ? Math.round(((product.originalPrice! - product.price) / product.originalPrice!) * 100)
+    ? Math.round(((product.original_price! - product.price) / product.original_price!) * 100)
     : 0;
 
   const averageRating = reviews.length > 0
@@ -147,8 +175,8 @@ export const ProductDetail: React.FC = () => {
     : 0;
 
   const selectedVariantData = product.variants?.find(v => v.id === selectedVariant);
-  const currentStock = selectedVariantData?.stock ?? product.stock;
-  const maxQuantity = Math.min(currentStock, 10);
+  const currentStock = selectedVariantData?.stock ?? product.stock_quantity;
+  const maxQuantity = Math.min(currentStock || 0, 10);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -229,6 +257,11 @@ export const ProductDetail: React.FC = () => {
                 <span className="text-sm text-gray-600">
                   {averageRating.toFixed(1)} ({reviews.length} avaliações)
                 </span>
+                <span className="text-gray-300">|</span>
+                <div className="flex items-center gap-1 text-sm text-gray-500">
+                  <Eye className="h-4 w-4" />
+                  <span>{totalViews || 0} visitas</span>
+                </div>
               </div>
 
               {/* Seller */}
@@ -263,7 +296,7 @@ export const ProductDetail: React.FC = () => {
                 {hasDiscount && (
                   <>
                     <span className="text-lg text-gray-500 line-through">
-                      {formatPrice(product.originalPrice!)}
+                      {formatPrice(product.original_price!)}
                     </span>
                     <Badge variant="destructive">
                       -{discountPercentage}%
@@ -272,7 +305,7 @@ export const ProductDetail: React.FC = () => {
                 )}
               </div>
 
-              {product.isService && (
+              {product.is_service && (
                 <Badge variant="outline" className="w-fit">
                   Serviço
                 </Badge>
@@ -352,7 +385,7 @@ export const ProductDetail: React.FC = () => {
                   size="lg"
                 >
                   <ShoppingCart className="h-5 w-5 mr-2" />
-                  {isAddingToCart ? 'Adicionando...' : 'Adicionar ao Carrinho'}
+                  {isAddingToCart ? 'Adicionando...' : (product.is_service ? 'Reservar Serviço' : 'Adicionar ao Carrinho')}
                 </Button>
 
                 <Button
@@ -465,12 +498,12 @@ export const ProductDetail: React.FC = () => {
               )}
 
               {/* Default static info if no calculation yet */}
-              {shippingOptions.length === 0 && !loadingShipping && product.shippingInfo && (
+              {shippingOptions.length === 0 && !loadingShipping && (product as any).shipping_info && (
                 <div className="space-y-1 text-sm text-gray-600 pt-2 border-t mt-2">
                   <div className="flex justify-between">
                     <span>Frete base:</span>
-                    <span className={product.shippingInfo.freeShipping ? 'text-green-600 font-medium' : ''}>
-                      {product.shippingInfo.freeShipping ? 'Grátis' : formatPrice(product.shippingInfo.price)}
+                    <span className={(product as any).shipping_info.freeShipping ? 'text-green-600 font-medium' : ''}>
+                      {(product as any).shipping_info.freeShipping ? 'Grátis' : formatPrice((product as any).shipping_info.price)}
                     </span>
                   </div>
                 </div>
@@ -674,7 +707,7 @@ export const ProductDetail: React.FC = () => {
 
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <Store className="h-4 w-4" />
-                        <span>Membro desde {new Date(product.seller.createdAt).getFullYear()}</span>
+                        <span>Membro desde {product.seller.joinedAt ? new Date(product.seller.joinedAt).getFullYear() : 'N/A'}</span>
                       </div>
                     </div>
 
@@ -685,7 +718,13 @@ export const ProductDetail: React.FC = () => {
                         </Link>
                       </Button>
 
-                      <Button variant="outline">
+                      <Button variant="outline" onClick={() => {
+                        if (product) {
+                          trackEvent(product.id, product.seller_id, 'whatsapp_click');
+                          // Logic to open WhatsApp would go here
+                          window.open(`https://wa.me/?text=Olá, tenho interesse no produto ${product.name}`, '_blank');
+                        }
+                      }}>
                         <MessageCircle className="h-4 w-4 mr-2" />
                         Contatar vendedor
                       </Button>
@@ -706,9 +745,6 @@ export const ProductDetail: React.FC = () => {
             <ProductGrid
               products={relatedProducts}
               loading={false}
-              error={null}
-              viewMode="grid"
-              showPagination={false}
               className="grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
             />
           </div>

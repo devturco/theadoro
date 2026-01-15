@@ -192,7 +192,7 @@ const AdminProducts = () => {
   const columns = [
     {
       key: 'images',
-      label: 'Imagem',
+      title: 'Imagem',
       render: (images: string[]) => (
         <div className="w-12 h-12 rounded-md overflow-hidden bg-muted">
           {images?.[0] ? (
@@ -211,19 +211,16 @@ const AdminProducts = () => {
     },
     {
       key: 'name',
-      label: 'Nome'
+      title: 'Nome'
     },
     {
       key: 'category',
-      label: 'Categoria',
-      render: (_: any, row: Product) => {
-        const category = categories?.find((cat: any) => cat.id === row.category_id);
-        return category?.name || 'N/A';
-      }
+      title: 'Categoria',
+      render: (_: any, row: Product) => row.category?.name || 'N/A'
     },
     {
       key: 'type',
-      label: 'Tipo',
+      title: 'Tipo',
       render: (type: ProductType) => (
         <Badge variant={type === 'physical' ? 'default' : 'secondary'}>
           {type === 'physical' ? 'Físico' : 'Serviço'}
@@ -232,12 +229,12 @@ const AdminProducts = () => {
     },
     {
       key: 'price',
-      label: 'Preço',
+      title: 'Preço',
       render: (price: number) => `R$ ${price.toFixed(2)}`
     },
     {
       key: 'stock_quantity',
-      label: 'Estoque',
+      title: 'Estoque',
       render: (stock: number, row: Product) => (
         <div className="flex items-center gap-2">
           <span>{stock || 0}</span>
@@ -249,7 +246,7 @@ const AdminProducts = () => {
     },
     {
       key: 'is_active',
-      label: 'Status',
+      title: 'Status',
       render: (isActive: boolean) => (
         <Badge variant={isActive ? 'default' : 'secondary'}>
           {isActive ? 'Ativo' : 'Inativo'}
@@ -258,12 +255,12 @@ const AdminProducts = () => {
     },
     {
       key: 'seller',
-      label: 'Vendedor',
+      title: 'Vendedor',
       render: (_: any, row: Product) => row.seller?.name || 'N/A'
     },
     {
       key: 'actions',
-      label: 'Ações',
+      title: 'Ações',
       render: (_: any, row: Product) => (
         <div className="flex gap-2">
           <Button

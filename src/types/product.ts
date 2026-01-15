@@ -13,6 +13,10 @@ export interface Product {
   is_active: boolean;
   is_service: boolean;
   tags: string[];
+  stock?: number;
+  variants?: any[];
+  shipping_info?: any;
+  seller_id: string;
   created_at?: string;
   updated_at?: string;
   category: {
@@ -67,3 +71,5 @@ export interface ProductFilters {
   page?: number;
   limit?: number;
 }
+
+export type ProductType = 'physical' | 'service';

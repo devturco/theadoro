@@ -3,6 +3,7 @@ import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { useRole } from '@/hooks/useRole';
 import Maintenance from '@/pages/Maintenance';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface MaintenanceGuardProps {
     children: ReactNode;
@@ -10,12 +11,24 @@ interface MaintenanceGuardProps {
 
 export const MaintenanceGuard = ({ children }: MaintenanceGuardProps) => {
     const { getSettingValue, loading: settingsLoading } = useSiteSettings('general');
-    const { isAdmin, loading: authLoading } = useRole();
+    const { isAdmin } = useRole();
+    const { loading: authLoading } = useAuth();
 
+    console.log('[MaintenanceGuard] Render', { settingsLoading, authLoading, isAdmin });
+
+    // If it's taking too long, we show a small indicator but don't block the whole screen
+    // Unless truly initial load
     if (settingsLoading || authLoading) {
         return (
-            <div className="min-h-screen flex items-center justify-center">
+            <div className="min-h-screen flex flex-col items-center justify-center gap-4">
                 <LoadingSpinner size="lg" />
+                <p className="text-sm text-muted-foreground animate-pulse">Confirmando acesso...</p>
+                <button
+                    onClick={() => window.location.reload()}
+                    className="mt-4 text-xs underline text-champagne-dark"
+                >
+                    Demorando muito? Tente atualizar.
+                </button>
             </div>
         );
     }

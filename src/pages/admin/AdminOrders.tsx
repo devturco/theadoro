@@ -39,8 +39,10 @@ import {
   User,
   Gift,
   Download,
-  Printer
+  Printer,
+  Trash2
 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Order, OrderStatus } from '@/types/order';
 
@@ -56,7 +58,8 @@ const AdminOrders = () => {
     loading,
     updateOrderStatus,
     getOrderStats,
-    refetch
+    deleteOrder,
+    refresh
   } = useOrders();
 
   const [stats, setStats] = useState({
@@ -66,7 +69,8 @@ const AdminOrders = () => {
     shipped: 0,
     delivered: 0,
     cancelled: 0,
-    totalRevenue: 0
+    totalRevenue: 0,
+    appointments: 0
   });
 
   useEffect(() => {
@@ -78,31 +82,49 @@ const AdminOrders = () => {
     calculateStats();
   }, [isAdmin, orders]);
 
-  const calculateStats = () => {
+  const calculateStats = async () => {
     if (!orders) return;
 
-    const stats = {
+    // Fetch appointments count
+    const { count: appointmentsCount } = await supabase
+      .from('appointments')
+      .select('*', { count: 'exact', head: true });
+
+    const newStats = {
       total: orders.length,
       pending: orders.filter(o => o.status === 'pending').length,
       confirmed: orders.filter(o => o.status === 'confirmed').length,
       shipped: orders.filter(o => o.status === 'shipped').length,
       delivered: orders.filter(o => o.status === 'delivered').length,
       cancelled: orders.filter(o => o.status === 'cancelled').length,
-      totalRevenue: orders.reduce((sum, order) => sum + order.total_amount, 0)
+      totalRevenue: orders.reduce((sum, order) => sum + (order.total_amount || 0), 0),
+      appointments: appointmentsCount || 0
     };
 
-    setStats(stats);
+    setStats(newStats);
   };
 
   const handleStatusUpdate = async (orderId: string, newStatus: OrderStatus) => {
     try {
       await updateOrderStatus(orderId, newStatus);
-      toast.success('Status do pedido atualizado com sucesso!');
-      refetch();
-      calculateStats();
-    } catch (error) {
+      refresh();
+    } catch (error: any) {
       console.error('Erro ao atualizar status:', error);
-      toast.error('Erro ao atualizar status do pedido');
+      const details = error.details || error.message || '';
+      toast.error(`Erro ao atualizar status: ${details}`);
+    }
+  };
+
+  const handleDeleteOrder = async (orderId: string) => {
+    if (!confirm('Tem certeza que deseja excluir este pedido das estatísticas? Esta ação não pode ser desfeita.')) return;
+
+    try {
+      await deleteOrder(orderId);
+      toast.success('Pedido excluído com sucesso!');
+      refresh();
+    } catch (error: any) {
+      console.error('Erro ao excluir pedido:', error);
+      toast.error('Erro ao excluir pedido');
     }
   };
 
@@ -115,6 +137,7 @@ const AdminOrders = () => {
     const variants = {
       pending: 'secondary',
       confirmed: 'default',
+      processing: 'default',
       shipped: 'default',
       delivered: 'default',
       cancelled: 'destructive'
@@ -123,6 +146,7 @@ const AdminOrders = () => {
     const labels = {
       pending: 'Pendente',
       confirmed: 'Confirmado',
+      processing: 'Processando',
       shipped: 'Enviado',
       delivered: 'Entregue',
       cancelled: 'Cancelado'
@@ -139,6 +163,7 @@ const AdminOrders = () => {
     const icons = {
       pending: Clock,
       confirmed: CheckCircle,
+      processing: Clock,
       shipped: Truck,
       delivered: Package,
       cancelled: XCircle
@@ -155,37 +180,37 @@ const AdminOrders = () => {
   const columns = [
     {
       key: 'id',
-      label: 'ID',
+      title: 'ID',
       render: (value: string) => `#${value.slice(0, 8)}`
     },
     {
       key: 'buyer',
-      label: 'Cliente',
-      render: (_: any, row: Order) => row.buyer?.name || 'N/A'
+      title: 'Cliente',
+      render: (_: any, row: Order) => row.buyer?.full_name || 'N/A'
     },
     {
       key: 'items_count',
-      label: 'Itens',
+      title: 'Itens',
       render: (_: any, row: Order) => row.items?.length || 0
     },
     {
       key: 'total_amount',
-      label: 'Total',
+      title: 'Total',
       render: (value: number) => `R$ ${value.toFixed(2)}`
     },
     {
       key: 'status',
-      label: 'Status',
+      title: 'Status',
       render: (status: OrderStatus) => getStatusBadge(status)
     },
     {
       key: 'created_at',
-      label: 'Data do Pedido',
+      title: 'Data do Pedido',
       render: (value: string) => new Date(value).toLocaleDateString('pt-BR')
     },
     {
       key: 'actions',
-      label: 'Ações',
+      title: 'Ações',
       render: (_: any, row: Order) => (
         <div className="flex gap-2">
           <Button
@@ -205,11 +230,20 @@ const AdminOrders = () => {
             <SelectContent>
               <SelectItem value="pending">Pendente</SelectItem>
               <SelectItem value="confirmed">Confirmado</SelectItem>
+              <SelectItem value="processing">Processando</SelectItem>
               <SelectItem value="shipped">Enviado</SelectItem>
               <SelectItem value="delivered">Entregue</SelectItem>
               <SelectItem value="cancelled">Cancelado</SelectItem>
             </SelectContent>
           </Select>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleDeleteOrder(row.id)}
+            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
         </div>
       )
     }
@@ -235,10 +269,10 @@ const AdminOrders = () => {
       </div>
 
       {/* Métricas de pedidos */}
-      <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total</CardTitle>
+            <CardTitle className="text-sm font-medium">Total de Pedidos</CardTitle>
             <ShoppingCart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -263,6 +297,16 @@ const AdminOrders = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.confirmed}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Agendamentos</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.appointments}</div>
           </CardContent>
         </Card>
 
@@ -298,7 +342,7 @@ const AdminOrders = () => {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Receita</CardTitle>
+            <CardTitle className="text-sm font-medium">Receita Total</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -350,8 +394,6 @@ const AdminOrders = () => {
             data={filteredOrders || []}
             columns={columns}
             loading={loading}
-            searchable={true}
-            searchPlaceholder="Buscar pedidos..."
           />
         </CardContent>
       </Card>
@@ -397,7 +439,7 @@ const AdminOrders = () => {
                         <User className="h-4 w-4" /> Cliente
                       </h3>
                       <div className="bg-white border rounded-lg p-3 text-sm space-y-1">
-                        <p><span className="font-medium">Nome:</span> {notes.customer?.firstName} {notes.customer?.lastName} ({selectedOrder.buyer?.name})</p>
+                        <p><span className="font-medium">Nome:</span> {notes.customer?.firstName} {notes.customer?.lastName} ({selectedOrder.buyer?.full_name})</p>
                         <p><span className="font-medium">Email:</span> {selectedOrder.buyer?.email}</p>
                         <p><span className="font-medium">Telefone:</span> {notes.customer?.phone}</p>
                       </div>

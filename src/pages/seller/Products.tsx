@@ -2,11 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import Header from '@/components/Header';
-import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, EyeOff, ShoppingBag, Package } from 'lucide-react';
 import { toast } from 'sonner';
 
 const SellerProducts = () => {
@@ -80,94 +78,126 @@ const SellerProducts = () => {
   };
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Carregando...</div>;
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
+        <div className="w-8 h-8 border-4 border-wine border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-sm text-muted-foreground animate-pulse">Carregando seus produtos...</p>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
+    <div className="animate-in fade-in duration-500">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+        <div>
+          <h1 className="text-3xl font-bold font-sans text-gradient-wine mb-1">Meus Produtos</h1>
+          <p className="text-sm text-muted-foreground">
+            Gerencie seu catálogo de {products.length === 1 ? '1 produto' : `${products.length} produtos`}
+          </p>
+        </div>
+        <Button
+          variant="wine"
+          onClick={() => navigate('/seller/products/new')}
+          className="shadow-md hover:shadow-wine transition-all"
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Criar Anúncio
+        </Button>
+      </div>
 
-      <main className="container mx-auto px-4 py-8 pt-32">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-4xl font-serif text-wine mb-2">Meus Produtos</h1>
-            <p className="text-muted-foreground">{products.length} produtos cadastrados</p>
+      {products.length === 0 ? (
+        <div className="bg-gradient-to-br from-white to-gray-50/50 rounded-2xl border border-dashed border-gray-200 p-12 text-center shadow-sm">
+          <div className="w-20 h-20 bg-wine/5 rounded-full flex items-center justify-center mx-auto mb-6 border border-wine/10">
+            <ShoppingBag className="h-10 w-10 text-wine/40" />
           </div>
-          <Button variant="wine" onClick={() => navigate('/seller/products/new')}>
-            <Plus className="mr-2 h-4 w-4" />
-            Novo Produto
+          <h3 className="text-xl font-bold text-gray-900 mb-2 font-sans">Comece seu Catálogo</h3>
+          <p className="text-muted-foreground mb-8 max-w-sm mx-auto">
+            Você ainda não criou nenhum anúncio. Adicione seu primeiro item para começar a vender.
+          </p>
+          <Button
+            variant="wine"
+            size="lg"
+            onClick={() => navigate('/seller/products/new')}
+            className="rounded-full px-8 shadow-wine transition-all hover:scale-105 active:scale-95"
+          >
+            Criar Primeiro Anúncio
           </Button>
         </div>
+      ) : (
+        <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
+          {products.map((product) => (
+            <Card key={product.id} className="group overflow-hidden rounded-2xl border-gray-100 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+              <div className="aspect-[4/3] overflow-hidden bg-gray-50 relative group">
+                {product.images?.[0] ? (
+                  <img
+                    src={product.images[0]}
+                    alt={product.name}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-300 italic text-xs">
+                    <Package className="h-12 w-12 mb-2 opacity-20" />
+                    <span>Sem imagem</span>
+                  </div>
+                )}
+                <div className="absolute top-3 right-3">
+                  <span className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full shadow-sm ${product.is_active
+                    ? 'bg-green-500 text-white'
+                    : 'bg-gray-400 text-white'
+                    }`}>
+                    {product.is_active ? 'Ativo' : 'Inativo'}
+                  </span>
+                </div>
+              </div>
 
-        {products.length === 0 ? (
-          <Card>
-            <CardContent className="py-16 text-center">
-              <p className="text-muted-foreground mb-4">Você ainda não cadastrou nenhum produto</p>
-              <Button variant="wine" onClick={() => navigate('/seller/products/new')}>
-                Cadastrar Primeiro Produto
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {products.map((product) => (
-              <Card key={product.id} className="hover-scale">
-                <CardHeader>
-                  <div className="aspect-square rounded-lg overflow-hidden mb-4 bg-muted">
-                    {product.images?.[0] ? (
-                      <img
-                        src={product.images[0]}
-                        alt={product.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        Sem imagem
-                      </div>
-                    )}
-                  </div>
-                  <CardTitle className="line-clamp-2">{product.name}</CardTitle>
-                  <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    <span>R$ {Number(product.price).toFixed(2)}</span>
-                    <span className={product.is_active ? 'text-green-600' : 'text-red-600'}>
-                      {product.is_active ? 'Ativo' : 'Inativo'}
-                    </span>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => navigate(`/seller/products/${product.id}`)}
-                    >
-                      <Edit className="mr-2 h-4 w-4" />
-                      Editar
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => toggleActive(product.id, product.is_active)}
-                    >
-                      {product.is_active ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => deleteProduct(product.id)}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </main>
+              <CardContent className="p-5">
+                <div className="mb-4">
+                  <p className="text-[10px] font-bold text-wine/60 uppercase tracking-widest mb-1 truncate">
+                    {product.categories?.name || 'Sem Categoria'}
+                  </p>
+                  <CardTitle className="text-lg font-bold text-gray-900 line-clamp-1 mb-2 group-hover:text-wine transition-colors">
+                    {product.name}
+                  </CardTitle>
+                  <p className="text-xl font-bold text-gray-900 font-sans">
+                    <span className="text-sm font-medium mr-1 text-gray-400">R$</span>
+                    {Number(product.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
 
-      <Footer />
+                <div className="pt-4 border-t border-gray-50 flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 rounded-lg border-gray-200 hover:border-wine hover:text-wine font-semibold transition-all"
+                    onClick={() => navigate(`/seller/products/${product.id}`)}
+                  >
+                    <Edit className="mr-2 h-3.5 w-3.5" />
+                    Editar
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-lg border-gray-200 hover:bg-gray-50 text-gray-500 transition-all"
+                    onClick={() => toggleActive(product.id, product.is_active)}
+                    title={product.is_active ? 'Desativar' : 'Ativar'}
+                  >
+                    {product.is_active ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-lg border-gray-200 hover:bg-red-50 hover:text-red-600 hover:border-red-100 text-gray-400 transition-all"
+                    onClick={() => deleteProduct(product.id)}
+                    title="Excluir"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

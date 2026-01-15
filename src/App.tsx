@@ -15,7 +15,7 @@ import { MaintenanceGuard } from '@/components/auth/MaintenanceGuard';
 // Layouts
 import AdminLayout from '@/components/layouts/AdminLayout';
 import SellerLayout from '@/components/layouts/SellerLayout';
-import BuyerLayout from '@/components/layouts/BuyerLayout';
+import UserDashboardLayout from '@/components/layouts/BuyerLayout';
 import PublicLayout from '@/components/layouts/PublicLayout';
 
 // Public Pages
@@ -43,7 +43,7 @@ import Terms from '@/pages/Terms';
 import Privacy from '@/pages/Privacy';
 
 // General Dashboard
-import Dashboard from '@/pages/Dashboard';
+import RoleBasedRedirect from '@/components/auth/RoleBasedRedirect';
 
 // Admin Pages
 import AdminDashboard from '@/pages/admin/AdminDashboard';
@@ -58,9 +58,11 @@ import AdminSettings from '@/pages/admin/AdminSettings';
 // Seller Pages
 import SellerDashboard from '@/pages/seller/SellerDashboard';
 import SellerProducts from '@/pages/seller/Products';
+import SellerProductForm from '@/pages/seller/SellerProductForm';
 import SellerSales from '@/pages/seller/SellerSales';
 import SellerAppointments from '@/pages/seller/SellerAppointments';
 import SellerReports from '@/pages/seller/SellerReports';
+import SellerInsights from '@/pages/seller/SellerInsights';
 
 // Buyer Pages
 import BuyerDashboard from '@/pages/buyer/BuyerDashboard';
@@ -124,9 +126,7 @@ function App() {
                     path="/dashboard"
                     element={
                       <MaintenanceGuard>
-                        <ProtectedRoute>
-                          <Dashboard />
-                        </ProtectedRoute>
+                        <RoleBasedRedirect />
                       </MaintenanceGuard>
                     }
                   />
@@ -134,9 +134,7 @@ function App() {
                     path="/dashboard/profile"
                     element={
                       <MaintenanceGuard>
-                        <ProtectedRoute>
-                          <BuyerProfile />
-                        </ProtectedRoute>
+                        <RoleBasedRedirect />
                       </MaintenanceGuard>
                     }
                   />
@@ -175,16 +173,19 @@ function App() {
                     element={
                       <ProtectedRoute>
                         <RoleGuard allowedRoles={['seller', 'admin']}>
-                          <SellerLayout>
+                          <UserDashboardLayout>
                             <Routes>
                               <Route path="dashboard" element={<SellerDashboard />} />
                               <Route path="products" element={<SellerProducts />} />
+                              <Route path="products/new" element={<SellerProductForm />} />
+                              <Route path="products/:id" element={<SellerProductForm />} />
                               <Route path="sales" element={<SellerSales />} />
                               <Route path="appointments" element={<SellerAppointments />} />
                               <Route path="reports" element={<SellerReports />} />
+                              <Route path="insights" element={<SellerInsights />} />
                               <Route path="*" element={<SellerDashboard />} />
                             </Routes>
-                          </SellerLayout>
+                          </UserDashboardLayout>
                         </RoleGuard>
                       </ProtectedRoute>
                     }
@@ -196,7 +197,7 @@ function App() {
                     element={
                       <ProtectedRoute>
                         <RoleGuard allowedRoles={['buyer', 'admin']}>
-                          <BuyerLayout>
+                          <UserDashboardLayout>
                             <Routes>
                               <Route path="dashboard" element={<BuyerDashboard />} />
                               <Route path="orders" element={<BuyerOrders />} />
@@ -206,7 +207,7 @@ function App() {
                               <Route path="profile" element={<BuyerProfile />} />
                               <Route path="*" element={<BuyerDashboard />} />
                             </Routes>
-                          </BuyerLayout>
+                          </UserDashboardLayout>
                         </RoleGuard>
                       </ProtectedRoute>
                     }

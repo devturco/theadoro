@@ -20,7 +20,7 @@ export const RoleGuard = ({
   fallbackPath = '/dashboard',
   showError = true
 }: RoleGuardProps) => {
-  const { user, profile, roles, loading } = useAuth();
+  const { user, profile, roles, loading, refreshProfile } = useAuth();
 
   if (loading) {
     return (
@@ -60,8 +60,8 @@ export const RoleGuard = ({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => {
-                      window.location.reload();
+                    onClick={async () => {
+                      await refreshProfile();
                     }}
                   >
                     Atualizar Permissões
