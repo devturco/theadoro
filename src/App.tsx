@@ -54,6 +54,7 @@ import AdminOrders from '@/pages/admin/AdminOrders';
 import AdminReports from '@/pages/admin/AdminReports';
 import AdminContent from '@/pages/admin/AdminContent';
 import AdminSettings from '@/pages/admin/AdminSettings';
+import AdminInsights from '@/pages/admin/AdminInsights';
 
 // Seller Pages
 import SellerDashboard from '@/pages/seller/SellerDashboard';
@@ -157,6 +158,7 @@ function App() {
                               <Route path="categories" element={<AdminCategories />} />
                               <Route path="orders" element={<AdminOrders />} />
                               <Route path="reports" element={<AdminReports />} />
+                              <Route path="insights" element={<AdminInsights />} />
                               <Route path="content" element={<AdminContent />} />
                               <Route path="settings" element={<AdminSettings />} />
                               <Route path="*" element={<AdminDashboard />} />

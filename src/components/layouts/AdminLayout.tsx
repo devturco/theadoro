@@ -27,7 +27,8 @@ import {
   Gift,
   LayoutTemplate,
   Settings,
-  ShieldCheck
+  ShieldCheck,
+  Sparkles
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -69,6 +70,11 @@ const adminMenuItems = [
     title: 'Relatórios',
     url: '/admin/reports',
     icon: BarChart3,
+  },
+  {
+    title: 'Insights',
+    url: '/admin/insights',
+    icon: Sparkles,
   },
   {
     title: 'Conteúdo',
