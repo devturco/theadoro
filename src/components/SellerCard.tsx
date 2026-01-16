@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Star, MapPin, Clock, CheckCircle, MessageCircle } from 'lucide-react';
+import { Star, MapPin, Clock, CheckCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,7 @@ interface Seller {
   responseTime: string;
   joinedAt: string;
   productCount?: number;
+  mainCategory?: string;
 }
 
 interface SellerCardProps {
@@ -56,7 +57,7 @@ export const SellerCard: React.FC<SellerCardProps> = ({
           ) : (
             <div className="w-full h-full bg-gradient-to-r from-primary/10 to-primary/5" />
           )}
-          
+
           {/* Verified Badge */}
           {seller.verified && (
             <div className="absolute top-3 right-3">
@@ -103,7 +104,7 @@ export const SellerCard: React.FC<SellerCardProps> = ({
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between mb-2">
               <div className="min-w-0 flex-1">
-                <Link 
+                <Link
                   to={`/sellers/${seller.id}`}
                   className="block hover:text-primary transition-colors"
                 >
@@ -117,6 +118,9 @@ export const SellerCard: React.FC<SellerCardProps> = ({
                     )}
                   </h3>
                 </Link>
+                <p className="text-xs text-muted-foreground italic mt-0.5">
+                  {seller.mainCategory || "Vendedor Especialista"}
+                </p>
 
                 {/* Rating */}
                 <div className="flex items-center gap-1 mt-1">
@@ -165,7 +169,7 @@ export const SellerCard: React.FC<SellerCardProps> = ({
                   {seller.location}
                 </span>
               </div>
-              
+
               <div className="flex items-center text-gray-500">
                 <Clock className={cn(
                   isCompact ? "w-3 h-3" : "w-4 h-4"
@@ -208,29 +212,13 @@ export const SellerCard: React.FC<SellerCardProps> = ({
             )}
 
             {/* Actions */}
-            {showContact && !isCompact && (
-              <div className="flex gap-2">
-                <Button size="sm" asChild className="flex-1">
-                  <Link to={`/sellers/${seller.id}`}>
-                    Ver Perfil
-                  </Link>
-                </Button>
-                
-                <Button variant="outline" size="sm">
-                  <MessageCircle className="w-4 h-4 mr-1" />
-                  Contatar
-                </Button>
-              </div>
-            )}
-
-            {/* Compact Actions */}
-            {showContact && isCompact && (
-              <Button size="sm" variant="outline" asChild className="w-full">
+            <div className="flex gap-2">
+              <Button size="sm" asChild className="w-full">
                 <Link to={`/sellers/${seller.id}`}>
                   Ver Perfil
                 </Link>
               </Button>
-            )}
+            </div>
           </div>
         </div>
       </CardContent>

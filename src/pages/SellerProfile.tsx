@@ -5,7 +5,6 @@ import {
   MapPin,
   Clock,
   CheckCircle,
-  MessageCircle,
   Phone,
   Mail,
   Globe,
@@ -30,172 +29,6 @@ import { useSeller } from '@/hooks/useSellers';
 import { useProducts } from '@/hooks/useProducts';
 import { toast } from 'sonner';
 
-// Contact Info Component
-const ContactInfo: React.FC<{ seller: any }> = ({ seller }) => (
-  <Card>
-    <CardHeader>
-      <CardTitle className="flex items-center">
-        <MessageCircle className="w-5 h-5 mr-2" />
-        Informações de Contato
-      </CardTitle>
-    </CardHeader>
-    <CardContent className="space-y-4">
-      {seller.email && (
-        <div className="flex items-center">
-          <Mail className="w-4 h-4 text-gray-500 mr-3" />
-          <a
-            href={`mailto:${seller.email}`}
-            className="text-primary hover:underline"
-          >
-            {seller.email}
-          </a>
-        </div>
-      )}
-      
-      {seller.phone && (
-        <div className="flex items-center">
-          <Phone className="w-4 h-4 text-gray-500 mr-3" />
-          <a
-            href={`tel:${seller.phone}`}
-            className="text-primary hover:underline"
-          >
-            {seller.phone}
-          </a>
-        </div>
-      )}
-      
-      {seller.website && (
-        <div className="flex items-center">
-          <Globe className="w-4 h-4 text-gray-500 mr-3" />
-          <a
-            href={seller.website}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-primary hover:underline flex items-center"
-          >
-            {seller.website}
-            <ExternalLink className="w-3 h-3 ml-1" />
-          </a>
-        </div>
-      )}
-
-      {seller.socialMedia && (
-        <div className="pt-2">
-          <h4 className="font-medium mb-2">Redes Sociais</h4>
-          <div className="space-y-2">
-            {seller.socialMedia.instagram && (
-              <div className="flex items-center">
-                <Instagram className="w-4 h-4 text-gray-500 mr-3" />
-                <a
-                  href={`https://instagram.com/${seller.socialMedia.instagram.replace('@', '')}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
-                >
-                  {seller.socialMedia.instagram}
-                </a>
-              </div>
-            )}
-            
-            {seller.socialMedia.facebook && (
-              <div className="flex items-center">
-                <Facebook className="w-4 h-4 text-gray-500 mr-3" />
-                <span className="text-gray-700">{seller.socialMedia.facebook}</span>
-              </div>
-            )}
-            
-            {seller.socialMedia.whatsapp && (
-              <div className="flex items-center">
-                <MessageCircle className="w-4 h-4 text-gray-500 mr-3" />
-                <a
-                  href={`https://wa.me/${seller.socialMedia.whatsapp}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
-                >
-                  WhatsApp
-                </a>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </CardContent>
-  </Card>
-);
-
-// Business Hours Component
-const BusinessHours: React.FC<{ seller: any }> = ({ seller }) => {
-  if (!seller.businessHours) return null;
-
-  const days = [
-    { key: 'monday', label: 'Segunda-feira' },
-    { key: 'tuesday', label: 'Terça-feira' },
-    { key: 'wednesday', label: 'Quarta-feira' },
-    { key: 'thursday', label: 'Quinta-feira' },
-    { key: 'friday', label: 'Sexta-feira' },
-    { key: 'saturday', label: 'Sábado' },
-    { key: 'sunday', label: 'Domingo' }
-  ];
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center">
-          <Clock className="w-5 h-5 mr-2" />
-          Horário de Funcionamento
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
-          {days.map(({ key, label }) => (
-            <div key={key} className="flex justify-between">
-              <span className="text-gray-600">{label}</span>
-              <span className="font-medium">
-                {seller.businessHours[key] || 'Fechado'}
-              </span>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
-
-// Policies Component
-const Policies: React.FC<{ seller: any }> = ({ seller }) => {
-  if (!seller.policies) return null;
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Políticas da Loja</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {seller.policies.returns && (
-          <div>
-            <h4 className="font-medium mb-1">Política de Devolução</h4>
-            <p className="text-gray-600 text-sm">{seller.policies.returns}</p>
-          </div>
-        )}
-        
-        {seller.policies.shipping && (
-          <div>
-            <h4 className="font-medium mb-1">Política de Envio</h4>
-            <p className="text-gray-600 text-sm">{seller.policies.shipping}</p>
-          </div>
-        )}
-        
-        {seller.policies.customization && (
-          <div>
-            <h4 className="font-medium mb-1">Personalização</h4>
-            <p className="text-gray-600 text-sm">{seller.policies.customization}</p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-};
 
 // Reviews Component (Mock for now)
 const Reviews: React.FC<{ sellerId: string }> = ({ sellerId }) => {
@@ -249,11 +82,10 @@ const Reviews: React.FC<{ sellerId: string }> = ({ sellerId }) => {
                     {[...Array(5)].map((_, i) => (
                       <Star
                         key={i}
-                        className={`w-3 h-3 ${
-                          i < review.rating
-                            ? 'text-yellow-400 fill-current'
-                            : 'text-gray-300'
-                        }`}
+                        className={`w-3 h-3 ${i < review.rating
+                          ? 'text-yellow-400 fill-current'
+                          : 'text-gray-300'
+                          }`}
                       />
                     ))}
                   </div>
@@ -275,7 +107,7 @@ const Reviews: React.FC<{ sellerId: string }> = ({ sellerId }) => {
 export const SellerProfile: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { seller, loading, error } = useSeller(id!);
-  const { products, loading: productsLoading } = useProducts({ sellerId: id });
+  const { products, loading: productsLoading } = useProducts({ initialFilters: { sellerId: id } });
   const [activeTab, setActiveTab] = useState('products');
 
   const handleShare = () => {
@@ -291,15 +123,6 @@ export const SellerProfile: React.FC = () => {
     }
   };
 
-  const handleContact = () => {
-    if (seller?.socialMedia?.whatsapp) {
-      window.open(`https://wa.me/${seller.socialMedia.whatsapp}`, '_blank');
-    } else if (seller?.email) {
-      window.open(`mailto:${seller.email}`, '_blank');
-    } else {
-      toast.info('Informações de contato não disponíveis');
-    }
-  };
 
   if (loading) {
     return (
@@ -341,9 +164,9 @@ export const SellerProfile: React.FC = () => {
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full bg-gradient-to-r from-primary/10 to-primary/5" />
+          <div className="w-full h-full bg-gradient-to-r from-wine/5 to-wine/10" />
         )}
-        
+
         {/* Back Button */}
         <div className="absolute top-4 left-4">
           <Button variant="secondary" size="sm" asChild>
@@ -367,97 +190,96 @@ export const SellerProfile: React.FC = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Profile Header */}
-        <div className="relative -mt-16 mb-8">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex flex-col lg:flex-row gap-6">
-                {/* Avatar and Basic Info */}
-                <div className="flex flex-col sm:flex-row gap-4 lg:flex-col lg:w-48">
-                  <Avatar className="w-24 h-24 border-4 border-white shadow-lg">
-                    <AvatarImage src={seller.avatar} alt={seller.name} />
-                    <AvatarFallback className="text-2xl">
-                      {seller.name.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  
-                  <div className="flex-1 lg:text-center">
-                    <div className="flex items-center gap-2 lg:justify-center">
-                      <h1 className="text-2xl font-bold">{seller.name}</h1>
-                      {seller.verified && (
-                        <CheckCircle className="w-6 h-6 text-green-600" />
-                      )}
-                    </div>
-                    
-                    <div className="flex items-center gap-1 mt-2 lg:justify-center">
-                      <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                      <span className="font-medium">{seller.rating.toFixed(1)}</span>
-                      <span className="text-gray-500">
-                        ({seller.reviewCount} avaliações)
-                      </span>
-                    </div>
-                    
-                    <div className="flex items-center text-gray-500 mt-2 lg:justify-center">
-                      <MapPin className="w-4 h-4 mr-1" />
-                      <span className="text-sm">{seller.location}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Description and Details */}
-                <div className="flex-1">
-                  <p className="text-gray-700 mb-4">{seller.description}</p>
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-                    <div className="flex items-center text-gray-600">
-                      <Clock className="w-4 h-4 mr-2" />
-                      <span className="text-sm">Responde em {seller.responseTime}</span>
-                    </div>
-                    
-                    <div className="flex items-center text-gray-600">
-                      <Calendar className="w-4 h-4 mr-2" />
-                      <span className="text-sm">
-                        Desde {new Date(seller.joinedAt).toLocaleDateString('pt-BR')}
-                      </span>
-                    </div>
-                    
-                    {seller.productCount && (
-                      <div className="flex items-center text-gray-600">
-                        <Package className="w-4 h-4 mr-2" />
-                        <span className="text-sm">
-                          {seller.productCount} {seller.productCount === 1 ? 'produto' : 'produtos'}
-                        </span>
+        <div className="relative -mt-20 mb-8">
+          <Card className="border-none shadow-xl bg-white/80 backdrop-blur-md overflow-hidden">
+            <CardContent className="p-0">
+              <div className="flex flex-col lg:flex-row">
+                {/* Identity Sidebar - Profile Info */}
+                <div className="p-8 lg:w-80 bg-gradient-to-b from-white to-gray-50/50 border-r border-gray-100 flex flex-col items-center text-center">
+                  <div className="relative mb-6">
+                    <Avatar className="w-32 h-32 border-4 border-white shadow-2xl">
+                      <AvatarImage src={seller.avatar} alt={seller.name} />
+                      <AvatarFallback className="text-4xl bg-wine-50 text-wine">
+                        {seller.name.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    {seller.verified && (
+                      <div className="absolute -bottom-2 -right-2 bg-white rounded-full p-1.5 shadow-lg border border-gray-100">
+                        <CheckCircle className="w-6 h-6 text-green-500 fill-white" />
                       </div>
                     )}
                   </div>
 
-                  {/* Specialties */}
-                  <div className="mb-4">
-                    <h3 className="font-medium mb-2">Especialidades</h3>
-                    <div className="flex flex-wrap gap-2">
+                  <h1 className="text-3xl font-bold text-gray-900 mb-2 leading-tight">{seller.name}</h1>
+
+                  <div className="flex items-center gap-1.5 mb-3 bg-champagne/10 px-3 py-1 rounded-full">
+                    <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                    <span className="font-bold text-gray-900">{seller.rating.toFixed(1)}</span>
+                    <span className="text-gray-500 text-xs">
+                      ({seller.reviewCount} avaliações)
+                    </span>
+                  </div>
+
+                  <div className="flex items-center text-gray-500 text-sm">
+                    <MapPin className="w-4 h-4 mr-1.5 text-wine/60" />
+                    <span>{seller.location}</span>
+                  </div>
+                </div>
+
+                {/* Main Content Area - Bio & Stats */}
+                <div className="flex-1 p-8 flex flex-col justify-between">
+                  <div className="mb-8">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-wine mb-4">Sobre a Loja</h3>
+                    <p className="text-gray-700 leading-relaxed text-lg italic serif">
+                      "{seller.description}"
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-6 border-t border-gray-100">
+                    <div className="bg-white p-4 rounded-2xl border border-gray-50 shadow-sm flex items-center gap-4 transition-all hover:shadow-md">
+                      <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+                        <Clock className="w-5 h-5 text-blue-500" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Resposta</p>
+                        <p className="text-sm font-semibold text-gray-700">{seller.responseTime}</p>
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-4 rounded-2xl border border-gray-50 shadow-sm flex items-center gap-4 transition-all hover:shadow-md">
+                      <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center shrink-0">
+                        <Calendar className="w-5 h-5 text-purple-500" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Membro desde</p>
+                        <p className="text-sm font-semibold text-gray-700">
+                          {new Date(seller.joinedAt).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-4 rounded-2xl border border-gray-50 shadow-sm flex items-center gap-4 transition-all hover:shadow-md">
+                      <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center shrink-0">
+                        <Package className="w-5 h-5 text-orange-500" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Catálogo</p>
+                        <p className="text-sm font-semibold text-gray-700">
+                          {seller.productCount || 0} {seller.productCount === 1 ? 'produto' : 'produtos'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {seller.specialties && seller.specialties.length > 0 && (
+                    <div className="mt-8 flex flex-wrap gap-2">
                       {seller.specialties.map((specialty, index) => (
-                        <Badge key={index} variant="outline">
+                        <Badge key={index} variant="outline" className="bg-gray-50/50 border-gray-200 text-gray-600 px-3 py-1">
                           {specialty}
                         </Badge>
                       ))}
                     </div>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex flex-wrap gap-3">
-                    <Button onClick={handleContact} className="flex-1 sm:flex-none">
-                      <MessageCircle className="w-4 h-4 mr-2" />
-                      Entrar em Contato
-                    </Button>
-                    
-                    {seller.socialMedia?.whatsapp && (
-                      <Button
-                        variant="outline"
-                        onClick={() => window.open(`https://wa.me/${seller.socialMedia.whatsapp}`, '_blank')}
-                      >
-                        WhatsApp
-                      </Button>
-                    )}
-                  </div>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -465,13 +287,23 @@ export const SellerProfile: React.FC = () => {
         </div>
 
         {/* Content Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="products">Produtos</TabsTrigger>
-            <TabsTrigger value="about">Sobre</TabsTrigger>
-            <TabsTrigger value="reviews">Avaliações</TabsTrigger>
-            <TabsTrigger value="contact">Contato</TabsTrigger>
-          </TabsList>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-12">
+          <div className="flex justify-center mb-10">
+            <TabsList className="bg-gray-100/50 p-1 rounded-full border border-gray-200/50 backdrop-blur-sm">
+              <TabsTrigger
+                value="products"
+                className="rounded-full px-8 py-2.5 data-[state=active]:bg-wine data-[state=active]:text-white transition-all duration-300"
+              >
+                Produtos
+              </TabsTrigger>
+              <TabsTrigger
+                value="reviews"
+                className="rounded-full px-8 py-2.5 data-[state=active]:bg-wine data-[state=active]:text-white transition-all duration-300"
+              >
+                Avaliações
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="products" className="mt-6">
             {productsLoading ? (
@@ -497,12 +329,6 @@ export const SellerProfile: React.FC = () => {
             )}
           </TabsContent>
 
-          <TabsContent value="about" className="mt-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <BusinessHours seller={seller} />
-              <Policies seller={seller} />
-            </div>
-          </TabsContent>
 
           <TabsContent value="reviews" className="mt-6">
             <div className="max-w-4xl">
@@ -524,11 +350,6 @@ export const SellerProfile: React.FC = () => {
             </div>
           </TabsContent>
 
-          <TabsContent value="contact" className="mt-6">
-            <div className="max-w-2xl">
-              <ContactInfo seller={seller} />
-            </div>
-          </TabsContent>
         </Tabs>
       </div>
     </div>

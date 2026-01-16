@@ -64,6 +64,7 @@ import SellerSales from '@/pages/seller/SellerSales';
 import SellerAppointments from '@/pages/seller/SellerAppointments';
 import SellerReports from '@/pages/seller/SellerReports';
 import SellerInsights from '@/pages/seller/SellerInsights';
+import SellerStoreSettings from '@/pages/seller/SellerStoreSettings';
 
 // Buyer Pages
 import BuyerDashboard from '@/pages/buyer/BuyerDashboard';
@@ -185,6 +186,7 @@ function App() {
                               <Route path="appointments" element={<SellerAppointments />} />
                               <Route path="reports" element={<SellerReports />} />
                               <Route path="insights" element={<SellerInsights />} />
+                              <Route path="settings" element={<SellerStoreSettings />} />
                               <Route path="*" element={<SellerDashboard />} />
                             </Routes>
                           </UserDashboardLayout>

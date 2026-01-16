@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface Seller {
   id: string;
@@ -15,6 +15,7 @@ export interface Seller {
   responseTime: string;
   joinedAt: string;
   productCount?: number;
+  mainCategory?: string;
   email?: string;
   phone?: string;
   website?: string;
@@ -69,116 +70,6 @@ export interface UseSellerReturn {
 
 const ITEMS_PER_PAGE = 12;
 
-// Mock data for development
-const mockSellers: Seller[] = [
-  {
-    id: '1',
-    name: 'Artesanatos da Maria',
-    description: 'Especializada em peças artesanais únicas, feitas à mão com muito carinho. Trabalho com diversos materiais como madeira, tecido e cerâmica.',
-    avatar: 'https://trae-api-us.mchost.guru/api/ide/v1/text_to_image?prompt=professional%20woman%20artisan%20portrait%20smiling%20warm%20lighting&image_size=square',
-    coverImage: 'https://trae-api-us.mchost.guru/api/ide/v1/text_to_image?prompt=artisan%20workshop%20handmade%20crafts%20colorful%20materials&image_size=landscape_16_9',
-    rating: 4.8,
-    reviewCount: 127,
-    location: 'São Paulo, SP',
-    verified: true,
-    specialties: ['Artesanato', 'Decoração', 'Presentes Personalizados'],
-    responseTime: '2h',
-    joinedAt: '2023-01-15',
-    productCount: 45,
-    email: 'maria@artesanatos.com',
-    phone: '(11) 99999-9999',
-    website: 'www.artesanatosdamaria.com.br',
-    socialMedia: {
-      instagram: '@artesanatosdamaria',
-      whatsapp: '5511999999999'
-    },
-    businessHours: {
-      monday: '9:00 - 18:00',
-      tuesday: '9:00 - 18:00',
-      wednesday: '9:00 - 18:00',
-      thursday: '9:00 - 18:00',
-      friday: '9:00 - 18:00',
-      saturday: '9:00 - 14:00',
-      sunday: 'Fechado'
-    },
-    policies: {
-      returns: 'Aceito devoluções em até 7 dias',
-      shipping: 'Envio para todo o Brasil via Correios',
-      customization: 'Aceito encomendas personalizadas'
-    }
-  },
-  {
-    id: '2',
-    name: 'Doces & Delícias',
-    description: 'Confeitaria artesanal especializada em doces gourmet, bolos personalizados e presentes comestíveis para todas as ocasiões.',
-    avatar: 'https://trae-api-us.mchost.guru/api/ide/v1/text_to_image?prompt=professional%20baker%20chef%20woman%20smiling%20kitchen%20uniform&image_size=square',
-    coverImage: 'https://trae-api-us.mchost.guru/api/ide/v1/text_to_image?prompt=bakery%20colorful%20cakes%20sweets%20display%20elegant&image_size=landscape_16_9',
-    rating: 4.9,
-    reviewCount: 203,
-    location: 'Rio de Janeiro, RJ',
-    verified: true,
-    specialties: ['Confeitaria', 'Bolos Personalizados', 'Doces Gourmet'],
-    responseTime: '1h',
-    joinedAt: '2022-08-20',
-    productCount: 78,
-    email: 'contato@docesdelicias.com',
-    phone: '(21) 98888-8888',
-    socialMedia: {
-      instagram: '@docesdelicias',
-      facebook: 'Doces e Delícias',
-      whatsapp: '5521988888888'
-    },
-    businessHours: {
-      monday: '8:00 - 19:00',
-      tuesday: '8:00 - 19:00',
-      wednesday: '8:00 - 19:00',
-      thursday: '8:00 - 19:00',
-      friday: '8:00 - 19:00',
-      saturday: '8:00 - 16:00',
-      sunday: '10:00 - 16:00'
-    },
-    policies: {
-      returns: 'Produtos perecíveis não aceito devolução',
-      shipping: 'Entrega local e envio refrigerado',
-      customization: 'Especialista em encomendas personalizadas'
-    }
-  },
-  {
-    id: '3',
-    name: 'Flores & Jardins',
-    description: 'Floricultura especializada em arranjos únicos, plantas ornamentais e presentes naturais que transmitem carinho e beleza.',
-    avatar: 'https://trae-api-us.mchost.guru/api/ide/v1/text_to_image?prompt=florist%20woman%20smiling%20flowers%20garden%20natural%20lighting&image_size=square',
-    rating: 4.7,
-    reviewCount: 89,
-    location: 'Belo Horizonte, MG',
-    verified: false,
-    specialties: ['Floricultura', 'Arranjos', 'Plantas Ornamentais'],
-    responseTime: '3h',
-    joinedAt: '2023-03-10',
-    productCount: 32,
-    email: 'flores@jardins.com',
-    phone: '(31) 97777-7777',
-    socialMedia: {
-      instagram: '@floresjardins',
-      whatsapp: '5531977777777'
-    },
-    businessHours: {
-      monday: '7:00 - 17:00',
-      tuesday: '7:00 - 17:00',
-      wednesday: '7:00 - 17:00',
-      thursday: '7:00 - 17:00',
-      friday: '7:00 - 17:00',
-      saturday: '7:00 - 15:00',
-      sunday: 'Fechado'
-    },
-    policies: {
-      returns: 'Plantas com garantia de 15 dias',
-      shipping: 'Entrega cuidadosa para preservar as plantas',
-      customization: 'Arranjos personalizados sob encomenda'
-    }
-  }
-];
-
 export const useSellers = (initialFilters: SellerFilters = {}): UseSellersReturn => {
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [loading, setLoading] = useState(true);
@@ -192,86 +83,80 @@ export const useSellers = (initialFilters: SellerFilters = {}): UseSellersReturn
       setLoading(true);
       setError(null);
 
-      // For now, use mock data
-      // TODO: Replace with actual Supabase query when sellers table is ready
-      let filteredSellers = [...mockSellers];
+      const from = (page - 1) * ITEMS_PER_PAGE;
+      const to = from + ITEMS_PER_PAGE - 1;
+
+      let query = (supabase.from as any)('seller_summary')
+        .select('*', { count: 'exact' });
 
       // Apply filters
       if (currentFilters.location) {
-        filteredSellers = filteredSellers.filter(seller =>
-          seller.location.toLowerCase().includes(currentFilters.location!.toLowerCase())
-        );
-      }
-
-      if (currentFilters.specialty) {
-        filteredSellers = filteredSellers.filter(seller =>
-          seller.specialties.some(specialty =>
-            specialty.toLowerCase().includes(currentFilters.specialty!.toLowerCase())
-          )
-        );
+        query = query.ilike('location', `%${currentFilters.location}%`);
       }
 
       if (currentFilters.verified !== undefined) {
-        filteredSellers = filteredSellers.filter(seller =>
-          seller.verified === currentFilters.verified
-        );
+        // Assume all sellers in seller_summary are 'verified' for now as they are active sellers
+        // This can be refined if we add a 'verified' column to profiles
       }
 
       if (currentFilters.minRating) {
-        filteredSellers = filteredSellers.filter(seller =>
-          seller.rating >= currentFilters.minRating!
-        );
+        query = query.gte('rating', currentFilters.minRating);
       }
 
       // Apply sorting
       if (currentFilters.sortBy) {
-        filteredSellers.sort((a, b) => {
-          let aValue: any, bValue: any;
+        const order = currentFilters.sortOrder === 'desc' ? { ascending: false } : { ascending: true };
 
-          switch (currentFilters.sortBy) {
-            case 'rating':
-              aValue = a.rating;
-              bValue = b.rating;
-              break;
-            case 'name':
-              aValue = a.name.toLowerCase();
-              bValue = b.name.toLowerCase();
-              break;
-            case 'joinedAt':
-              aValue = new Date(a.joinedAt);
-              bValue = new Date(b.joinedAt);
-              break;
-            case 'productCount':
-              aValue = a.productCount || 0;
-              bValue = b.productCount || 0;
-              break;
-            default:
-              return 0;
-          }
-
-          if (currentFilters.sortOrder === 'desc') {
-            return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
-          } else {
-            return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
-          }
-        });
+        switch (currentFilters.sortBy) {
+          case 'rating':
+            query = query.order('rating', order);
+            break;
+          case 'name':
+            query = query.order('name', order);
+            break;
+          case 'joinedAt':
+            query = query.order('joined_at', order);
+            break;
+          case 'productCount':
+            query = query.order('product_count', order);
+            break;
+        }
+      } else {
+        query = query.order('rating', { ascending: false }); // Default sort
       }
 
-      setTotalCount(filteredSellers.length);
+      const { data, error: fetchError, count } = await query.range(from, to);
 
-      // Pagination
-      const startIndex = (page - 1) * ITEMS_PER_PAGE;
-      const endIndex = startIndex + ITEMS_PER_PAGE;
-      const paginatedSellers = filteredSellers.slice(0, endIndex);
+      if (fetchError) throw fetchError;
+
+      const mappedSellers: Seller[] = (data || []).map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        description: s.description || '',
+        avatar: s.avatar,
+        coverImage: s.banner,
+        rating: Number(s.rating || 0),
+        reviewCount: Number(s.review_count || 0),
+        location: s.location || 'Brasil',
+        verified: !!s.is_seller,
+        specialties: [], // This would need another join or a new column
+        responseTime: '2h', // Default
+        joinedAt: s.joined_at,
+        productCount: Number(s.product_count || 0),
+        mainCategory: s.main_category
+      }));
+
+      setTotalCount(count || 0);
 
       if (page === 1) {
-        setSellers(paginatedSellers);
+        setSellers(mappedSellers);
       } else {
-        setSellers(prev => [...prev, ...paginatedSellers.slice(startIndex)]);
+        setSellers(prev => [...prev, ...mappedSellers]);
       }
 
       setCurrentPage(page);
     } catch (err) {
+      console.error('Error loading sellers:', err);
       setError(err instanceof Error ? err.message : 'Erro ao carregar vendedores');
     } finally {
       setLoading(false);
@@ -324,16 +209,36 @@ export const useSeller = (sellerId: string): UseSellerReturn => {
       setLoading(true);
       setError(null);
 
-      // For now, use mock data
-      // TODO: Replace with actual Supabase query when sellers table is ready
-      const foundSeller = mockSellers.find(s => s.id === sellerId);
-      
-      if (foundSeller) {
-        setSeller(foundSeller);
+      const { data, error: fetchError } = await (supabase.from as any)('seller_summary')
+        .select('*')
+        .eq('id', sellerId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      if (data) {
+        const s = data as any;
+        setSeller({
+          id: s.id,
+          name: s.name,
+          description: s.description || '',
+          avatar: s.avatar,
+          coverImage: s.banner,
+          rating: Number(s.rating || 0),
+          reviewCount: Number(s.review_count || 0),
+          location: s.location || 'Brasil',
+          verified: !!s.is_seller,
+          specialties: [],
+          responseTime: '2h',
+          joinedAt: s.joined_at,
+          productCount: Number(s.product_count || 0),
+          mainCategory: s.main_category
+        });
       } else {
         setError('Vendedor não encontrado');
       }
     } catch (err) {
+      console.error('Error loading seller:', err);
       setError(err instanceof Error ? err.message : 'Erro ao carregar vendedor');
     } finally {
       setLoading(false);
