@@ -13,17 +13,17 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { GIFT_WRAPS } from '@/data/giftWraps';
-import { GiftOptions as GiftOptionsType } from '@/types/order';
+import { GiftOptions as GiftOptionsType, GiftWrap } from '@/types/order';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 
 interface GiftOptionsProps {
     value: GiftOptionsType;
     onChange: (value: GiftOptionsType) => void;
+    giftWraps?: GiftWrap[];
 }
 
-export const GiftOptions: React.FC<GiftOptionsProps> = ({ value, onChange }) => {
+export const GiftOptions: React.FC<GiftOptionsProps> = ({ value, onChange, giftWraps = [] }) => {
     const handleToggleGift = (checked: boolean) => {
         onChange({ ...value, is_gift: checked });
     };
@@ -70,44 +70,51 @@ export const GiftOptions: React.FC<GiftOptionsProps> = ({ value, onChange }) => 
             {/* Gift Wraps Carousel */}
             <div className="space-y-3">
                 <Label className="text-base">Escolha a Embalagem</Label>
-                <Carousel
-                    opts={{ align: "start" }}
-                    className="w-full max-w-sm mx-auto sm:max-w-xl md:max-w-2xl"
-                >
-                    <CarouselContent>
-                        {GIFT_WRAPS.map((wrap) => (
-                            <CarouselItem key={wrap.id} className="md:basis-1/2 lg:basis-1/3">
-                                <div
-                                    className={cn(
-                                        "p-2 cursor-pointer transition-all",
-                                        value.wrap_style_id === wrap.id ? "ring-2 ring-purple-600 rounded-xl" : ""
-                                    )}
-                                    onClick={() => handleChange('wrap_style_id', wrap.id)}
-                                >
-                                    <Card>
-                                        <CardContent className="flex flex-col items-center p-4 gap-3">
-                                            <div className="relative w-full aspect-square rounded-md overflow-hidden">
-                                                <img
-                                                    src={wrap.image_url}
-                                                    alt={wrap.name}
-                                                    className="object-cover w-full h-full hover:scale-105 transition-transform duration-300"
-                                                />
-                                            </div>
-                                            <div className="text-center space-y-1">
-                                                <h4 className="font-medium text-sm line-clamp-1">{wrap.name}</h4>
-                                                <Badge variant="secondary" className="bg-purple-50 text-purple-700">
-                                                    {wrap.price > 0 ? `R$ ${wrap.price.toFixed(2)}` : 'Grátis'}
-                                                </Badge>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                </div>
-                            </CarouselItem>
-                        ))}
-                    </CarouselContent>
-                    <CarouselPrevious />
-                    <CarouselNext />
-                </Carousel>
+
+                {!giftWraps || giftWraps.length === 0 ? (
+                    <div className="py-8 text-center bg-gray-50 rounded-xl border border-dashed text-muted-foreground">
+                        {giftWraps ? 'Nenhuma embalagem ativa disponível.' : 'Carregando embalagens...'}
+                    </div>
+                ) : (
+                    <Carousel
+                        opts={{ align: "start" }}
+                        className="w-full max-w-sm mx-auto sm:max-w-xl md:max-w-2xl"
+                    >
+                        <CarouselContent>
+                            {giftWraps.map((wrap) => (
+                                <CarouselItem key={wrap.id} className="md:basis-1/2 lg:basis-1/3">
+                                    <div
+                                        className={cn(
+                                            "p-2 cursor-pointer transition-all",
+                                            value.wrap_style_id === wrap.id ? "ring-2 ring-purple-600 rounded-xl" : ""
+                                        )}
+                                        onClick={() => handleChange('wrap_style_id', wrap.id)}
+                                    >
+                                        <Card>
+                                            <CardContent className="flex flex-col items-center p-4 gap-3">
+                                                <div className="relative w-full aspect-square rounded-md overflow-hidden">
+                                                    <img
+                                                        src={wrap.image_url || 'https://via.placeholder.com/300?text=Embalagem'}
+                                                        alt={wrap.name}
+                                                        className="object-cover w-full h-full hover:scale-105 transition-transform duration-300"
+                                                    />
+                                                </div>
+                                                <div className="text-center space-y-1">
+                                                    <h4 className="font-medium text-sm line-clamp-1">{wrap.name}</h4>
+                                                    <Badge variant="secondary" className="bg-purple-50 text-purple-700">
+                                                        {Number(wrap.price) > 0 ? `R$ ${Number(wrap.price).toFixed(2)}` : 'Grátis'}
+                                                    </Badge>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    </div>
+                                </CarouselItem>
+                            ))}
+                        </CarouselContent>
+                        <CarouselPrevious />
+                        <CarouselNext />
+                    </Carousel>
+                )}
             </div>
 
             {/* Message & Recipient */}

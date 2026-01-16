@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -17,8 +17,9 @@ import { CartItem } from '@/contexts/CartContext';
 import { useCheckout } from '@/hooks/useCheckout';
 import { GiftOptions } from '@/components/checkout/GiftOptions';
 import { DeliveryScheduler } from '@/components/checkout/DeliveryScheduler';
-import { GiftOptions as GiftOptionsType, DeliverySchedule as DeliveryScheduleType } from '@/types/order';
-import { GIFT_WRAPS } from '@/data/giftWraps';
+import { GiftOptions as GiftOptionsType, DeliverySchedule as DeliveryScheduleType, GiftWrap } from '@/types/order';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -121,14 +122,7 @@ export const Checkout: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const [currentStep, setCurrentStep] = useState<number>(() => {
-    const saved = localStorage.getItem('checkoutStep');
-    if (saved) {
-      const step = parseInt(saved);
-      if (step >= 1 && step <= 4) return step;
-    }
-    return 1;
-  });
+  const [currentStep, setCurrentStep] = useState<number>(1);
 
   const [formData, setFormData] = useState<CheckoutFormData>(() => {
     const saved = localStorage.getItem('checkoutFormData');
@@ -151,6 +145,24 @@ export const Checkout: React.FC = () => {
 
   const { profile } = useAuth();
   const [profileAutoFilled, setProfileAutoFilled] = useState(false);
+
+  const { data: giftWraps } = useQuery({
+    queryKey: ['gift-wraps'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('gift_wraps' as any)
+        .select('*')
+        .eq('is_active', true);
+
+      if (error) {
+        console.error('Error fetching gift wraps:', error);
+        throw error;
+      }
+
+      return (data as any) as GiftWrap[];
+    },
+    staleTime: 1000 * 60 * 10, // 10 minutes
+  });
 
   // Auto-fill from profile if logged in and data is empty
   useEffect(() => {
@@ -178,17 +190,18 @@ export const Checkout: React.FC = () => {
   const subtotal = cart.items.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
   const shippingCost = selectedShipping?.price || 0;
 
-  // Find selected gift wrap price
-  const selectedWrap = formData.giftOptions.is_gift && formData.giftOptions.wrap_style_id
-    ? GIFT_WRAPS.find(w => w.id === formData.giftOptions.wrap_style_id)
-    : null;
-  const giftWrapPrice = selectedWrap?.price || 0;
+  // Find selected gift wrap price from fetched data
+  const giftWrapPrice = useMemo(() => {
+    if (!formData.giftOptions.is_gift || !formData.giftOptions.wrap_style_id || !giftWraps) return 0;
+    const wrap = giftWraps.find(w => w.id === formData.giftOptions.wrap_style_id);
+    return wrap ? Number(wrap.price) : 0;
+  }, [formData.giftOptions.is_gift, formData.giftOptions.wrap_style_id, giftWraps]);
 
   let discount = 0;
   if (formData.paymentMethod === 'pix') {
-    discount = (subtotal + shippingCost) * 0.05;
+    discount = (subtotal + shippingCost + giftWrapPrice) * 0.05;
   } else if (formData.paymentMethod === 'boleto') {
-    discount = (subtotal + shippingCost) * 0.03;
+    discount = (subtotal + shippingCost + giftWrapPrice) * 0.03;
   }
 
   const total = subtotal + shippingCost + giftWrapPrice - discount;
@@ -307,14 +320,13 @@ export const Checkout: React.FC = () => {
         if (!formData.cardExpiry.trim()) newErrors.cardExpiry = 'Validade é obrigatória';
         if (!formData.cardCvv.trim()) newErrors.cardCvv = 'CVV é obrigatório';
       }
-    }
 
-
-    // Validate Gift Options if Gift is selected
-    if (formData.giftOptions.is_gift) {
-      if (!formData.giftOptions.wrap_style_id) newErrors.giftWrap = 'Escolha uma embalagem';
-      if (!formData.giftOptions.recipient_name) newErrors.recipientName = 'Informe o nome do destinatário';
-      if (!formData.giftOptions.sender_name) newErrors.senderName = 'Informe seu nome (De)';
+      // Validate Gift Options if Gift is selected (Gift options are in step 3)
+      if (formData.giftOptions.is_gift) {
+        if (!formData.giftOptions.wrap_style_id) newErrors.giftWrap = 'Escolha uma embalagem';
+        if (!formData.giftOptions.recipient_name) newErrors.recipientName = 'Informe o nome do destinatário';
+        if (!formData.giftOptions.sender_name) newErrors.senderName = 'Informe seu nome (De)';
+      }
     }
 
     setErrors(newErrors);
@@ -372,6 +384,10 @@ export const Checkout: React.FC = () => {
       const order = await processOrder(orderItems as any, checkoutData);
 
       if (order) {
+        // Clear checkout state from localStorage
+        localStorage.removeItem('checkoutFormData');
+        localStorage.removeItem('checkoutStep');
+
         // Redirect to success page
         navigate(`/order-success/${order.id}`);
       }
@@ -762,6 +778,7 @@ export const Checkout: React.FC = () => {
                     <GiftOptions
                       value={formData.giftOptions}
                       onChange={(val) => handleInputChange('giftOptions', val)}
+                      giftWraps={giftWraps}
                     />
                   </div>
 

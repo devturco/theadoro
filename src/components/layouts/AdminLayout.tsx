@@ -82,6 +82,11 @@ const adminMenuItems = [
     icon: LayoutTemplate,
   },
   {
+    title: 'Embalagens',
+    url: '/admin/gift-wraps',
+    icon: Gift,
+  },
+  {
     title: 'Gerais',
     url: '/admin/settings',
     icon: Settings,

@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRole } from '@/hooks/useRole';
 import { useOrders } from '@/hooks/useOrders';
@@ -481,15 +482,41 @@ const AdminOrders = () => {
                         <DollarSign className="h-4 w-4" /> Pagamento
                       </h3>
                       <div className="bg-white border rounded-lg p-3 text-sm space-y-2">
-                        <p className="capitalize"><span className="font-medium">Método:</span> {selectedOrder.payment_method?.replace('_', ' ')}</p>
-                        <p><span className="font-medium">Total:</span> R$ {selectedOrder.total_amount.toFixed(2)}</p>
+                        <div className="flex justify-between text-muted-foreground text-xs">
+                          <span>Produtos:</span>
+                          <span>R$ {(selectedOrder.subtotal_amount || (selectedOrder.total_amount - (selectedOrder.shipping_cost || 0) - (selectedOrder.gift_wrap_price || 0) + (selectedOrder.discount_amount || 0))).toFixed(2)}</span>
+                        </div>
+                        {selectedOrder.gift_wrap_price > 0 && (
+                          <div className="flex justify-between text-muted-foreground text-xs">
+                            <span>Embalagem:</span>
+                            <span>R$ {selectedOrder.gift_wrap_price.toFixed(2)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between text-muted-foreground text-xs">
+                          <span>Frete:</span>
+                          <span>R$ {(selectedOrder.shipping_cost || 0).toFixed(2)}</span>
+                        </div>
+                        {selectedOrder.discount_amount > 0 && (
+                          <div className="flex justify-between text-green-600 text-xs">
+                            <span>Desconto:</span>
+                            <span>-R$ {selectedOrder.discount_amount.toFixed(2)}</span>
+                          </div>
+                        )}
+                        <Separator className="my-1" />
+                        <div className="flex justify-between font-bold text-sm text-primary">
+                          <span>Total:</span>
+                          <span>R$ {selectedOrder.total_amount.toFixed(2)}</span>
+                        </div>
+                        <p className="capitalize text-[10px] text-muted-foreground pt-1 border-t mt-1">
+                          <span className="font-medium">Método:</span> {selectedOrder.payment_method?.replace('_', ' ')}
+                        </p>
 
                         {paymentInfo && (
-                          <div className="bg-gray-50 p-2 rounded text-xs">
+                          <div className="bg-gray-50 p-2 rounded text-[10px] text-muted-foreground mt-2">
                             <p>Transaction ID: {paymentInfo.id}</p>
                             {paymentInfo.pixCode && (
                               <div className="mt-1 break-all">
-                                <span className="font-semibold">PIX Code:</span> {paymentInfo.pixCode.slice(0, 20)}...
+                                <span className="font-semibold">PIX:</span> {paymentInfo.pixCode.slice(0, 30)}...
                               </div>
                             )}
                           </div>
@@ -502,17 +529,30 @@ const AdminOrders = () => {
                         <h3 className="flex items-center gap-2 font-semibold mb-3 text-purple-600">
                           <Gift className="h-4 w-4" /> Opções de Presente
                         </h3>
-                        <div className="bg-purple-50 border border-purple-100 rounded-lg p-3 text-sm space-y-2">
-                          <p>🎁 <strong>Pedido para Presente</strong></p>
+                        <div className="bg-purple-50 border border-purple-100 rounded-lg p-3 text-sm space-y-3">
+                          <div className="flex gap-3">
+                            {giftOptions.wrap_style_image && (
+                              <div className="w-16 h-16 rounded overflow-hidden border bg-white flex-shrink-0">
+                                <img
+                                  src={giftOptions.wrap_style_image}
+                                  alt={giftOptions.wrap_style_name}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                            )}
+                            <div>
+                              <p className="font-bold text-purple-900">{giftOptions.wrap_style_name || 'Pedido para Presente'}</p>
+                              <div className="text-xs text-purple-700 mt-1">
+                                <p>De: {giftOptions.sender_name || 'Anônimo'}</p>
+                                <p>Para: {giftOptions.recipient_name || 'Destinatário'}</p>
+                              </div>
+                            </div>
+                          </div>
                           {giftOptions.message && (
-                            <div className="italic text-gray-600">
+                            <div className="italic text-purple-900 bg-white/50 p-2 rounded border border-purple-100 italic">
                               "{giftOptions.message}"
                             </div>
                           )}
-                          <div className="text-xs text-gray-500 mt-2">
-                            <p>De: {giftOptions.sender_name || 'Anônimo'}</p>
-                            <p>Para: {giftOptions.recipient_name || 'Destinatário'}</p>
-                          </div>
                         </div>
                       </div>
                     )}

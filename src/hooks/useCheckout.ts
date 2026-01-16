@@ -145,7 +145,6 @@ export const useCheckout = () => {
     try {
       // 1. Validate Data
       const validationErrors = validateCheckoutData(checkoutData);
-      console.log('Processing order with data:', { items: items.length, checkoutData });
 
       if (validationErrors.length > 0) {
         console.error('Validation errors:', validationErrors);
@@ -156,16 +155,35 @@ export const useCheckout = () => {
 
       // 2. Calculate Totals
       const subtotal = items.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-
-      if (!selectedShipping && items.some(item => !item.product.is_service)) {
-        throw new Error('Selecione uma opção de frete');
-      }
       const shipping = selectedShipping?.price || 0;
-      const tax = calculateTax(subtotal);
-      const total = subtotal + shipping + tax;
+
+      // Calculate Gift Wrap Price from DB to ensure accuracy
+      let giftWrapPrice = 0;
+      let giftWrapName = '';
+      let giftWrapImage = '';
+      if (checkoutData.giftOptions?.is_gift && checkoutData.giftOptions?.wrap_style_id) {
+        const { data: wrapData } = await supabase
+          .from('gift_wraps' as any)
+          .select('name, price, image_url')
+          .eq('id', checkoutData.giftOptions.wrap_style_id)
+          .single();
+        giftWrapPrice = (wrapData as any)?.price ? Number((wrapData as any).price) : 0;
+        giftWrapName = (wrapData as any)?.name || '';
+        giftWrapImage = (wrapData as any)?.image_url || '';
+      }
+
+      // Calculate Discount based on payment method
+      let discount = 0;
+      if (checkoutData.paymentMethod === 'pix') {
+        discount = (subtotal + shipping + giftWrapPrice) * 0.05;
+      } else if (checkoutData.paymentMethod === 'boleto') {
+        discount = (subtotal + shipping + giftWrapPrice) * 0.03;
+      }
+
+      const total = subtotal + shipping + giftWrapPrice - discount;
+      const tax = 0; // Tax is currently not part of the active pricing model but kept for interface consistency
 
       // 3. Process Payment
-      console.log('3. Processing payment...', { method: checkoutData.paymentMethod, total });
       let paymentResult;
       if (checkoutData.paymentMethod === 'credit_card' || checkoutData.paymentMethod === 'debit_card') {
         if (!checkoutData.paymentDetails?.cardNumber) throw new Error('Dados do cartão incompletos');
@@ -183,7 +201,6 @@ export const useCheckout = () => {
         // Boleto
         paymentResult = await PaymentService.generateBoleto(total);
       }
-      console.log('Payment result:', paymentResult);
 
       if (paymentResult.status === 'failed') {
         throw new Error('Pagamento recusado. Verifique os dados e tente novamente.');
@@ -191,11 +208,17 @@ export const useCheckout = () => {
 
       // 3.5 Save User Data & Address if requested
       if (user?.id) {
-        console.log('3.5 Saving user data/address...');
         if (checkoutData.saveProfile) {
           const { error: profileErr } = await supabase.from('profiles').update({
             full_name: `${checkoutData.firstName} ${checkoutData.lastName}`.trim(),
             phone: checkoutData.phone,
+            address: checkoutData.street,
+            address_number: checkoutData.number,
+            address_complement: checkoutData.complement || '',
+            neighborhood: checkoutData.neighborhood || '',
+            city: checkoutData.city,
+            state: checkoutData.state,
+            postal_code: checkoutData.zipCode,
           }).eq('id', user.id);
           if (profileErr) console.error('Error updating profile:', profileErr);
         }
@@ -218,7 +241,6 @@ export const useCheckout = () => {
       }
 
       // 4. Create Order in DB
-      console.log('4. Creating order in DB...');
       const notesJson = JSON.stringify({
         customer: {
           firstName: checkoutData.firstName,
@@ -228,7 +250,11 @@ export const useCheckout = () => {
         },
         billingAddress: checkoutData.billingAddress,
         userNote: checkoutData.notes,
-        giftOptions: checkoutData.giftOptions,
+        giftOptions: {
+          ...checkoutData.giftOptions,
+          wrap_style_name: giftWrapName,
+          wrap_style_image: giftWrapImage
+        },
         deliverySchedule: checkoutData.deliverySchedule,
         paymentInfo: {
           id: paymentResult.id,
@@ -241,7 +267,11 @@ export const useCheckout = () => {
         buyer_id: user?.id || null,
         seller_id: items[0]?.product.seller?.id || (items[0]?.product as any).seller_id || null,
         total_amount: total,
+        subtotal_amount: subtotal,
         shipping_cost: shipping,
+        gift_wrap_price: giftWrapPrice,
+        discount_amount: discount,
+        tax_amount: tax,
         shipping_method: selectedShipping?.name || 'Padrão',
         status: 'pending' as 'pending',
         shipping_address: JSON.stringify({
@@ -297,7 +327,6 @@ export const useCheckout = () => {
       // 6. Create Appointments for Services
       for (const item of items) {
         if (item.product.is_service) {
-          console.log('Creating appointment for service:', item.product.name);
           const { error: apptError } = await supabase.from('appointments').insert({
             buyer_id: user?.id,
             seller_id: item.product.seller?.id || (item.product as any).seller_id,
@@ -415,6 +444,7 @@ export const useCheckout = () => {
           description: item.products.description,
           price: item.unit_price || item.products.price, // Use unit_price from order_items
           original_price: item.products.original_price,
+          seller_id: item.products.seller_id,
           images: item.products.images || [],
           rating: item.products.rating || 0,
           review_count: item.products.review_count || 0,

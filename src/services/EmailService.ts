@@ -15,13 +15,8 @@ export const EmailService = {
      * Send an email.
      */
     send: async (payload: EmailPayload): Promise<{ success: boolean; id?: string }> => {
-        // Log to console to simulate sending
-        console.group('📧 EmailService Mock Send');
-        console.log(`To: ${payload.to}`);
-        console.log(`Subject: ${payload.subject}`);
-        console.log('Template:', payload.template);
-        console.log('Data:', payload.data);
-        console.groupEnd();
+        // Log briefly in development
+        console.log(`[EmailService] Enviar mock para: ${payload.to} | Assunto: ${payload.subject}`);
 
         // Simulate API latency
         await new Promise(resolve => setTimeout(resolve, 500));

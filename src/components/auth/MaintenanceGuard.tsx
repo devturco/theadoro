@@ -14,7 +14,6 @@ export const MaintenanceGuard = ({ children }: MaintenanceGuardProps) => {
     const { isAdmin } = useRole();
     const { loading: authLoading } = useAuth();
 
-    console.log('[MaintenanceGuard] Render', { settingsLoading, authLoading, isAdmin });
 
     // If it's taking too long, we show a small indicator but don't block the whole screen
     // Unless truly initial load

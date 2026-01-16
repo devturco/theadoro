@@ -285,13 +285,29 @@ export default function OrderDetail() {
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <div className="flex justify-between text-sm">
-                                <span className="text-muted-foreground">Subtotal</span>
-                                <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(order.total_amount - (order.shipping_cost || 0))}</span>
+                                <span className="text-muted-foreground">Produtos</span>
+                                <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(order.subtotal_amount || (order.total_amount - (order.shipping_cost || 0) - (order.gift_wrap_price || 0) + (order.discount_amount || 0)))}</span>
                             </div>
+                            {(order.gift_wrap_price > 0) && (
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-muted-foreground flex items-center gap-1">
+                                        Embalagem para presente
+                                    </span>
+                                    <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(order.gift_wrap_price)}</span>
+                                </div>
+                            )}
                             <div className="flex justify-between text-sm">
                                 <span className="text-muted-foreground">Frete</span>
                                 <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(order.shipping_cost || 0)}</span>
                             </div>
+                            {(order.discount_amount > 0) && (
+                                <div className="flex justify-between text-sm text-green-600">
+                                    <span className="flex items-center gap-1">
+                                        Desconto
+                                    </span>
+                                    <span>-{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(order.discount_amount)}</span>
+                                </div>
+                            )}
                             <Separator />
                             <div className="flex justify-between font-bold text-lg">
                                 <span>Total</span>
@@ -311,6 +327,55 @@ export default function OrderDetail() {
                             </div>
                         </CardContent>
                     </Card>
+
+                    {/* Gift Options */}
+                    {order.notes?.giftOptions?.is_gift && (
+                        <Card className="border-purple-200 bg-purple-50/30">
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-lg flex items-center gap-2 text-purple-900">
+                                    <Gift className="h-5 w-5 text-purple-600" />
+                                    Opções de Presente
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="text-sm space-y-4">
+                                <div className="flex gap-4">
+                                    {order.notes?.giftOptions?.wrap_style_image && (
+                                        <div className="w-20 h-20 rounded-lg overflow-hidden border bg-gray-50 flex-shrink-0">
+                                            <img
+                                                src={order.notes.giftOptions.wrap_style_image}
+                                                alt={order.notes.giftOptions.wrap_style_name}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        </div>
+                                    )}
+                                    <div className="flex-1">
+                                        <p className="font-semibold text-purple-800">Embalagem:</p>
+                                        <p className="text-purple-700">{order.notes?.giftOptions?.wrap_style_name || 'Embalagem Selecionada'}</p>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    {order.notes?.giftOptions?.recipient_name && (
+                                        <div>
+                                            <p className="font-semibold text-purple-800 text-xs uppercase tracking-wider">Para:</p>
+                                            <p className="text-purple-700 font-medium">{order.notes?.giftOptions.recipient_name}</p>
+                                        </div>
+                                    )}
+                                    {order.notes?.giftOptions?.sender_name && (
+                                        <div>
+                                            <p className="font-semibold text-purple-800 text-xs uppercase tracking-wider">De:</p>
+                                            <p className="text-purple-700 font-medium">{order.notes?.giftOptions.sender_name}</p>
+                                        </div>
+                                    )}
+                                </div>
+                                {order.notes?.giftOptions?.message && (
+                                    <div className="bg-white p-4 rounded-xl border border-purple-100 italic text-purple-900 shadow-sm relative">
+                                        <span className="absolute -top-2 left-4 px-2 bg-white text-[10px] font-bold text-purple-300 uppercase leading-none">Mensagem</span>
+                                        "{order.notes?.giftOptions.message}"
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    )}
 
                     {/* Delivery Address */}
                     <Card>

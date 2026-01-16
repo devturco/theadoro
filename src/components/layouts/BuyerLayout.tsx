@@ -95,7 +95,6 @@ export const UserDashboardLayout = ({ children }: BuyerLayoutProps) => {
       const userId = user?.id || profile?.id;
       if (!userId) return;
 
-      console.log('[UserDashboardLayout] Checking seller status for:', userId);
 
       // Fast race for seller applications
       const fetchTask = (supabase.from as any)('seller_applications')
@@ -109,11 +108,9 @@ export const UserDashboardLayout = ({ children }: BuyerLayoutProps) => {
         const result: any = await Promise.race([fetchTask, timeoutTask]);
         const { data } = result;
         if (data) {
-          console.log('[UserDashboardLayout] Application status found:', data.status);
           setApplicationStatus(data.status);
 
           if (data.status === 'approved' && !roles.includes('seller')) {
-            console.log('[UserDashboardLayout] Auto-healing roles...');
             refreshProfile();
           }
         }
@@ -131,7 +128,6 @@ export const UserDashboardLayout = ({ children }: BuyerLayoutProps) => {
 
   const handleSignOut = async () => {
     try {
-      console.log('[UserDashboardLayout] Attempting sign out...');
       await signOut();
       window.location.href = '/auth'; // Force redirect to be sure
     } catch (error) {
@@ -262,7 +258,6 @@ export const UserDashboardLayout = ({ children }: BuyerLayoutProps) => {
                   <button
                     type="button"
                     onClick={() => {
-                      console.log('[UserDashboardLayout] Manual role refresh triggered');
                       refreshProfile();
                     }}
                     className="w-full flex items-center gap-3 p-2 rounded-lg text-xs text-muted-foreground hover:bg-gray-50 transition-all font-medium border border-gray-100 border-dashed"
@@ -273,7 +268,6 @@ export const UserDashboardLayout = ({ children }: BuyerLayoutProps) => {
                   <button
                     type="button"
                     onClick={(e) => {
-                      console.log('[UserDashboardLayout] Sign out button clicked');
                       handleSignOut();
                     }}
                     className="w-full flex items-center gap-3 p-3 rounded-lg text-red-500 hover:bg-red-50 transition-all font-medium cursor-pointer"

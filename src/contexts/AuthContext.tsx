@@ -62,7 +62,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
     // 🚀 ASYNC FETCH: Both happen in background and update state when ready
-    console.log('[AuthContext] Starting background fetches for:', userId);
 
     // Roles fetch (Priority 1)
     const fetchRoles = async () => {
@@ -70,7 +69,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const { data } = await supabase.from('user_roles').select('role').eq('user_id', userId);
         if (data && data.length > 0) {
           const rolesArray = data.map((r: any) => r.role as UserRole);
-          console.log('[AuthContext] Roles received:', rolesArray);
           setDbRoles(rolesArray);
           localStorage.setItem('auth_db_roles', JSON.stringify(rolesArray));
         }
@@ -93,7 +91,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } catch (e: any) {
         console.warn('[AuthContext] Profile fetch ignored during timeout/fail:', e.message);
       } finally {
-        console.log('[AuthContext] Profile background task finished');
       }
     };
 
@@ -102,7 +99,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshProfile = useCallback(async () => {
     if (user?.id) {
-      console.log('[AuthContext] Manually refreshing profile for:', user.id);
       await fetchProfile(user.id);
     }
   }, [user?.id, fetchProfile]);
@@ -114,26 +110,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Safety timeout - IF we have roles, we can unblock loading even if profile is slow
     const safetyTimeout = setTimeout(() => {
       if (mounted && loading) {
-        console.log('[AuthContext] Safety timeout reached. Loading = false');
         setLoading(false);
       }
     }, 8000); // Increased to 8s to give parallel fetch a better chance
 
     // Initial Load
     const initAuth = async () => {
-      console.log('[AuthContext] initAuth started');
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
-        console.log('[AuthContext] getSession done', { hasSession: !!session, error });
 
         if (error) throw error;
 
         if (mounted) {
           if (session?.user) {
             setUser(session.user as AuthUser);
-            console.log('[AuthContext] user found, fetching profile...');
             await fetchProfile(session.user.id);
-            console.log('[AuthContext] fetchProfile done');
           } else {
             console.log('[AuthContext] no session found');
             setUser(null);
@@ -144,7 +135,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.error('[AuthContext] Auth init error:', error);
       } finally {
         if (mounted) {
-          console.log('[AuthContext] setLoading(false)');
           setLoading(false);
         } else {
           console.warn('[AuthContext] initAuth finished but component unmounted');
@@ -212,11 +202,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Sign out
   const signOut = useCallback(async () => {
-    console.log('[AuthContext] signOut triggered');
 
     // Internal helper to clear everything
     const performLocalCleanup = () => {
-      console.log('[AuthContext] Performing local state cleanup...');
       setUser(null);
       setProfile(null);
       setDbRoles([]);
@@ -236,7 +224,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       );
 
       await Promise.race([signOutTask, timeoutTask]);
-      console.log('[AuthContext] Supabase signOut returned');
     } catch (e: any) {
       console.warn('[AuthContext] SignOut Supabase call failed or timed out:', e.message);
     } finally {

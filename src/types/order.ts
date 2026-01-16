@@ -4,7 +4,14 @@ export type AppointmentStatus = 'pending' | 'confirmed' | 'in_progress' | 'compl
 export interface Order {
   id: string;
   buyer_id: string;
+  seller_id: string | null;
   total_amount: number;
+  subtotal_amount?: number;
+  shipping_cost?: number;
+  gift_wrap_price?: number;
+  discount_amount?: number;
+  tax_amount?: number;
+  shipping_method?: string | null;
   status: OrderStatus;
   shipping_address: string | null;
   payment_method: string | null;
@@ -35,6 +42,16 @@ export interface GiftOptions {
 export interface DeliverySchedule {
   scheduled_date: string; // ISO date string YYYY-MM-DD
   scheduled_slot: string; // e.g. "morning", "afternoon" or "14:00-16:00"
+}
+
+export interface GiftWrap {
+  id: string;
+  name: string;
+  description: string | null;
+  price: number;
+  image_url: string | null;
+  is_active: boolean;
+  created_at?: string;
 }
 
 export interface OrderItem {
