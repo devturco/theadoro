@@ -69,6 +69,12 @@ export const useProduct = (productId: string | undefined) => {
         throw new Error('Produto não encontrado');
       }
 
+      // Fetch sold count
+      const { count: soldCount } = await supabase
+        .from('order_items')
+        .select('*', { count: 'exact', head: true })
+        .eq('product_id', data.id);
+
       // Transform data to match Product interface
       const transformedProduct: Product = {
         id: data.id,
@@ -85,6 +91,7 @@ export const useProduct = (productId: string | undefined) => {
         tags: data.tags || [],
         is_active: data.is_active,
         is_service: data.is_service,
+        sold_count: soldCount || 0,
         seller_id: Array.isArray(data.profiles) ? data.profiles[0]?.id : data.profiles?.id || '',
         created_at: data.created_at,
         updated_at: data.updated_at,

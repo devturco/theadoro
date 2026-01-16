@@ -10,9 +10,9 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
           {/* Brand */}
           <div className="space-y-4">
-            <img 
-              src="/logo-colors.png" 
-              alt="THEADORO" 
+            <img
+              src="/logo-colors.png"
+              alt="THEADORO"
               className="h-16 w-auto"
             />
             <p className="text-white/80 text-sm leading-relaxed">
@@ -96,11 +96,11 @@ const Footer = () => {
               </li>
               <li className="flex items-center gap-2 text-white/80">
                 <Phone className="h-4 w-4 text-champagne" />
-                (11) 9999-9999
+                (65) 9999-9999
               </li>
               <li className="flex items-start gap-2 text-white/80">
                 <MapPin className="h-4 w-4 text-champagne mt-0.5" />
-                São Paulo, SP
+                Cuiabá, MT
               </li>
             </ul>
 

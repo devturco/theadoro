@@ -16,6 +16,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { cn } from "@/lib/utils";
 
 const Header = () => {
   const navigate = useNavigate();
@@ -111,8 +113,17 @@ const Header = () => {
     }
   };
 
+  const { getSettingValue } = useSiteSettings('general');
+  const isMaintenanceMode = getSettingValue('maintenance_mode', false);
+  const showMaintenanceBanner = isMaintenanceMode && isAdmin;
+
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-100 transition-all duration-300">
+    <header
+      className={cn(
+        "fixed left-0 right-0 z-50 bg-white border-b border-gray-100 transition-all duration-300",
+        showMaintenanceBanner ? "top-8" : "top-0"
+      )}
+    >
       <div className="container mx-auto px-4">
 
         {/* Top Row: Logo, Search, Sell Button */}
@@ -153,7 +164,7 @@ const Header = () => {
                     key={item.id}
                     className="w-full flex items-center gap-4 px-4 py-3 hover:bg-gray-50 transition-colors text-left group"
                     onClick={() => {
-                      navigate(item.type === 'category' ? `/category/${item.slug}` : `/product/${item.slug}`);
+                      navigate(item.type === 'category' ? `/categories/${item.slug}` : `/product/${item.slug}`);
                       setShowSuggestions(false);
                       setSearchQuery("");
                     }}
@@ -198,10 +209,10 @@ const Header = () => {
                 Categorias <ChevronDown className="h-4 w-4 text-gray-400" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56 p-2 rounded-xl shadow-xl mt-1">
-                <DropdownMenuItem className="p-2 cursor-pointer rounded-lg hover:bg-wine/5 hover:text-wine" onClick={() => navigate('/category/flores')}>Flores & Cestas</DropdownMenuItem>
-                <DropdownMenuItem className="p-2 cursor-pointer rounded-lg hover:bg-wine/5 hover:text-wine" onClick={() => navigate('/category/joias')}>Joias & Acessórios</DropdownMenuItem>
-                <DropdownMenuItem className="p-2 cursor-pointer rounded-lg hover:bg-wine/5 hover:text-wine" onClick={() => navigate('/category/moda')}>Moda & Estilo</DropdownMenuItem>
-                <DropdownMenuItem className="p-2 cursor-pointer rounded-lg hover:bg-wine/5 hover:text-wine" onClick={() => navigate('/category/cestas')}>Experiências</DropdownMenuItem>
+                <DropdownMenuItem className="p-2 cursor-pointer rounded-lg hover:bg-wine/5 hover:text-wine" onClick={() => navigate('/categories/flores')}>Flores & Cestas</DropdownMenuItem>
+                <DropdownMenuItem className="p-2 cursor-pointer rounded-lg hover:bg-wine/5 hover:text-wine" onClick={() => navigate('/categories/joias')}>Joias & Acessórios</DropdownMenuItem>
+                <DropdownMenuItem className="p-2 cursor-pointer rounded-lg hover:bg-wine/5 hover:text-wine" onClick={() => navigate('/categories/moda')}>Moda & Estilo</DropdownMenuItem>
+                <DropdownMenuItem className="p-2 cursor-pointer rounded-lg hover:bg-wine/5 hover:text-wine" onClick={() => navigate('/categories/cestas')}>Experiências</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
             <Link to="/offers" className="hover:text-wine transition-colors">Ofertas</Link>

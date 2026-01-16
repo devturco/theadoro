@@ -14,6 +14,7 @@ export interface Product {
   is_service: boolean;
   tags: string[];
   stock?: number;
+  sold_count?: number;
   variants?: any[];
   shipping_info?: any;
   seller_id: string;

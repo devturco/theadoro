@@ -97,43 +97,39 @@ interface ProductCardSkeletonProps {
 
 const ProductCardSkeleton: React.FC<ProductCardSkeletonProps> = ({ variant = 'default' }) => {
   const cardHeight = {
-    default: 'h-96',
-    compact: 'h-80',
-    featured: 'h-[420px]',
-  }[variant];
-
-  const imageHeight = {
-    default: 'h-48',
-    compact: 'h-40',
-    featured: 'h-56',
+    default: 'h-[440px]',
+    compact: 'h-[400px]',
+    featured: 'h-[500px]',
   }[variant];
 
   return (
     <div className={cn('bg-white rounded-lg border border-gray-200 overflow-hidden', cardHeight)}>
       {/* Image Skeleton */}
-      <Skeleton className={cn('w-full', imageHeight)} />
-      
+      <div className="aspect-square bg-gray-100">
+        <Skeleton className="w-full h-full" />
+      </div>
+
       {/* Content Skeleton */}
       <div className="p-4 space-y-3">
         {/* Category */}
         <Skeleton className="h-3 w-20" />
-        
+
         {/* Title */}
         <div className="space-y-2">
           <Skeleton className="h-4 w-full" />
           <Skeleton className="h-4 w-3/4" />
         </div>
-        
+
         {/* Location */}
         <Skeleton className="h-3 w-24" />
-        
+
         {/* Rating */}
         <div className="flex items-center gap-2">
           <Skeleton className="h-4 w-4 rounded" />
           <Skeleton className="h-3 w-12" />
           <Skeleton className="h-3 w-8" />
         </div>
-        
+
         {/* Price */}
         <div className="flex items-center gap-2 mt-auto">
           <Skeleton className="h-6 w-20" />

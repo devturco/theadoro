@@ -109,7 +109,7 @@ const INITIAL_STATE: CheckoutFormData = {
 
 export const Checkout: React.FC = () => {
   const navigate = useNavigate();
-  const { cart } = useCart();
+  const { cart, clearCart } = useCart();
   const {
     processOrder,
     getShippingQuotes,
@@ -387,6 +387,9 @@ export const Checkout: React.FC = () => {
         // Clear checkout state from localStorage
         localStorage.removeItem('checkoutFormData');
         localStorage.removeItem('checkoutStep');
+
+        // Clear the shopping cart
+        await clearCart();
 
         // Redirect to success page
         navigate(`/order-success/${order.id}`);

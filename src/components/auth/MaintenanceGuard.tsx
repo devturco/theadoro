@@ -43,8 +43,8 @@ export const MaintenanceGuard = ({ children }: MaintenanceGuardProps) => {
     if (isAdmin) {
         return (
             <>
-                {/* Optional: Add a banner to remind admin they are in maintenance mode */}
-                <div className="bg-amber-500/10 text-amber-600 text-xs text-center py-1 border-b border-amber-500/20">
+                {/* Banner to remind admin they are in maintenance mode */}
+                <div className="fixed top-0 left-0 right-0 z-[100] h-8 bg-amber-500 text-white text-xs font-bold flex items-center justify-center shadow-md">
                     Modo Manutenção Ativo (Visível apenas para Admins)
                 </div>
                 {children}

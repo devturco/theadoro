@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Product, ProductFilters, ProductsResponse } from '@/types/product';
+import { Product, ProductFilters } from '@/types/product';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -137,7 +137,7 @@ export const useProducts = (options: UseProductsOptions = {}) => {
       if (error) throw error;
 
       // Transform data to match Product interface
-      const transformedProducts: Product[] = (data || []).map(item => ({
+      const transformedProducts: Product[] = ((data as any[]) || []).map(item => ({
         id: item.id,
         name: item.name,
         slug: item.slug,
@@ -154,6 +154,7 @@ export const useProducts = (options: UseProductsOptions = {}) => {
         is_service: item.is_service,
         created_at: item.created_at,
         updated_at: item.updated_at,
+        seller_id: item.seller_id,
         category: {
           id: item.category?.id || '',
           name: item.category?.name || 'Sem categoria',
@@ -314,6 +315,8 @@ export const useProducts = (options: UseProductsOptions = {}) => {
     error,
     filters,
     pagination,
+    totalCount: pagination.total,
+    totalPages: pagination.totalPages,
     updateFilters,
     nextPage,
     prevPage,

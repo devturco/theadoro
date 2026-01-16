@@ -1,256 +1,149 @@
 import React from 'react';
-import { Heart, Users, Award, MapPin, Mail, Phone } from 'lucide-react';
+import { Heart, Users, Award, Mail, Phone, ShoppingBag, Star, Clock } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
 
 const About: React.FC = () => {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       {/* Hero Section */}
-      <section className="bg-gradient-to-r from-pink-500 to-purple-600 text-white py-20">
-        <div className="container mx-auto px-4 text-center">
-          <h1 className="text-4xl md:text-6xl font-bold mb-6">
-            Sobre a THEADORO
+      <section className="relative h-[60vh] flex items-center justify-center overflow-hidden">
+        <div className="absolute inset-0 bg-black/40 z-10" />
+        <img
+          src="https://images.unsplash.com/photo-1549465220-1a8b9238cd48?q=80&w=2040&auto=format&fit=crop"
+          alt="Presentes THEADORO"
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+        <div className="container mx-auto px-4 relative z-20 text-center text-white">
+          <h1 className="text-5xl md:text-7xl font-serif font-bold mb-6 animate-fade-in translate-y-4">
+            A Arte de Presentear
           </h1>
-          <p className="text-xl md:text-2xl max-w-3xl mx-auto leading-relaxed">
-            Conectando corações através de presentes únicos e experiências inesquecíveis
+          <p className="text-xl md:text-2xl max-w-2xl mx-auto font-light leading-relaxed opacity-90 animate-fade-in delay-100">
+            Mais do que produtos, entregamos sentimentos. Conectando histórias através de gestos inesquecíveis.
           </p>
         </div>
       </section>
 
-      {/* Nossa História */}
-      <section className="py-16">
+      {/* Our Essence */}
+      <section className="py-24 bg-white">
         <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto">
-            <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 text-gray-800">
-              Nossa História
-            </h2>
-            <div className="grid md:grid-cols-2 gap-12 items-center">
-              <div>
-                <img 
-                  src="https://trae-api-us.mchost.guru/api/ide/v1/text_to_image?prompt=modern%20gift%20store%20interior%20with%20beautiful%20presents%20and%20flowers%20warm%20lighting%20cozy%20atmosphere&image_size=landscape_4_3"
-                  alt="Loja THEADORO"
-                  className="rounded-lg shadow-lg w-full"
-                />
-              </div>
-              <div className="space-y-6">
-                <p className="text-lg text-gray-700 leading-relaxed">
-                  A THEADORO nasceu em 2020 com uma missão simples: tornar cada momento especial 
-                  ainda mais memorável através de presentes únicos e experiências personalizadas.
+          <div className="grid md:grid-cols-2 gap-16 items-center max-w-6xl mx-auto">
+            <div className="space-y-8 animate-fade-in">
+              <span className="text-wine font-bold tracking-widest uppercase text-sm">Nossa Essência</span>
+              <h2 className="text-4xl md:text-5xl font-serif font-bold text-gray-900 leading-tight">
+                Transformando mimos em memórias eternas.
+              </h2>
+              <div className="space-y-6 text-lg text-gray-600 font-light leading-relaxed">
+                <p>
+                  A THEADORO nasceu da crença de que todo presente carrega uma parte de quem presenteia.
+                  Começamos como um sonho pequeno e nos tornamos o destino favorito de quem busca
+                  sofisticação e significado.
                 </p>
-                <p className="text-lg text-gray-700 leading-relaxed">
-                  Começamos como uma pequena loja de presentes em São Paulo e evoluímos para 
-                  um marketplace digital que conecta pessoas apaixonadas por criar momentos 
-                  especiais com vendedores talentosos de todo o Brasil.
-                </p>
-                <p className="text-lg text-gray-700 leading-relaxed">
-                  Hoje, somos uma plataforma que celebra a arte de presentear, oferecendo 
-                  desde produtos artesanais únicos até experiências inesquecíveis.
+                <p>
+                  Nossa curadoria é feita a "quatro mãos" com produtores locais e grandes marcas,
+                  garantindo que cada item em nossa plataforma tenha qualidade, alma e propósito.
                 </p>
               </div>
+            </div>
+            <div className="relative animate-fade-in delay-200">
+              <div className="absolute -inset-4 bg-gray-50 rounded-full blur-3xl opacity-50 z-0" />
+              <img
+                src="https://images.unsplash.com/photo-1513201099705-a9746e1e201f?q=80&w=1974&auto=format&fit=crop"
+                alt="Curadoria de Presentes"
+                className="relative z-10 rounded-2xl shadow-2xl w-full object-cover aspect-4/5"
+              />
             </div>
           </div>
         </div>
       </section>
 
-      {/* Missão, Visão e Valores */}
-      <section className="py-16 bg-white">
+      {/* Values Grid */}
+      <section className="py-20 bg-gray-50">
         <div className="container mx-auto px-4">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-16 text-gray-800">
-            Nossos Valores
-          </h2>
           <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {/* Missão */}
-            <div className="text-center p-8 rounded-lg bg-pink-50 border border-pink-100">
-              <div className="w-16 h-16 bg-pink-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Heart className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-2xl font-bold mb-4 text-gray-800">Missão</h3>
-              <p className="text-gray-700 leading-relaxed">
-                Conectar pessoas através de presentes únicos e experiências memoráveis, 
-                facilitando a expressão de amor, carinho e gratidão.
-              </p>
-            </div>
-
-            {/* Visão */}
-            <div className="text-center p-8 rounded-lg bg-purple-50 border border-purple-100">
-              <div className="w-16 h-16 bg-purple-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Award className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-2xl font-bold mb-4 text-gray-800">Visão</h3>
-              <p className="text-gray-700 leading-relaxed">
-                Ser a principal plataforma de presentes e experiências do Brasil, 
-                reconhecida pela qualidade, inovação e impacto positivo na vida das pessoas.
-              </p>
-            </div>
-
-            {/* Valores */}
-            <div className="text-center p-8 rounded-lg bg-blue-50 border border-blue-100">
-              <div className="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Users className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-2xl font-bold mb-4 text-gray-800">Valores</h3>
-              <ul className="text-gray-700 leading-relaxed text-left space-y-2">
-                <li>• Autenticidade e originalidade</li>
-                <li>• Qualidade em cada detalhe</li>
-                <li>• Sustentabilidade e responsabilidade</li>
-                <li>• Inovação constante</li>
-                <li>• Relacionamentos duradouros</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Números da THEADORO */}
-      <section className="py-16 bg-gradient-to-r from-pink-500 to-purple-600 text-white">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">
-            THEADORO em Números
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto">
-            <div className="text-center">
-              <div className="text-4xl md:text-5xl font-bold mb-2">50K+</div>
-              <div className="text-lg opacity-90">Presentes Entregues</div>
-            </div>
-            <div className="text-center">
-              <div className="text-4xl md:text-5xl font-bold mb-2">1.2K+</div>
-              <div className="text-lg opacity-90">Vendedores Parceiros</div>
-            </div>
-            <div className="text-center">
-              <div className="text-4xl md:text-5xl font-bold mb-2">25K+</div>
-              <div className="text-lg opacity-90">Clientes Felizes</div>
-            </div>
-            <div className="text-center">
-              <div className="text-4xl md:text-5xl font-bold mb-2">4.8</div>
-              <div className="text-lg opacity-90">Avaliação Média</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Nossa Equipe */}
-      <section className="py-16 bg-gray-50">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-16 text-gray-800">
-            Nossa Equipe
-          </h2>
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {/* CEO */}
-            <div className="text-center bg-white p-8 rounded-lg shadow-lg">
-              <img 
-                src="https://trae-api-us.mchost.guru/api/ide/v1/text_to_image?prompt=professional%20business%20woman%20CEO%20portrait%20confident%20smile%20modern%20office%20background&image_size=square"
-                alt="Ana Silva - CEO"
-                className="w-32 h-32 rounded-full mx-auto mb-6 object-cover"
-              />
-              <h3 className="text-xl font-bold mb-2 text-gray-800">Ana Silva</h3>
-              <p className="text-pink-600 font-semibold mb-4">CEO &amp; Fundadora</p>
-              <p className="text-gray-600 text-sm leading-relaxed">
-                Empreendedora apaixonada por conectar pessoas através de experiências únicas. 
-                15 anos de experiência em e-commerce e marketplace.
-              </p>
-            </div>
-
-            {/* CTO */}
-            <div className="text-center bg-white p-8 rounded-lg shadow-lg">
-              <img 
-                src="https://trae-api-us.mchost.guru/api/ide/v1/text_to_image?prompt=professional%20business%20man%20CTO%20portrait%20confident%20smile%20tech%20background&image_size=square"
-                alt="Carlos Santos - CTO"
-                className="w-32 h-32 rounded-full mx-auto mb-6 object-cover"
-              />
-              <h3 className="text-xl font-bold mb-2 text-gray-800">Carlos Santos</h3>
-              <p className="text-purple-600 font-semibold mb-4">CTO</p>
-              <p className="text-gray-600 text-sm leading-relaxed">
-                Especialista em tecnologia e inovação digital. Responsável por toda a 
-                infraestrutura tecnológica que torna a THEADORO possível.
-              </p>
-            </div>
-
-            {/* Head of Marketing */}
-            <div className="text-center bg-white p-8 rounded-lg shadow-lg">
-              <img 
-                src="https://trae-api-us.mchost.guru/api/ide/v1/text_to_image?prompt=professional%20business%20woman%20marketing%20director%20portrait%20creative%20background&image_size=square"
-                alt="Mariana Costa - Head of Marketing"
-                className="w-32 h-32 rounded-full mx-auto mb-6 object-cover"
-              />
-              <h3 className="text-xl font-bold mb-2 text-gray-800">Mariana Costa</h3>
-              <p className="text-blue-600 font-semibold mb-4">Head of Marketing</p>
-              <p className="text-gray-600 text-sm leading-relaxed">
-                Especialista em marketing digital e experiência do cliente. Garante que 
-                cada interação com a THEADORO seja especial e memorável.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Localização e Contato */}
-      <section className="py-16 bg-white">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-16 text-gray-800">
-            Onde Estamos
-          </h2>
-          <div className="grid md:grid-cols-2 gap-12 max-w-6xl mx-auto">
-            {/* Mapa/Localização */}
-            <div>
-              <div className="bg-gray-100 rounded-lg p-8 h-80 flex items-center justify-center">
-                <div className="text-center">
-                  <MapPin className="w-16 h-16 text-pink-500 mx-auto mb-4" />
-                  <h3 className="text-2xl font-bold mb-4 text-gray-800">Sede THEADORO</h3>
-                  <p className="text-gray-600 leading-relaxed">
-                    Rua das Flores, 123<br />
-                    Vila Madalena - São Paulo/SP<br />
-                    CEP: 05435-000
-                  </p>
+            {[
+              {
+                icon: Heart,
+                title: "Curadoria Afetiva",
+                text: "Selecionamos cada produto pensando na emoção de quem vai receber."
+              },
+              {
+                icon: Star,
+                title: "Qualidade Premium",
+                text: "Parceria apenas com os melhores fornecedores e artesãos do mercado."
+              },
+              {
+                icon: Users,
+                title: "Conexão Real",
+                text: "Uma comunidade de vendedores apaixonados pelo que fazem."
+              }
+            ].map((value, idx) => (
+              <div key={idx} className="bg-white p-10 rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 group">
+                <div className="w-14 h-14 bg-wine/5 text-wine rounded-full flex items-center justify-center mb-6 group-hover:bg-wine group-hover:text-white transition-colors">
+                  <value.icon className="w-7 h-7" />
                 </div>
+                <h3 className="text-2xl font-serif font-bold text-gray-900 mb-4">{value.title}</h3>
+                <p className="text-gray-600 leading-relaxed font-light">{value.text}</p>
               </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Stats - Minimalist */}
+      <section className="py-20 bg-wine text-white">
+        <div className="container mx-auto px-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-12 max-w-5xl mx-auto text-center divide-white/20 md:divide-x-0">
+            {[
+              { label: "Clientes Felizes", value: "25k+" },
+              { label: "Vendedores", value: "1.2k" },
+              { label: "Produtos", value: "5k+" },
+              { label: "Avaliação", value: "4.9" },
+            ].map((stat, idx) => (
+              <div key={idx}>
+                <div className="text-4xl md:text-5xl font-serif font-bold mb-2">{stat.value}</div>
+                <div className="text-sm uppercase tracking-widest opacity-80">{stat.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="py-24 bg-white text-center">
+        <div className="container mx-auto px-4">
+          <h2 className="text-3xl md:text-4xl font-serif font-bold text-gray-900 mb-6">
+            Faça parte da nossa história
+          </h2>
+          <p className="text-xl text-gray-600 font-light mb-10 max-w-2xl mx-auto">
+            Seja para comprar o presente perfeito ou para vender suas criações para todo o Brasil.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button size="lg" className="bg-wine hover:bg-wine-dark text-white px-8 h-12 text-base" asChild>
+              <Link to="/products">Explorar Loja</Link>
+            </Button>
+            <Button size="lg" variant="outline" className="border-gray-300 hover:bg-gray-50 text-gray-900 px-8 h-12 text-base" asChild>
+              <Link to="/seller/onboarding">Quero Vender</Link>
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Simple Footer Location/Contact */}
+      <section className="py-16 bg-gray-50 border-t border-gray-100">
+        <div className="container mx-auto px-4 text-center">
+          <div className="flex flex-col md:flex-row justify-center gap-12 text-gray-600 font-light text-sm">
+            <div className="flex flex-col items-center gap-3">
+              <Mail className="w-5 h-5 text-wine" />
+              <span>contato@theadoro.com.br</span>
             </div>
-
-            {/* Informações de Contato */}
-            <div className="space-y-8">
-              <div>
-                <h3 className="text-2xl font-bold mb-6 text-gray-800">Entre em Contato</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-12 h-12 bg-pink-100 rounded-full flex items-center justify-center">
-                      <Mail className="w-6 h-6 text-pink-600" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-800">Email</p>
-                      <p className="text-gray-600">contato@theadoro.com.br</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-4">
-                    <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                      <Phone className="w-6 h-6 text-purple-600" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-800">Telefone</p>
-                      <p className="text-gray-600">(11) 3456-7890</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-4">
-                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                      <Users className="w-6 h-6 text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-800">Atendimento</p>
-                      <p className="text-gray-600">Segunda a Sexta: 9h às 18h</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-gradient-to-r from-pink-50 to-purple-50 p-6 rounded-lg border border-pink-100">
-                <h4 className="text-lg font-bold mb-3 text-gray-800">Quer ser um Vendedor Parceiro?</h4>
-                <p className="text-gray-600 mb-4">
-                  Junte-se à nossa comunidade de vendedores e alcance milhares de clientes 
-                  que buscam presentes únicos e especiais.
-                </p>
-                <button className="bg-pink-500 text-white px-6 py-2 rounded-lg hover:bg-pink-600 transition-colors">
-                  Saiba Mais
-                </button>
-              </div>
+            <div className="flex flex-col items-center gap-3">
+              <Clock className="w-5 h-5 text-wine" />
+              <span>Seg - Sex: 9h às 18h</span>
+            </div>
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-5 h-5 text-wine font-bold text-lg leading-none">@</div>
+              <span>São Paulo, SP</span>
             </div>
           </div>
         </div>

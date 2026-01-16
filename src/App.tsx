@@ -35,6 +35,8 @@ import Search from '@/pages/Search';
 import Wishlist from '@/pages/Wishlist';
 import Sellers from '@/pages/Sellers';
 import SellerProfile from '@/pages/SellerProfile';
+import Offers from '@/pages/Offers';
+import Coupons from '@/pages/Coupons';
 
 // Institutional Pages
 import About from '@/pages/About';
@@ -117,6 +119,8 @@ function App() {
                   <Route path="/wishlist" element={<MaintenanceGuard><PublicLayout><Wishlist /></PublicLayout></MaintenanceGuard>} />
                   <Route path="/sellers" element={<MaintenanceGuard><PublicLayout><Sellers /></PublicLayout></MaintenanceGuard>} />
                   <Route path="/sellers/:id" element={<MaintenanceGuard><PublicLayout><SellerProfile /></PublicLayout></MaintenanceGuard>} />
+                  <Route path="/offers" element={<MaintenanceGuard><PublicLayout><Offers /></PublicLayout></MaintenanceGuard>} />
+                  <Route path="/coupons" element={<MaintenanceGuard><PublicLayout><Coupons /></PublicLayout></MaintenanceGuard>} />
 
                   {/* Institutional Pages */}
                   <Route path="/about" element={<MaintenanceGuard><PublicLayout><About /></PublicLayout></MaintenanceGuard>} />

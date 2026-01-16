@@ -24,8 +24,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   variant = 'default',
 }) => {
   const { isInWishlist, toggleWishlist } = useWishlist();
-  const { addItem } = useCart();
-
+  const { addToCart } = useCart();
+  const [isAdding, setIsAdding] = React.useState(false);
 
   const handleWishlistClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -33,10 +33,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     toggleWishlist(product);
   };
 
-  const handleQuickAdd = (e: React.MouseEvent) => {
+  const handleQuickAdd = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    addItem(product, 1);
+    setIsAdding(true);
+    // Simulate a small delay for feedback or just add
+    addToCart(product, 1);
+    setTimeout(() => setIsAdding(false), 500);
   };
 
   const formatPrice = (price: number) => {
@@ -51,137 +54,124 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     ? Math.round(((product.original_price! - product.price) / product.original_price!) * 100)
     : 0;
 
-  const cardClasses = cn(
-    'group relative bg-white rounded-lg border border-gray-200 overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-gray-300',
-    {
-      'h-96': variant === 'default',
-      'h-80': variant === 'compact',
-      'h-[420px]': variant === 'featured',
-    },
-    className
-  );
-
-  const imageClasses = cn(
-    'w-full object-cover transition-transform duration-300 group-hover:scale-105',
-    {
-      'h-48': variant === 'default',
-      'h-40': variant === 'compact',
-      'h-56': variant === 'featured',
-    }
-  );
-
   return (
-    <Link to={`/product/${product.slug || product.id}`} className={cardClasses}>
+    <div
+      className={cn(
+        'group relative bg-white rounded-lg overflow-hidden transition-all duration-300 hover:shadow-xl flex flex-col h-fit border border-transparent hover:border-gray-100',
+        className
+      )}
+    >
       {/* Image Container */}
-      <div className="relative overflow-hidden">
-        <img
-          src={product.images[0] || '/placeholder-product.jpg'}
-          alt={product.name}
-          className={imageClasses}
-        />
+      <div className="relative aspect-square overflow-hidden bg-white">
+        <Link to={`/product/${product.slug || product.id}`} className="block w-full h-full">
+          <img
+            src={product.images[0] || '/placeholder-product.jpg'}
+            alt={product.name}
+            className="w-full h-full object-contain p-2 transition-transform duration-500 group-hover:scale-105"
+          />
+        </Link>
 
-        {/* Badges */}
-        <div className="absolute top-2 left-2 flex flex-col gap-1">
-          {hasDiscount && (
-            <Badge variant="destructive" className="text-xs">
-              -{discountPercentage}%
-            </Badge>
-          )}
-          {product.is_service && (
-            <Badge variant="secondary" className="text-xs">
-              Serviço
-            </Badge>
-          )}
-          {!product.in_stock && (
-            <Badge variant="outline" className="text-xs bg-gray-100">
-              Esgotado
-            </Badge>
-          )}
+        {/* Badges - Removed absolute badges for ML style, favor inline text next to price or distinct tags */}
+        {/* ML often has no overlay badges on the image except maybe 'FULL' lightning bolt or free shipping strip, 
+            but the user print shows discount next to price. keeping image clean. */}
+        <div className="absolute top-0 right-0 p-2">
+          {/* Keeping Wishlist here? ML puts it top right often */}
         </div>
 
         {/* Wishlist Button */}
         {showWishlist && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="absolute top-2 right-2 p-2 bg-white/80 hover:bg-white transition-colors"
+          <button
+            className="absolute top-3 right-3 p-2 rounded-full bg-white/90 backdrop-blur text-gray-400 hover:text-red-500 hover:bg-white transition-all shadow-sm border border-transparent hover:border-gray-100 z-10"
             onClick={handleWishlistClick}
           >
             <Heart
               className={cn(
                 'h-4 w-4 transition-colors',
-                isInWishlist(product.id)
-                  ? 'fill-red-500 text-red-500'
-                  : 'text-gray-600 hover:text-red-500'
+                isInWishlist(product.id) && 'fill-current text-red-500'
               )}
             />
-          </Button>
-        )}
-
-        {/* Quick Add Button */}
-        {showQuickAdd && product.in_stock && (
-          <Button
-            size="sm"
-            className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-            onClick={handleQuickAdd}
-          >
-            <ShoppingBag className="h-4 w-4 mr-1" />
-            Adicionar
-          </Button>
+          </button>
         )}
       </div>
 
       {/* Content */}
-      <div className="p-4 flex flex-col justify-between flex-1">
-        <div>
-          {/* Category */}
-          <p className="text-xs text-gray-500 mb-1">{product.category.name}</p>
-
-          {/* Title */}
-          <h3 className="font-medium text-gray-900 mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors">
+      <div className="p-3 flex flex-col gap-2">
+        <Link to={`/product/${product.slug || product.id}`} className="block group/title">
+          {/* Title - Clean, gray, simplified */}
+          <h3 className="text-sm font-normal text-gray-600 line-clamp-2 leading-snug group-hover/title:text-gray-900 transition-colors">
             {product.name}
           </h3>
+        </Link>
 
-          {/* Seller Info */}
-          <div className="flex items-center gap-1 mb-2">
-            <MapPin className="h-3 w-3 text-gray-400" />
-            <span className="text-xs text-gray-500">{product.seller.location}</span>
-          </div>
-
-          {/* Rating */}
-          {product.rating > 0 && (
-            <div className="flex items-center gap-1 mb-2">
-              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-              <span className="text-sm text-gray-600">
-                {product.rating.toFixed(1)}
-              </span>
-              <span className="text-xs text-gray-500">
-                ({product.review_count})
-              </span>
-            </div>
+        {/* Price Block */}
+        <div className="mt-1">
+          {/* Original Price */}
+          {hasDiscount && (
+            <span className="text-xs text-gray-400 line-through block">
+              {formatPrice(product.original_price!)}
+            </span>
           )}
-        </div>
 
-        {/* Price */}
-        <div className="mt-auto">
+          {/* Current Price and Discount */}
           <div className="flex items-center gap-2">
-            <span className="text-lg font-bold text-gray-900">
+            <span className="text-2xl font-normal text-gray-900">
               {formatPrice(product.price)}
             </span>
             {hasDiscount && (
-              <span className="text-sm text-gray-500 line-through">
-                {formatPrice(product.original_price!)}
+              <span className="text-sm font-medium text-green-600">
+                {discountPercentage}% OFF
               </span>
             )}
           </div>
 
-          {product.is_service && (
-            <p className="text-xs text-gray-500 mt-1">
-              A partir de
-            </p>
+          {/* Installments Logic (Simulated 10x or 12x) */}
+          <div className="text-[10px] sm:text-xs text-gray-900 mt-1">
+            em <span className="font-medium">10x {formatPrice(product.price / 10)}</span> sem juros
+          </div>
+
+          {/* Free Shipping Badge */}
+          {product.price > 79 && ( // Simulation: Free shipping over R$ 79
+            <div className="mt-2 text-center">
+              <span className="text-xs font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded inline-block">
+                Entrega Full
+              </span>
+            </div>
+          )}
+
+          {/* Rating (Optional vs ML style, keeping simplistic) */}
+          {product.rating > 0 && (
+            <div className="flex items-center gap-0.5 mt-2">
+              {/* Only showing star count or simplistic stars if space permits, 
+                     ML usually puts this lower or hides in grid if not minimal */}
+              {/* Keeping hidden for strict ML clone or showing small? 
+                    User asked to be "Equal", grid listings often don't show stars prominently unless "Best Seller".
+                    I'll keep it very subtle or remove if strictly following "clean".
+                    Let's keep it but very specific.
+                */}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-2">
+          {/* Quick Add Button - Kept as requested but styled to fit */}
+          {showQuickAdd && product.in_stock && (
+            <Button
+              size="sm"
+              className={cn(
+                "w-full rounded-md transition-all h-8 bg-wine hover:bg-wine-dark text-white font-medium text-xs shadow-none"
+              )}
+              onClick={handleQuickAdd}
+              disabled={isAdding}
+            >
+              {isAdding ? (
+                <span className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                "Adicionar ao carrinho"
+              )}
+            </Button>
           )}
         </div>
       </div>
-    </Link>
+    </div>
   );
 };
