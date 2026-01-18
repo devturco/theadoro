@@ -354,6 +354,18 @@ const AdminContent = () => {
                                         className="w-full min-h-[300px] p-3 rounded-b-md border border-input bg-background text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-mono"
                                     />
                                 )}
+
+                                <div className="p-3 bg-amber-50 border border-amber-100 rounded-md">
+                                    <p className="text-[10px] font-bold text-amber-800 uppercase mb-1 flex items-center gap-1">
+                                        💡 Dicas de Formatação (Markdown)
+                                    </p>
+                                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] text-amber-700">
+                                        <p><code># Título</code> &rarr; Título Principal</p>
+                                        <p><code>## Título</code> &rarr; Subtítulo</p>
+                                        <p><code>**texto**</code> &rarr; <strong>Negrito</strong></p>
+                                        <p><code>- Item</code> &rarr; Lista de tópicos</p>
+                                    </div>
+                                </div>
                             </div>
                         ) : (setting.type === 'text' || setting.type === 'number' || setting.type === 'image') && (
                             <div className="relative">
