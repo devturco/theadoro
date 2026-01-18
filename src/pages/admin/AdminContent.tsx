@@ -146,7 +146,9 @@ const AdminContent = () => {
     };
 
     // Group settings by section
-    const sections = Array.from(new Set(localSettings.map(s => s.section)));
+    // Group settings by section, excluding redundant ones already in AdminSettings
+    const sections = Array.from(new Set(localSettings.map(s => s.section)))
+        .filter(section => !['general', 'integrations', 'geral', 'integrações'].includes(section.toLowerCase()));
 
     const renderSettingInput = (setting: SiteSetting) => {
         // Hide legacy bg_image if we are in hero section
