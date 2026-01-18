@@ -24,6 +24,26 @@ import { cn } from '@/lib/utils';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { Checkbox } from '@/components/ui/checkbox';
 
+const renderMarkdown = (text: string) => {
+    if (!text) return '';
+    // Clean potential extra quotes from storage
+    let cleanText = text;
+    if (cleanText.startsWith('"') && cleanText.endsWith('"')) {
+        cleanText = cleanText.slice(1, -1);
+    }
+    // Handle literal \n from manual input escaping
+    cleanText = cleanText.replace(/\\n/g, '\n');
+
+    return cleanText
+        .replace(/^### (.*$)/gim, '<h3 class="text-lg font-bold mt-4 mb-2">$1</h3>')
+        .replace(/^## (.*$)/gim, '<h2 class="text-xl font-bold mt-6 mb-3">$1</h2>')
+        .replace(/^# (.*$)/gim, '<h1 class="text-2xl font-bold mt-8 mb-4">$1</h1>')
+        .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
+        .replace(/\*(.*)\*/gim, '<em>$1</em>')
+        .replace(/^- (.*$)/gim, '<li class="ml-4 list-disc">$1</li>')
+        .replace(/\n/g, '<br/>');
+};
+
 type Step = 'branding' | 'entity' | 'details' | 'documents' | 'legal' | 'success';
 
 export default function SellerOnboarding() {
@@ -636,7 +656,7 @@ export default function SellerOnboarding() {
                             <div className="space-y-2">
                                 <Label className="text-sm font-bold">Termos de Uso</Label>
                                 <div
-                                    className="h-48 overflow-y-auto p-4 bg-gray-50 rounded-lg border text-xs text-gray-600 space-y-4"
+                                    className="h-48 overflow-y-auto p-4 bg-gray-50 rounded-lg border text-sm text-gray-700 prose prose-sm max-w-none"
                                     onScroll={(e) => {
                                         const target = e.currentTarget;
                                         if (target.scrollHeight - target.scrollTop <= target.clientHeight + 10) {
@@ -644,8 +664,10 @@ export default function SellerOnboarding() {
                                         }
                                     }}
                                 >
-                                    {getSettingValue('terms_of_use', 'Carregando termos...') && (
-                                        <div dangerouslySetInnerHTML={{ __html: getSettingValue('terms_of_use').replace(/\n/g, '<br/>') }} />
+                                    {getSettingValue('terms_of_use') ? (
+                                        <div dangerouslySetInnerHTML={{ __html: renderMarkdown(getSettingValue('terms_of_use')) }} />
+                                    ) : (
+                                        <p className="text-muted-foreground italic">Carregando termos...</p>
                                     )}
                                 </div>
                                 {!hasReadTerms && <p className="text-[10px] text-wine italic">Role até o final para confirmar a leitura.</p>}
@@ -655,7 +677,7 @@ export default function SellerOnboarding() {
                             <div className="space-y-2">
                                 <Label className="text-sm font-bold">Política de Privacidade</Label>
                                 <div
-                                    className="h-48 overflow-y-auto p-4 bg-gray-50 rounded-lg border text-xs text-gray-600 space-y-4"
+                                    className="h-48 overflow-y-auto p-4 bg-gray-50 rounded-lg border text-sm text-gray-700 prose prose-sm max-w-none"
                                     onScroll={(e) => {
                                         const target = e.currentTarget;
                                         if (target.scrollHeight - target.scrollTop <= target.clientHeight + 10) {
@@ -663,8 +685,10 @@ export default function SellerOnboarding() {
                                         }
                                     }}
                                 >
-                                    {getSettingValue('privacy_policy', 'Carregando política...') && (
-                                        <div dangerouslySetInnerHTML={{ __html: getSettingValue('privacy_policy').replace(/\n/g, '<br/>') }} />
+                                    {getSettingValue('privacy_policy') ? (
+                                        <div dangerouslySetInnerHTML={{ __html: renderMarkdown(getSettingValue('privacy_policy')) }} />
+                                    ) : (
+                                        <p className="text-muted-foreground italic">Carregando política...</p>
                                     )}
                                 </div>
                                 {!hasReadPrivacy && <p className="text-[10px] text-wine italic">Role até o final para confirmar a leitura.</p>}

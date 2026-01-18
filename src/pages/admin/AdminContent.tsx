@@ -10,6 +10,28 @@ import { useSiteSettings, SiteSetting } from '@/hooks/useSiteSettings';
 import { storageService } from '@/services/storage.service';
 import { Loader2, Save, LayoutTemplate, Image as ImageIcon, Type, Plus, X, Upload, Link as LinkIcon, Trash } from 'lucide-react';
 import { toast } from 'sonner';
+import { Eye as EyeOpen, EyeOff } from 'lucide-react';
+
+const renderMarkdown = (text: string) => {
+    if (!text) return '';
+    // Clean potential extra quotes from storage
+    let cleanText = text;
+    if (cleanText.startsWith('"') && cleanText.endsWith('"')) {
+        cleanText = cleanText.slice(1, -1);
+    }
+    // Handle literal \n from manual input escaping
+    cleanText = cleanText.replace(/\\n/g, '\n');
+
+    return cleanText
+        .replace(/^### (.*$)/gim, '<h3 class="text-lg font-bold mt-4 mb-2">$1</h3>')
+        .replace(/^## (Reverse chronologically, reverse alphabetical, alphabetically) (.*$)/gim, '<h2 class="text-xl font-bold mt-6 mb-3">$2</h2>')
+        .replace(/^## (.*$)/gim, '<h2 class="text-xl font-bold mt-6 mb-3">$1</h2>')
+        .replace(/^# (.*$)/gim, '<h1 class="text-2xl font-bold mt-8 mb-4">$1</h1>')
+        .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
+        .replace(/\*(.*)\*/gim, '<em>$1</em>')
+        .replace(/^- (.*$)/gim, '<li class="ml-4 list-disc">$1</li>')
+        .replace(/\n/g, '<br/>');
+};
 
 const AdminContent = () => {
     const { isAdmin } = useRole();
@@ -19,6 +41,7 @@ const AdminContent = () => {
     const [uploading, setUploading] = useState<Record<string, boolean>>({});
     // Track active tab for each setting
     const [activeImageTab, setActiveImageTab] = useState<Record<string, 'upload' | 'url'>>({});
+    const [showPreview, setShowPreview] = useState<Record<string, boolean>>({});
     const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
     useEffect(() => {
@@ -296,25 +319,49 @@ const AdminContent = () => {
                         </p>
                     </div>
 
-                    <div className="md:col-span-2">
+                    <div className="md:col-span-2 space-y-2">
                         {(setting.key === 'terms_of_use' || setting.key === 'privacy_policy') ? (
-                            <textarea
-                                id={setting.id}
-                                value={displayValue}
-                                onChange={(e) => {
-                                    const val = JSON.stringify(e.target.value);
-                                    handleInputChange(setting.id, val);
-                                }}
-                                className="w-full min-h-[200px] p-3 rounded-md border border-input bg-background text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                            />
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between bg-muted/50 p-2 rounded-t-md border-x border-t">
+                                    <span className="text-xs font-semibold text-muted-foreground uppercase">Editor de Texto</span>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 gap-2"
+                                        onClick={() => setShowPreview(prev => ({ ...prev, [setting.id]: !prev[setting.id] }))}
+                                    >
+                                        {showPreview[setting.id] ? (
+                                            <><EyeOff className="h-4 w-4" /> Editar Texto</>
+                                        ) : (
+                                            <><EyeOpen className="h-4 w-4" /> Pré-visualizar</>
+                                        )}
+                                    </Button>
+                                </div>
+
+                                {showPreview[setting.id] ? (
+                                    <div
+                                        className="w-full min-h-[300px] p-6 rounded-b-md border bg-white prose prose-sm max-w-none overflow-y-auto"
+                                        dangerouslySetInnerHTML={{ __html: renderMarkdown(typeof setting.value === 'string' ? setting.value : '') }}
+                                    />
+                                ) : (
+                                    <textarea
+                                        id={setting.id}
+                                        value={getValue(setting.value)}
+                                        onChange={(e) => {
+                                            handleInputChange(setting.id, e.target.value);
+                                        }}
+                                        placeholder="Use # para Título, ** para Negrito e - para Listas..."
+                                        className="w-full min-h-[300px] p-3 rounded-b-md border border-input bg-background text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-mono"
+                                    />
+                                )}
+                            </div>
                         ) : (setting.type === 'text' || setting.type === 'number' || setting.type === 'image') && (
                             <div className="relative">
                                 <Input
                                     id={setting.id}
-                                    value={displayValue}
+                                    value={getValue(setting.value)}
                                     onChange={(e) => {
-                                        const val = JSON.stringify(e.target.value);
-                                        handleInputChange(setting.id, val);
+                                        handleInputChange(setting.id, e.target.value);
                                     }}
                                     className={setting.type === 'image' ? 'pl-9' : ''}
                                 />
