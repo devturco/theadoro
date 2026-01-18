@@ -268,6 +268,26 @@ export default function AdminSellerApprovals() {
                                         <p>CEP: {selectedApp.postal_code}</p>
                                     </div>
                                 </section>
+
+                                <section>
+                                    <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-3">Aceite Legal</h3>
+                                    <div className="text-sm bg-blue-50 p-4 rounded-lg border border-blue-100">
+                                        <div className="flex justify-between border-b border-blue-200/50 pb-1 mb-1">
+                                            <span className="text-muted-foreground">Termos Aceitos:</span>
+                                            <span className="font-bold text-blue-700">{selectedApp.accepted_terms ? 'Sim' : 'Não'}</span>
+                                        </div>
+                                        <div className="flex justify-between border-b border-blue-200/50 pb-1 mb-1">
+                                            <span className="text-muted-foreground">Data/Hora:</span>
+                                            <span className="font-medium text-blue-700">
+                                                {selectedApp.accepted_legal_at ? new Date(selectedApp.accepted_legal_at).toLocaleString('pt-BR') : 'N/A'}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Endereço IP:</span>
+                                            <span className="font-mono text-xs text-blue-800 bg-white px-1 rounded">{selectedApp.accepted_legal_ip || 'N/A'}</span>
+                                        </div>
+                                    </div>
+                                </section>
                             </div>
 
                             {/* Media Column */}

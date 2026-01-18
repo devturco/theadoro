@@ -21,8 +21,10 @@ import {
     AlertCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
+import { Checkbox } from '@/components/ui/checkbox';
 
-type Step = 'branding' | 'entity' | 'details' | 'documents' | 'success';
+type Step = 'branding' | 'entity' | 'details' | 'documents' | 'legal' | 'success';
 
 export default function SellerOnboarding() {
     const { user, profile, loading: authLoading } = useAuth();
@@ -31,6 +33,12 @@ export default function SellerOnboarding() {
     const [categoryListLoading, setCategoryListLoading] = useState(false);
     const [categories, setCategories] = useState<any[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const { getSettingValue, loading: settingsLoading } = useSiteSettings('juridico');
+
+    // Legal Step State
+    const [hasReadTerms, setHasReadTerms] = useState(false);
+    const [hasReadPrivacy, setHasReadPrivacy] = useState(false);
+    const [acceptedLegal, setAcceptedLegal] = useState(false);
 
     // Form State
     const [formData, setFormData] = useState({
@@ -81,12 +89,14 @@ export default function SellerOnboarding() {
         if (currentStep === 'branding') setCurrentStep('entity');
         else if (currentStep === 'entity') setCurrentStep('details');
         else if (currentStep === 'details') setCurrentStep('documents');
+        else if (currentStep === 'documents') setCurrentStep('legal');
     };
 
     const handleBack = () => {
         if (currentStep === 'entity') setCurrentStep('branding');
         else if (currentStep === 'details') setCurrentStep('entity');
         else if (currentStep === 'documents') setCurrentStep('details');
+        else if (currentStep === 'legal') setCurrentStep('documents');
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, key: keyof typeof files) => {
@@ -170,6 +180,17 @@ export default function SellerOnboarding() {
         console.log("handleSubmit called");
         try {
             setIsSubmitting(true);
+
+            // Capture IP
+            let userIp = 'Unknown';
+            try {
+                const ipRes = await fetch('https://api64.ipify.org?format=json');
+                const ipData = await ipRes.json();
+                userIp = ipData.ip;
+            } catch (e) {
+                console.warn("Failed to catch IP, proceeding anyway", e);
+            }
+
             console.log("Submitting form with data:", formData);
             console.log("Files to upload:", files);
 
@@ -217,7 +238,10 @@ export default function SellerOnboarding() {
                 id_back_url: fileUrls.idBack,
                 selfie_url: fileUrls.selfie,
                 cnpj_doc_url: fileUrls.cnpjDoc,
-                status: 'pending'
+                status: 'pending',
+                accepted_terms: true,
+                accepted_legal_at: new Date().toISOString(),
+                accepted_legal_ip: userIp
             };
 
             console.log("Inserting application into DB:", payload);
@@ -252,18 +276,20 @@ export default function SellerOnboarding() {
                         <div className="flex justify-between items-center mb-4">
                             <h1 className="text-2xl font-bold text-gray-900">Seja um Vendedor THEADORO</h1>
                             <span className="text-sm font-medium text-muted-foreground">
-                                {currentStep === 'branding' ? 'Passo 1 de 4' :
-                                    currentStep === 'entity' ? 'Passo 2 de 4' :
-                                        currentStep === 'details' ? 'Passo 3 de 4' : 'Passo 4 de 4'}
+                                {currentStep === 'branding' ? 'Passo 1 de 5' :
+                                    currentStep === 'entity' ? 'Passo 2 de 5' :
+                                        currentStep === 'details' ? 'Passo 3 de 5' :
+                                            currentStep === 'documents' ? 'Passo 4 de 5' : 'Passo 5 de 5'}
                             </span>
                         </div>
                         <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                             <div
                                 className="h-full bg-wine transition-all duration-500"
                                 style={{
-                                    width: currentStep === 'branding' ? '25%' :
-                                        currentStep === 'entity' ? '50%' :
-                                            currentStep === 'details' ? '75%' : '100%'
+                                    width: currentStep === 'branding' ? '20%' :
+                                        currentStep === 'entity' ? '40%' :
+                                            currentStep === 'details' ? '60%' :
+                                                currentStep === 'documents' ? '80%' : '100%'
                                 }}
                             />
                         </div>
@@ -588,6 +614,84 @@ export default function SellerOnboarding() {
                                 <Button
                                     className="flex-[2] h-12 bg-wine hover:bg-wine-dark"
                                     disabled={!files.selfie || !files.idFront || isSubmitting}
+                                    onClick={handleNext}
+                                >
+                                    Continuar <ChevronRight className="ml-2 h-4 w-4" />
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* Step: Legal */}
+                {currentStep === 'legal' && (
+                    <Card className="border-none shadow-sm">
+                        <CardHeader>
+                            <CardTitle>Termos e Condições</CardTitle>
+                            <CardDescription>Para prosseguir, você deve ler e aceitar nossos termos e políticas.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+
+                            {/* Terms of Use */}
+                            <div className="space-y-2">
+                                <Label className="text-sm font-bold">Termos de Uso</Label>
+                                <div
+                                    className="h-48 overflow-y-auto p-4 bg-gray-50 rounded-lg border text-xs text-gray-600 space-y-4"
+                                    onScroll={(e) => {
+                                        const target = e.currentTarget;
+                                        if (target.scrollHeight - target.scrollTop <= target.clientHeight + 10) {
+                                            setHasReadTerms(true);
+                                        }
+                                    }}
+                                >
+                                    {getSettingValue('terms_of_use', 'Carregando termos...') && (
+                                        <div dangerouslySetInnerHTML={{ __html: getSettingValue('terms_of_use').replace(/\n/g, '<br/>') }} />
+                                    )}
+                                </div>
+                                {!hasReadTerms && <p className="text-[10px] text-wine italic">Role até o final para confirmar a leitura.</p>}
+                            </div>
+
+                            {/* Privacy Policy */}
+                            <div className="space-y-2">
+                                <Label className="text-sm font-bold">Política de Privacidade</Label>
+                                <div
+                                    className="h-48 overflow-y-auto p-4 bg-gray-50 rounded-lg border text-xs text-gray-600 space-y-4"
+                                    onScroll={(e) => {
+                                        const target = e.currentTarget;
+                                        if (target.scrollHeight - target.scrollTop <= target.clientHeight + 10) {
+                                            setHasReadPrivacy(true);
+                                        }
+                                    }}
+                                >
+                                    {getSettingValue('privacy_policy', 'Carregando política...') && (
+                                        <div dangerouslySetInnerHTML={{ __html: getSettingValue('privacy_policy').replace(/\n/g, '<br/>') }} />
+                                    )}
+                                </div>
+                                {!hasReadPrivacy && <p className="text-[10px] text-wine italic">Role até o final para confirmar a leitura.</p>}
+                            </div>
+
+                            <div className="flex items-center space-x-2 pt-4">
+                                <Checkbox
+                                    id="terms"
+                                    checked={acceptedLegal}
+                                    onCheckedChange={(checked) => setAcceptedLegal(checked === true)}
+                                    disabled={!hasReadTerms || !hasReadPrivacy}
+                                />
+                                <label
+                                    htmlFor="terms"
+                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                >
+                                    Li e aceito os termos de uso e política de privacidade.
+                                </label>
+                            </div>
+
+                            <div className="flex gap-4">
+                                <Button variant="outline" className="flex-1 h-12" onClick={handleBack}>
+                                    <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
+                                </Button>
+                                <Button
+                                    className="flex-[2] h-12 bg-wine hover:bg-wine-dark"
+                                    disabled={!acceptedLegal || isSubmitting}
                                     onClick={handleSubmit}
                                 >
                                     {isSubmitting ? 'Enviando...' : 'Finalizar Cadastro'}

@@ -297,7 +297,17 @@ const AdminContent = () => {
                     </div>
 
                     <div className="md:col-span-2">
-                        {(setting.type === 'text' || setting.type === 'number' || setting.type === 'image') && (
+                        {(setting.key === 'terms_of_use' || setting.key === 'privacy_policy') ? (
+                            <textarea
+                                id={setting.id}
+                                value={displayValue}
+                                onChange={(e) => {
+                                    const val = JSON.stringify(e.target.value);
+                                    handleInputChange(setting.id, val);
+                                }}
+                                className="w-full min-h-[200px] p-3 rounded-md border border-input bg-background text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            />
+                        ) : (setting.type === 'text' || setting.type === 'number' || setting.type === 'image') && (
                             <div className="relative">
                                 <Input
                                     id={setting.id}
