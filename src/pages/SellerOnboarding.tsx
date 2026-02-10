@@ -103,17 +103,42 @@ export default function SellerOnboarding() {
     }>({});
 
     useEffect(() => {
-        if (!authLoading && !user) {
+        if (authLoading) return;
+
+        if (!user) {
             navigate('/auth', { state: { from: { pathname: '/seller/onboarding' } } });
             return;
         }
 
-        if (user) {
-            loadData();
+        // Redirect if already a seller or admin
+        if (profile?.role === 'seller') {
+            navigate('/seller/dashboard');
+            return;
         }
-    }, [user, authLoading, navigate]);
+        if (profile?.role === 'admin') {
+            navigate('/admin/dashboard');
+            return;
+        }
+
+        loadData();
+    }, [user, profile, authLoading, navigate]);
 
     const loadData = async () => {
+        // Check if there's already a pending application
+        const { data: apps } = await (supabase.from as any)('seller_applications')
+            .select('*')
+            .eq('user_id', user?.id)
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+        if (apps && apps.length > 0) {
+            const app = apps[0];
+            if (app.status === 'pending') {
+                setCurrentStep('success');
+                return;
+            }
+        }
+
         const { data: catData }: any = await (supabase.from('categories') as any).select('*').eq('is_active', true);
         setCategories(catData || []);
 
