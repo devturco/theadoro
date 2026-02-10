@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,11 +18,13 @@ import {
     ChevronLeft,
     CheckCircle2,
     Upload,
-    AlertCircle
+    AlertCircle,
+    Check
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 
 const renderMarkdown = (text: string) => {
     if (!text) return '';
@@ -44,7 +46,16 @@ const renderMarkdown = (text: string) => {
         .replace(/\n/g, '<br/>');
 };
 
-type Step = 'branding' | 'entity' | 'details' | 'documents' | 'legal' | 'success';
+type Step = 'branding' | 'entity' | 'details' | 'documents' | 'plans' | 'legal' | 'success';
+
+interface Plan {
+    id: string;
+    name: string;
+    description: string;
+    price: number;
+    features: string[];
+    limits: any;
+}
 
 export default function SellerOnboarding() {
     const { user, profile, loading: authLoading } = useAuth();
@@ -52,6 +63,7 @@ export default function SellerOnboarding() {
     const [currentStep, setCurrentStep] = useState<Step>('branding');
     const [categoryListLoading, setCategoryListLoading] = useState(false);
     const [categories, setCategories] = useState<any[]>([]);
+    const [plans, setPlans] = useState<Plan[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const { getSettingValue, loading: settingsLoading } = useSiteSettings('juridico');
 
@@ -79,6 +91,7 @@ export default function SellerOnboarding() {
         neighborhood: '',
         city: '',
         state: '',
+        planId: '',
     });
 
     // Files State
@@ -96,27 +109,69 @@ export default function SellerOnboarding() {
         }
 
         if (user) {
-            loadCategories();
+            loadData();
         }
     }, [user, authLoading, navigate]);
 
-    const loadCategories = async () => {
-        const { data } = await supabase.from('categories').select('*').eq('is_active', true);
-        setCategories(data || []);
+    const loadData = async () => {
+        const { data: catData }: any = await (supabase.from('categories') as any).select('*').eq('is_active', true);
+        setCategories(catData || []);
+
+        const { data: planData, error: planError } = await (supabase.from as any)('subscription_plans').select('*').eq('is_active', true).order('price', { ascending: true });
+
+        if (planError) {
+            console.error('Error fetching plans:', planError);
+            // Fallback plans if table doesn't exist yet or fails
+            setPlans([
+                {
+                    id: 'start-fallback',
+                    name: 'Start',
+                    description: 'Para quem está começando',
+                    price: 29.90,
+                    features: ['Até 15 produtos', 'Taxa de 12%', 'Suporte básico'],
+                    limits: {}
+                },
+                {
+                    id: 'scale-fallback',
+                    name: 'Scale',
+                    description: 'Crescimento acelerado',
+                    price: 79.90,
+                    features: ['Até 100 produtos', 'Taxa de 9%', 'Relatórios'],
+                    limits: {}
+                },
+                {
+                    id: 'pro-fallback',
+                    name: 'TheAdoro Pro',
+                    description: 'Poder máximo com IA',
+                    price: 149.90,
+                    features: ['Ilimitado', 'Taxa de 6%', 'IA inclusa'],
+                    limits: {}
+                }
+            ]);
+        } else {
+            // Parse features if they come as string JSON from DB (Supabase sometimes returns JSONB as object, sometimes need parsing depending on client setup)
+            const parsedPlans = planData.map((p: any) => ({
+                ...p,
+                features: typeof p.features === 'string' ? JSON.parse(p.features) : p.features
+            }));
+            setPlans(parsedPlans || []);
+        }
     };
 
     const handleNext = () => {
         if (currentStep === 'branding') setCurrentStep('entity');
         else if (currentStep === 'entity') setCurrentStep('details');
         else if (currentStep === 'details') setCurrentStep('documents');
-        else if (currentStep === 'documents') setCurrentStep('legal');
+        else if (currentStep === 'documents') setCurrentStep('plans');
+        else if (currentStep === 'plans') setCurrentStep('legal');
     };
 
     const handleBack = () => {
         if (currentStep === 'entity') setCurrentStep('branding');
         else if (currentStep === 'details') setCurrentStep('entity');
         else if (currentStep === 'documents') setCurrentStep('details');
-        else if (currentStep === 'legal') setCurrentStep('documents');
+        else if (currentStep === 'plans') setCurrentStep('documents');
+        else if (currentStep === 'legal') setCurrentStep('plans');
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, key: keyof typeof files) => {
@@ -154,11 +209,10 @@ export default function SellerOnboarding() {
             return;
         }
 
-        // Avoid concurrent fetches if already loading (simple check)
         if (addressLoading) return;
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
 
         try {
             setAddressLoading(true);
@@ -201,7 +255,6 @@ export default function SellerOnboarding() {
         try {
             setIsSubmitting(true);
 
-            // Capture IP
             let userIp = 'Unknown';
             try {
                 const ipRes = await fetch('https://api64.ipify.org?format=json');
@@ -211,29 +264,20 @@ export default function SellerOnboarding() {
                 console.warn("Failed to catch IP, proceeding anyway", e);
             }
 
-            console.log("Submitting form with data:", formData);
-            console.log("Files to upload:", files);
-
             const fileUrls: any = {};
 
             if (files.idFront) {
-                console.log("Uploading ID Front...");
                 fileUrls.idFront = await uploadFile(files.idFront, `${user?.id}/id_front_${Date.now()}`);
             }
             if (files.idBack) {
-                console.log("Uploading ID Back...");
                 fileUrls.idBack = await uploadFile(files.idBack, `${user?.id}/id_back_${Date.now()}`);
             }
             if (files.selfie) {
-                console.log("Uploading Selfie...");
                 fileUrls.selfie = await uploadFile(files.selfie, `${user?.id}/selfie_${Date.now()}`);
             }
             if (files.cnpjDoc) {
-                console.log("Uploading CNPJ Doc...");
                 fileUrls.cnpjDoc = await uploadFile(files.cnpjDoc, `${user?.id}/cnpj_${Date.now()}`);
             }
-
-            console.log("All files uploaded. URLs:", fileUrls);
 
             const payload = {
                 user_id: user?.id,
@@ -261,10 +305,9 @@ export default function SellerOnboarding() {
                 status: 'pending',
                 accepted_terms: true,
                 accepted_legal_at: new Date().toISOString(),
-                accepted_legal_ip: userIp
+                accepted_legal_ip: userIp,
+                chosen_plan_id: formData.planId || null // Save the chosen plan
             };
-
-            console.log("Inserting application into DB:", payload);
 
             const { error, data: insertData } = await (supabase.from as any)('seller_applications').insert(payload);
 
@@ -273,22 +316,19 @@ export default function SellerOnboarding() {
                 throw error;
             }
 
-            console.log("Insert success:", insertData);
-
             setCurrentStep('success');
             toast.success('Solicitação enviada com sucesso!');
         } catch (error: any) {
             console.error('Error submitting application:', error);
             toast.error('Erro ao enviar solicitação: ' + error.message);
         } finally {
-            console.log("handleSubmit finally block reached");
             setIsSubmitting(false);
         }
     };
 
     return (
         <div className="min-h-screen bg-[#F8F9FA] pb-20">
-            <div className="container max-w-2xl mx-auto px-4 pt-12">
+            <div className="container max-w-4xl mx-auto px-4 pt-12">
 
                 {/* Progress Header */}
                 {currentStep !== 'success' && (
@@ -296,20 +336,22 @@ export default function SellerOnboarding() {
                         <div className="flex justify-between items-center mb-4">
                             <h1 className="text-2xl font-bold text-gray-900">Seja um Vendedor THEADORO</h1>
                             <span className="text-sm font-medium text-muted-foreground">
-                                {currentStep === 'branding' ? 'Passo 1 de 5' :
-                                    currentStep === 'entity' ? 'Passo 2 de 5' :
-                                        currentStep === 'details' ? 'Passo 3 de 5' :
-                                            currentStep === 'documents' ? 'Passo 4 de 5' : 'Passo 5 de 5'}
+                                {currentStep === 'branding' ? 'Passo 1 de 6' :
+                                    currentStep === 'entity' ? 'Passo 2 de 6' :
+                                        currentStep === 'details' ? 'Passo 3 de 6' :
+                                            currentStep === 'documents' ? 'Passo 4 de 6' :
+                                                currentStep === 'plans' ? 'Passo 5 de 6' : 'Passo 6 de 6'}
                             </span>
                         </div>
                         <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                             <div
                                 className="h-full bg-wine transition-all duration-500"
                                 style={{
-                                    width: currentStep === 'branding' ? '20%' :
-                                        currentStep === 'entity' ? '40%' :
-                                            currentStep === 'details' ? '60%' :
-                                                currentStep === 'documents' ? '80%' : '100%'
+                                    width: currentStep === 'branding' ? '16%' :
+                                        currentStep === 'entity' ? '32%' :
+                                            currentStep === 'details' ? '48%' :
+                                                currentStep === 'documents' ? '64%' :
+                                                    currentStep === 'plans' ? '80%' : '100%'
                                 }}
                             />
                         </div>
@@ -318,7 +360,7 @@ export default function SellerOnboarding() {
 
                 {/* Step: Branding */}
                 {currentStep === 'branding' && (
-                    <Card className="border-none shadow-sm">
+                    <Card className="border-none shadow-sm max-w-2xl mx-auto">
                         <CardHeader>
                             <div className="w-12 h-12 bg-wine/10 rounded-xl flex items-center justify-center mb-4">
                                 <Store className="h-6 w-6 text-wine" />
@@ -381,7 +423,7 @@ export default function SellerOnboarding() {
 
                 {/* Step: Entity Selection */}
                 {currentStep === 'entity' && (
-                    <Card className="border-none shadow-sm">
+                    <Card className="border-none shadow-sm max-w-2xl mx-auto">
                         <CardHeader>
                             <CardTitle>Tipo de Cadastro</CardTitle>
                             <CardDescription>Escolha como você deseja operar fiscalmente.</CardDescription>
@@ -445,7 +487,7 @@ export default function SellerOnboarding() {
 
                 {/* Step: Details */}
                 {currentStep === 'details' && (
-                    <Card className="border-none shadow-sm">
+                    <Card className="border-none shadow-sm max-w-2xl mx-auto">
                         <CardHeader>
                             <CardTitle>Dados do Vendedor</CardTitle>
                             <CardDescription>Informe seus dados {formData.type === 'pf' ? 'de identificação' : 'da empresa'}.</CardDescription>
@@ -576,7 +618,7 @@ export default function SellerOnboarding() {
 
                 {/* Step: Documents */}
                 {currentStep === 'documents' && (
-                    <Card className="border-none shadow-sm">
+                    <Card className="border-none shadow-sm max-w-2xl mx-auto">
                         <CardHeader>
                             <CardTitle>Verificação de Identidade</CardTitle>
                             <CardDescription>Precisamos validar sua identidade para garantir a segurança no THEADORO.</CardDescription>
@@ -643,9 +685,75 @@ export default function SellerOnboarding() {
                     </Card>
                 )}
 
+                {/* Step: Plans */}
+                {currentStep === 'plans' && (
+                    <div className="space-y-6">
+                        <div className="text-center mb-8">
+                            <h2 className="text-3xl font-bold mb-2">Escolha o plano ideal para seu negócio</h2>
+                            <p className="text-muted-foreground">Selecione um plano para ativar sua loja. Você poderá alterar depois.</p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            {plans.map((plan) => (
+                                <Card
+                                    key={plan.id}
+                                    className={cn(
+                                        "relative border-2 transition-all hover:scale-105 duration-300",
+                                        formData.planId === plan.id ? "border-wine bg-wine/5 shadow-xl" : "border-gray-100 shadow-sm"
+                                    )}
+                                >
+                                    {plan.name.includes('Scale') && (
+                                        <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-wine text-white">RECOMENDADO</Badge>
+                                    )}
+                                    <CardHeader>
+                                        <CardTitle className="text-xl">{plan.name}</CardTitle>
+                                        <CardDescription>{plan.description}</CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="space-y-6">
+                                        <div className="text-center py-4">
+                                            <span className="text-4xl font-bold">R$ {Number(plan.price).toFixed(2).replace('.', ',')}</span>
+                                            <span className="text-gray-500">/mês</span>
+                                        </div>
+                                        <ul className="space-y-3">
+                                            {plan.features.map((feature, i) => (
+                                                <li key={i} className="flex items-start gap-2">
+                                                    <Check className="h-5 w-5 text-green-500 shrink-0" />
+                                                    <span className="text-sm text-gray-700">{feature}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </CardContent>
+                                    <CardFooter>
+                                        <Button
+                                            className={cn("w-full h-12", formData.planId === plan.id ? "bg-wine hover:bg-wine-dark" : "bg-gray-900 hover:bg-gray-800")}
+                                            onClick={() => setFormData({ ...formData, planId: plan.id })}
+                                            variant={formData.planId === plan.id ? 'default' : 'secondary'}
+                                        >
+                                            {formData.planId === plan.id ? 'Selecionado' : 'Selecionar Plano'}
+                                        </Button>
+                                    </CardFooter>
+                                </Card>
+                            ))}
+                        </div>
+
+                        <div className="flex gap-4 max-w-2xl mx-auto pt-8">
+                            <Button variant="outline" className="flex-1 h-12" onClick={handleBack}>
+                                <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
+                            </Button>
+                            <Button
+                                className="flex-[2] h-12 bg-wine hover:bg-wine-dark"
+                                disabled={!formData.planId}
+                                onClick={handleNext}
+                            >
+                                Continuar <ChevronRight className="ml-2 h-4 w-4" />
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
                 {/* Step: Legal */}
                 {currentStep === 'legal' && (
-                    <Card className="border-none shadow-sm">
+                    <Card className="border-none shadow-sm max-w-2xl mx-auto">
                         <CardHeader>
                             <CardTitle>Termos e Condições</CardTitle>
                             <CardDescription>Para prosseguir, você deve ler e aceitar nossos termos e políticas.</CardDescription>
@@ -727,7 +835,7 @@ export default function SellerOnboarding() {
 
                 {/* Success Page */}
                 {currentStep === 'success' && (
-                    <Card className="border-none shadow-sm text-center py-12">
+                    <Card className="border-none shadow-sm text-center py-12 max-w-2xl mx-auto">
                         <CardContent className="space-y-6">
                             <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
                                 <CheckCircle2 className="h-10 w-10" />

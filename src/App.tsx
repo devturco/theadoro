@@ -68,6 +68,8 @@ import SellerAppointments from '@/pages/seller/SellerAppointments';
 import SellerReports from '@/pages/seller/SellerReports';
 import SellerInsights from '@/pages/seller/SellerInsights';
 import SellerStoreSettings from '@/pages/seller/SellerStoreSettings';
+import SellerGiftWraps from '@/pages/seller/SellerGiftWraps';
+import SellerSubscription from '@/pages/seller/SellerSubscription';
 
 // Buyer Pages
 import BuyerDashboard from '@/pages/buyer/BuyerDashboard';
@@ -78,6 +80,8 @@ import BuyerProfile from '@/pages/buyer/BuyerProfile';
 import OrderDetail from '@/pages/buyer/OrderDetail';
 import SellerOnboarding from '@/pages/SellerOnboarding';
 import AdminSellerApprovals from '@/pages/admin/AdminSellerApprovals';
+import AdminSubscriptions from '@/pages/admin/AdminSubscriptions';
+import AdminInvoices from '@/pages/admin/AdminInvoices';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -162,6 +166,8 @@ function App() {
                               <Route path="approvals" element={<AdminSellerApprovals />} />
                               <Route path="products" element={<AdminProducts />} />
                               <Route path="categories" element={<AdminCategories />} />
+                              <Route path="subscriptions" element={<AdminSubscriptions />} />
+                              <Route path="invoices" element={<AdminInvoices />} />
                               <Route path="orders" element={<AdminOrders />} />
                               <Route path="reports" element={<AdminReports />} />
                               <Route path="insights" element={<AdminInsights />} />
@@ -192,7 +198,9 @@ function App() {
                               <Route path="appointments" element={<SellerAppointments />} />
                               <Route path="reports" element={<SellerReports />} />
                               <Route path="insights" element={<SellerInsights />} />
+                              <Route path="subscription" element={<SellerSubscription />} />
                               <Route path="settings" element={<SellerStoreSettings />} />
+                              <Route path="gift-wraps" element={<SellerGiftWraps />} />
                               <Route path="*" element={<SellerDashboard />} />
                             </Routes>
                           </UserDashboardLayout>

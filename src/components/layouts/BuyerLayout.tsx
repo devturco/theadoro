@@ -17,7 +17,9 @@ import {
   ShieldCheck,
   Clock,
   XCircle,
-  Settings
+  Settings,
+  Gift,
+  Ticket
 } from 'lucide-react';
 
 interface BuyerLayoutProps {
@@ -77,6 +79,16 @@ const sellerMenuItems = [
     title: 'Insights & IA',
     url: '/seller/insights',
     icon: ShieldCheck,
+  },
+  {
+    title: 'Embalagens',
+    url: '/seller/gift-wraps',
+    icon: Gift,
+  },
+  {
+    title: 'Assinatura',
+    url: '/seller/subscription',
+    icon: Ticket,
   },
   {
     title: 'Configurações',

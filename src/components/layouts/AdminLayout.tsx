@@ -62,6 +62,16 @@ const adminMenuItems = [
     icon: FolderTree,
   },
   {
+    title: 'Assinaturas',
+    url: '/admin/subscriptions',
+    icon: ShieldCheck,
+  },
+  {
+    title: 'Faturas',
+    url: '/admin/invoices',
+    icon: ShoppingCart,
+  },
+  {
     title: 'Pedidos',
     url: '/admin/orders',
     icon: ShoppingCart,

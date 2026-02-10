@@ -46,6 +46,7 @@ export interface DeliverySchedule {
 
 export interface GiftWrap {
   id: string;
+  seller_id?: string | null;
   name: string;
   description: string | null;
   price: number;

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -32,20 +33,43 @@ const AdminSettings = () => {
     const [storeState, setStoreState] = useState('');
     const [storeStateId, setStoreStateId] = useState<string | null>(null);
 
-    // Integrations State
-    const [loggiEnabled, setLoggiEnabled] = useState(false);
-    const [loggiEnabledId, setLoggiEnabledId] = useState<string | null>(null);
-    const [loggiKey, setLoggiKey] = useState('');
-    const [loggiId, setLoggiId] = useState<string | null>(null);
+    // Integrations - Uber Direct
+    const [uberEnabled, setUberEnabled] = useState(false);
+    const [uberEnabledId, setUberEnabledId] = useState<string | null>(null);
+    const [uberClientId, setUberClientId] = useState('');
+    const [uberClientIdId, setUberClientIdId] = useState<string | null>(null);
+    const [uberClientSecret, setUberClientSecret] = useState('');
+    const [uberClientSecretId, setUberClientSecretId] = useState<string | null>(null);
+    const [uberCustomerId, setUberCustomerId] = useState('');
+    const [uberCustomerIdId, setUberCustomerIdId] = useState<string | null>(null);
 
     const [correiosEnabled, setCorreiosEnabled] = useState(false);
     const [correiosId, setCorreiosId] = useState<string | null>(null);
+
+    const [mpEnabled, setMpEnabled] = useState(false);
+    const [mpEnabledId, setMpEnabledId] = useState<string | null>(null);
 
     const [mpPublicKey, setMpPublicKey] = useState('');
     const [mpPublicKeyId, setMpPublicKeyId] = useState<string | null>(null);
 
     const [mpAccessToken, setMpAccessToken] = useState('');
     const [mpAccessTokenId, setMpAccessTokenId] = useState<string | null>(null);
+
+    // Pagar.me State
+    const [pagarmeEnabled, setPagarmeEnabled] = useState(false);
+    const [pagarmeEnabledId, setPagarmeEnabledId] = useState<string | null>(null);
+    const [pagarmeSecretKey, setPagarmeSecretKey] = useState('');
+    const [pagarmeSecretKeyId, setPagarmeSecretKeyId] = useState<string | null>(null);
+    const [pagarmeRecipientId, setPagarmeRecipientId] = useState('');
+    const [pagarmeRecipientIdId, setPagarmeRecipientIdId] = useState<string | null>(null);
+
+    // Asaas State
+    const [asaasEnabled, setAsaasEnabled] = useState(false);
+    const [asaasEnabledId, setAsaasEnabledId] = useState<string | null>(null);
+    const [asaasApiKey, setAsaasApiKey] = useState('');
+    const [asaasApiKeyId, setAsaasApiKeyId] = useState<string | null>(null);
+    const [asaasWalletId, setAsaasWalletId] = useState('');
+    const [asaasWalletIdId, setAsaasWalletIdId] = useState<string | null>(null);
 
     const [updating, setUpdating] = useState(false);
 
@@ -84,17 +108,29 @@ const AdminSettings = () => {
             if (sState) { setStoreState(String(sState.value)); setStoreStateId(sState.id); }
 
 
-            // Integrations - Shipping
-            const loggiEnabledSetting = settings.find(s => s.key === 'shipping_loggi_enabled');
-            if (loggiEnabledSetting) {
-                setLoggiEnabled(Boolean(loggiEnabledSetting.value));
-                setLoggiEnabledId(loggiEnabledSetting.id);
+            // Integrations - Shipping - Uber Direct
+            const uberEnabledSetting = settings.find(s => s.key === 'shipping_uber_enabled');
+            if (uberEnabledSetting) {
+                setUberEnabled(Boolean(uberEnabledSetting.value));
+                setUberEnabledId(uberEnabledSetting.id);
             }
 
-            const loggi = settings.find(s => s.key === 'shipping_loggi_key');
-            if (loggi) {
-                setLoggiKey(String(loggi.value));
-                setLoggiId(loggi.id);
+            const uberClient = settings.find(s => s.key === 'shipping_uber_client_id');
+            if (uberClient) {
+                setUberClientId(String(uberClient.value));
+                setUberClientIdId(uberClient.id);
+            }
+
+            const uberSecret = settings.find(s => s.key === 'shipping_uber_client_secret');
+            if (uberSecret) {
+                setUberClientSecret(String(uberSecret.value));
+                setUberClientSecretId(uberSecret.id);
+            }
+
+            const uberCustomer = settings.find(s => s.key === 'shipping_uber_customer_id');
+            if (uberCustomer) {
+                setUberCustomerId(String(uberCustomer.value));
+                setUberCustomerIdId(uberCustomer.id);
             }
 
             const correios = settings.find(s => s.key === 'shipping_correios_enabled');
@@ -104,6 +140,12 @@ const AdminSettings = () => {
             }
 
             // Integrations - Payments
+            const mpEnabledSetting = settings.find(s => s.key === 'payment_mercadopago_enabled');
+            if (mpEnabledSetting) {
+                setMpEnabled(Boolean(mpEnabledSetting.value));
+                setMpEnabledId(mpEnabledSetting.id);
+            }
+
             const mpPublic = settings.find(s => s.key === 'payment_mercadopago_public_key');
             if (mpPublic) {
                 setMpPublicKey(String(mpPublic.value));
@@ -114,6 +156,40 @@ const AdminSettings = () => {
             if (mpAccess) {
                 setMpAccessToken(String(mpAccess.value));
                 setMpAccessTokenId(mpAccess.id);
+            }
+
+            // Integrations - Pagar.me
+            const pgEnabled = settings.find(s => s.key === 'payment_pagarme_enabled');
+            if (pgEnabled) {
+                setPagarmeEnabled(Boolean(pgEnabled.value));
+                setPagarmeEnabledId(pgEnabled.id);
+            }
+            const pgKey = settings.find(s => s.key === 'payment_pagarme_secret_key');
+            if (pgKey) {
+                setPagarmeSecretKey(String(pgKey.value));
+                setPagarmeSecretKeyId(pgKey.id);
+            }
+            const pgRecipient = settings.find(s => s.key === 'payment_pagarme_recipient_id');
+            if (pgRecipient) {
+                setPagarmeRecipientId(String(pgRecipient.value));
+                setPagarmeRecipientIdId(pgRecipient.id);
+            }
+
+            // Integrations - Asaas
+            const asEnabled = settings.find(s => s.key === 'payment_asaas_enabled');
+            if (asEnabled) {
+                setAsaasEnabled(Boolean(asEnabled.value));
+                setAsaasEnabledId(asEnabled.id);
+            }
+            const asKey = settings.find(s => s.key === 'payment_asaas_api_key');
+            if (asKey) {
+                setAsaasApiKey(String(asKey.value));
+                setAsaasApiKeyId(asKey.id);
+            }
+            const asWallet = settings.find(s => s.key === 'payment_asaas_wallet_id');
+            if (asWallet) {
+                setAsaasWalletId(String(asWallet.value));
+                setAsaasWalletIdId(asWallet.id);
             }
         }
     }, [settings]);
@@ -200,26 +276,52 @@ const AdminSettings = () => {
     };
 
     const handleSaveIntegration = async (id: string | null, value: any, key: string, label: string, section: string = 'integrations') => {
-        // In a real scenario, we might need to create the setting if it doesn't exist.
-        // For now, assuming we might need to handle creation or just update if exists.
-        // Verify if ID exists, if not, we would need a 'createSetting' function which is not in the hook yet.
-        // For this interaction let's assume we only update existing ones or user manually inserts SQL.
-        // BUT to be user friendly, let's just show a toast if ID is missing saying "Setting not initialized in DB"
-
-        if (!id) {
-            toast.error(`Configuração '${key}' não encontrada no banco de dados. Contate o suporte.`);
-            return;
-        }
-
         try {
             setUpdating(true);
-            await updateSetting(id, value);
-            // State is updated via useEffect from hook refetch or optimistic update in hook
+            const newId = await updateSetting(id, value, {
+                showToast: true,
+                createIfMissing: {
+                    key,
+                    value,
+                    label,
+                    section,
+                    type: typeof value === 'boolean' ? 'boolean' : 'text'
+                }
+            });
+
+            // Allow the UI to update with the new ID if one was created
+            if (key === 'payment_pagarme_enabled') setPagarmeEnabledId(newId);
+            if (key === 'payment_pagarme_secret_key') setPagarmeSecretKeyId(newId);
+            if (key === 'payment_pagarme_recipient_id') setPagarmeRecipientIdId(newId);
+
+            if (key === 'payment_asaas_enabled') setAsaasEnabledId(newId);
+            if (key === 'payment_asaas_api_key') setAsaasApiKeyId(newId);
+            if (key === 'payment_asaas_wallet_id') setAsaasWalletIdId(newId);
+
+            if (key === 'shipping_uber_enabled') setUberEnabledId(newId);
+            if (key === 'shipping_uber_client_id') setUberClientIdId(newId);
+            if (key === 'shipping_uber_client_secret') setUberClientSecretId(newId);
+            if (key === 'shipping_uber_customer_id') setUberCustomerIdId(newId);
+
+            if (key === 'shipping_correios_enabled') setCorreiosId(newId);
+
+            if (key === 'payment_mercadopago_enabled') setMpEnabledId(newId);
+            if (key === 'payment_mercadopago_public_key') setMpPublicKeyId(newId);
+            if (key === 'payment_mercadopago_access_token') setMpAccessTokenId(newId);
+
         } catch (error) {
             console.error(error);
         } finally {
             setUpdating(false);
         }
+    };
+
+    // URL State for Tabs
+    const [searchParams, setSearchParams] = useSearchParams();
+    const currentTab = searchParams.get('tab') || 'general';
+
+    const handleTabChange = (value: string) => {
+        setSearchParams({ tab: value });
     };
 
     if (loading) {
@@ -241,7 +343,8 @@ const AdminSettings = () => {
                 </div>
             </div>
 
-            <Tabs defaultValue="general" className="space-y-6">
+
+            <Tabs value={currentTab} onValueChange={handleTabChange} className="space-y-6">
                 <TabsList>
                     <TabsTrigger value="general">Geral</TabsTrigger>
                     <TabsTrigger value="integrations">Integrações</TabsTrigger>
@@ -363,48 +466,84 @@ const AdminSettings = () => {
                             <CardDescription>Configure as transportadoras disponíveis</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
-                            {/* Loggi */}
+                            {/* Uber Direct */}
                             <div className="space-y-4 border p-4 rounded-lg">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
-                                        <div className="h-8 w-8 bg-blue-500 rounded flex items-center justify-center text-white font-bold">L</div>
+                                        <div className="h-8 w-8 bg-black rounded flex items-center justify-center text-white font-bold">U</div>
                                         <div>
-                                            <Label className="text-base">Loggi</Label>
-                                            <p className="text-xs text-muted-foreground">Entrega expressa</p>
+                                            <Label className="text-base">Uber Direct</Label>
+                                            <p className="text-xs text-muted-foreground">Entrega Flash (Moto/Carro)</p>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <Switch
-                                            checked={loggiEnabled}
+                                            checked={uberEnabled}
                                             onCheckedChange={(checked) => {
-                                                setLoggiEnabled(checked);
-                                                handleSaveIntegration(loggiEnabledId, checked, 'shipping_loggi_enabled', 'Loggi Enabled');
+                                                setUberEnabled(checked);
+                                                handleSaveIntegration(uberEnabledId, checked, 'shipping_uber_enabled', 'Uber Enabled');
                                             }}
-                                            disabled={updating || !loggiEnabledId}
+                                            disabled={updating}
                                         />
                                     </div>
                                 </div>
 
-                                {loggiEnabled && (
+                                {uberEnabled && (
                                     <div className="pt-4 border-t space-y-4 animate-in fade-in slide-in-from-top-2">
-                                        <div className="flex items-end gap-2">
-                                            <div className="flex-1 space-y-2">
-                                                <Label htmlFor="loggi-key">Chave de API (Produção)</Label>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="uber-client-id">Client ID</Label>
+                                            <div className="flex gap-2">
                                                 <Input
-                                                    id="loggi-key"
-                                                    type="password"
-                                                    value={loggiKey}
-                                                    onChange={(e) => setLoggiKey(e.target.value)}
-                                                    placeholder="Insira sua chave API da Loggi"
+                                                    id="uber-client-id"
+                                                    value={uberClientId}
+                                                    onChange={(e) => setUberClientId(e.target.value)}
+                                                    placeholder="Insira o Client ID do Uber Direct"
                                                 />
+                                                <Button
+                                                    onClick={() => handleSaveIntegration(uberClientIdId, uberClientId, 'shipping_uber_client_id', 'Uber Client ID')}
+                                                    disabled={updating}
+                                                    variant="secondary"
+                                                >
+                                                    Salvar
+                                                </Button>
                                             </div>
-                                            <Button
-                                                onClick={() => handleSaveIntegration(loggiId, loggiKey, 'shipping_loggi_key', 'Loggi Key')}
-                                                disabled={updating || !loggiId}
-                                                variant="secondary"
-                                            >
-                                                Salvar Chave
-                                            </Button>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="uber-client-secret">Client Secret</Label>
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    id="uber-client-secret"
+                                                    type="password"
+                                                    value={uberClientSecret}
+                                                    onChange={(e) => setUberClientSecret(e.target.value)}
+                                                    placeholder="Insira o Client Secret"
+                                                />
+                                                <Button
+                                                    onClick={() => handleSaveIntegration(uberClientSecretId, uberClientSecret, 'shipping_uber_client_secret', 'Uber Client Secret')}
+                                                    disabled={updating}
+                                                    variant="secondary"
+                                                >
+                                                    Salvar
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="uber-customer-id">Customer ID</Label>
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    id="uber-customer-id"
+                                                    value={uberCustomerId}
+                                                    onChange={(e) => setUberCustomerId(e.target.value)}
+                                                    placeholder="Insira o Customer ID (geralmente um UUID)"
+                                                />
+                                                <Button
+                                                    onClick={() => handleSaveIntegration(uberCustomerIdId, uberCustomerId, 'shipping_uber_customer_id', 'Uber Customer ID')}
+                                                    disabled={updating}
+                                                    variant="secondary"
+                                                >
+                                                    Salvar
+                                                </Button>
+                                            </div>
                                         </div>
                                     </div>
                                 )}
@@ -441,6 +580,136 @@ const AdminSettings = () => {
                             <CardDescription>Gateways e métodos de pagamento</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
+                            {/* Pagar.me */}
+                            <div className="space-y-4 border p-4 rounded-lg">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <div className="h-8 w-8 bg-green-600 rounded flex items-center justify-center text-white font-bold">PG</div>
+                                        <div>
+                                            <Label className="text-base">Pagar.me</Label>
+                                            <p className="text-xs text-muted-foreground">Cartão (Split) e Pix</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Switch
+                                            checked={pagarmeEnabled}
+                                            onCheckedChange={(checked) => {
+                                                setPagarmeEnabled(checked);
+                                                handleSaveIntegration(pagarmeEnabledId, checked, 'payment_pagarme_enabled', 'Pagar.me Enabled');
+                                            }}
+                                            disabled={updating}
+                                        />
+                                    </div>
+                                </div>
+                                {pagarmeEnabled && (
+                                    <div className="grid gap-4 pt-4 border-t animate-in fade-in slide-in-from-top-2">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="pagarme-sk">Secret Key (sk_...)</Label>
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    id="pagarme-sk"
+                                                    type="password"
+                                                    value={pagarmeSecretKey}
+                                                    onChange={(e) => setPagarmeSecretKey(e.target.value)}
+                                                    placeholder="sk_test_..."
+                                                />
+                                                <Button
+                                                    onClick={() => handleSaveIntegration(pagarmeSecretKeyId, pagarmeSecretKey, 'payment_pagarme_secret_key', 'Pagar.me Secret Key')}
+                                                    disabled={updating}
+                                                    variant="secondary"
+                                                >
+                                                    Salvar
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="pagarme-recipient">Recipient ID (Plataforma)</Label>
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    id="pagarme-recipient"
+                                                    value={pagarmeRecipientId}
+                                                    onChange={(e) => setPagarmeRecipientId(e.target.value)}
+                                                    placeholder="re_..."
+                                                />
+                                                <Button
+                                                    onClick={() => handleSaveIntegration(pagarmeRecipientIdId, pagarmeRecipientId, 'payment_pagarme_recipient_id', 'Pagar.me Recipient ID')}
+                                                    disabled={updating}
+                                                    variant="secondary"
+                                                >
+                                                    Salvar
+                                                </Button>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">ID do recebedor principal que receberá as taxas da plataforma.</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Asaas */}
+                            <div className="space-y-4 border p-4 rounded-lg">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <div className="h-8 w-8 bg-blue-800 rounded flex items-center justify-center text-white font-bold">AS</div>
+                                        <div>
+                                            <Label className="text-base">Asaas</Label>
+                                            <p className="text-xs text-muted-foreground">Boleto (Split) e Pix</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Switch
+                                            checked={asaasEnabled}
+                                            onCheckedChange={(checked) => {
+                                                setAsaasEnabled(checked);
+                                                handleSaveIntegration(asaasEnabledId, checked, 'payment_asaas_enabled', 'Asaas Enabled');
+                                            }}
+                                            disabled={updating}
+                                        />
+                                    </div>
+                                </div>
+                                {asaasEnabled && (
+                                    <div className="grid gap-4 pt-4 border-t animate-in fade-in slide-in-from-top-2">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="asaas-key">API Key ($...)</Label>
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    id="asaas-key"
+                                                    type="password"
+                                                    value={asaasApiKey}
+                                                    onChange={(e) => setAsaasApiKey(e.target.value)}
+                                                    placeholder="$aact_..."
+                                                />
+                                                <Button
+                                                    onClick={() => handleSaveIntegration(asaasApiKeyId, asaasApiKey, 'payment_asaas_api_key', 'Asaas API Key')}
+                                                    disabled={updating}
+                                                    variant="secondary"
+                                                >
+                                                    Salvar
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="asaas-wallet">Wallet ID (Plataforma)</Label>
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    id="asaas-wallet"
+                                                    value={asaasWalletId}
+                                                    onChange={(e) => setAsaasWalletId(e.target.value)}
+                                                    placeholder="Id da carteira..."
+                                                />
+                                                <Button
+                                                    onClick={() => handleSaveIntegration(asaasWalletIdId, asaasWalletId, 'payment_asaas_wallet_id', 'Asaas Wallet ID')}
+                                                    disabled={updating}
+                                                    variant="secondary"
+                                                >
+                                                    Salvar
+                                                </Button>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">ID da carteira principal para onde irão as taxas.</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
                             {/* Mercado Pago */}
                             <div className="space-y-4 border p-4 rounded-lg">
                                 <div className="flex items-center justify-between">
@@ -451,45 +720,64 @@ const AdminSettings = () => {
                                             <p className="text-xs text-muted-foreground">Cartão, Pix e Boleto</p>
                                         </div>
                                     </div>
-                                    <Button
-                                        onClick={() => {
-                                            handleSaveIntegration(mpPublicKeyId, mpPublicKey, 'payment_mercadopago_public_key', 'MP Public Key');
-                                            handleSaveIntegration(mpAccessTokenId, mpAccessToken, 'payment_mercadopago_access_token', 'MP Access Token');
-                                        }}
-                                        disabled={updating || !mpPublicKeyId}
-                                        variant="outline"
-                                        size="sm"
-                                    >
-                                        Salvar Definições
-                                    </Button>
-                                </div>
-                                <div className="grid gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="mp-public">Public Key</Label>
-                                        <Input
-                                            id="mp-public"
-                                            value={mpPublicKey}
-                                            onChange={(e) => setMpPublicKey(e.target.value)}
-                                            placeholder="APP_USR-..."
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="mp-access">Access Token</Label>
-                                        <Input
-                                            id="mp-access"
-                                            type="password"
-                                            value={mpAccessToken}
-                                            onChange={(e) => setMpAccessToken(e.target.value)}
-                                            placeholder="APP_USR-..."
+                                    <div className="flex items-center gap-2">
+                                        <Switch
+                                            checked={mpEnabled}
+                                            onCheckedChange={(checked) => {
+                                                setMpEnabled(checked);
+                                                handleSaveIntegration(mpEnabledId, checked, 'payment_mercadopago_enabled', 'Mercado Pago Enabled');
+                                            }}
+                                            disabled={updating}
                                         />
                                     </div>
                                 </div>
+                                {mpEnabled && (
+                                    <div className="grid gap-4 pt-4 border-t animate-in fade-in slide-in-from-top-2">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="mp-public">Public Key</Label>
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    id="mp-public"
+                                                    value={mpPublicKey}
+                                                    onChange={(e) => setMpPublicKey(e.target.value)}
+                                                    placeholder="APP_USR-..."
+                                                />
+                                                <Button
+                                                    onClick={() => handleSaveIntegration(mpPublicKeyId, mpPublicKey, 'payment_mercadopago_public_key', 'MP Public Key')}
+                                                    disabled={updating}
+                                                    variant="secondary"
+                                                >
+                                                    Salvar
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="mp-access">Access Token</Label>
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    id="mp-access"
+                                                    type="password"
+                                                    value={mpAccessToken}
+                                                    onChange={(e) => setMpAccessToken(e.target.value)}
+                                                    placeholder="APP_USR-..."
+                                                />
+                                                <Button
+                                                    onClick={() => handleSaveIntegration(mpAccessTokenId, mpAccessToken, 'payment_mercadopago_access_token', 'MP Access Token')}
+                                                    disabled={updating}
+                                                    variant="secondary"
+                                                >
+                                                    Salvar
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
                 </TabsContent>
             </Tabs>
-        </div>
+        </div >
     );
 };
 

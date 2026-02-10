@@ -184,6 +184,13 @@ export const useCheckout = () => {
       const tax = 0; // Tax is currently not part of the active pricing model but kept for interface consistency
 
       // 3. Process Payment
+      const customerData = {
+        name: `${checkoutData.firstName} ${checkoutData.lastName}`.trim(),
+        email: checkoutData.email,
+        phone: checkoutData.phone,
+        document: user?.user_metadata?.cpf || '00000000000' // TODO: Ensure CPF is collected in checkout if not in profile
+      };
+
       let paymentResult;
       if (checkoutData.paymentMethod === 'credit_card' || checkoutData.paymentMethod === 'debit_card') {
         if (!checkoutData.paymentDetails?.cardNumber) throw new Error('Dados do cartão incompletos');
@@ -194,12 +201,12 @@ export const useCheckout = () => {
           expiry: checkoutData.paymentDetails.cardExpiry || '',
           cvv: checkoutData.paymentDetails.cardCvv || '',
           installments: checkoutData.paymentDetails.installments || 1
-        });
+        }, customerData);
       } else if (checkoutData.paymentMethod === 'pix') {
-        paymentResult = await PaymentService.generatePix(total);
+        paymentResult = await PaymentService.generatePix(total, customerData);
       } else {
         // Boleto
-        paymentResult = await PaymentService.generateBoleto(total);
+        paymentResult = await PaymentService.generateBoleto(total, customerData);
       }
 
       if (paymentResult.status === 'failed') {

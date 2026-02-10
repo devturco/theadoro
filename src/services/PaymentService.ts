@@ -1,3 +1,4 @@
+import { supabase } from '@/integrations/supabase/client';
 
 export type PaymentMethod = 'credit_card' | 'debit_card' | 'pix' | 'boleto';
 
@@ -19,56 +20,86 @@ export interface CreditCardData {
     installments: number;
 }
 
+export interface CustomerData {
+    name: string;
+    email: string;
+    phone: string;
+    document: string; // CPF/CNPJ
+}
+
 /**
  * Service to handle payments.
- * Connects to 'functions/create-payment' in production.
+ * Connects to 'functions/process-payment' in production.
  */
 export const PaymentService = {
     /**
      * Process a credit card payment.
      */
-    processCard: async (amount: number, card: CreditCardData): Promise<PaymentIntent> => {
-        // Simulate API latency
-        await new Promise(resolve => setTimeout(resolve, 1500));
+    processCard: async (amount: number, card: CreditCardData, customer?: CustomerData): Promise<PaymentIntent> => {
+        // TODO: Get active gateway from settings or pass as argument
+        // For now defaulting to 'pagarme' as it supports credit card
+        const { data, error } = await supabase.functions.invoke('process-payment', {
+            body: {
+                gateway: 'pagarme',
+                paymentMethod: 'credit_card',
+                amount,
+                cardToken: card,
+                installments: card.installments,
+                customer: customer || {
+                    name: card.name,
+                    email: 'customer@example.com', // Should be passed
+                    document: '00000000000', // Should be passed
+                    phone: '11999999999' // Should be passed
+                }
+            }
+        });
 
-        // Simulate Validation
-        if (card.number.length < 16) {
-            throw new Error('Número de cartão inválido (simulação)');
-        }
-
-        return {
-            id: `pi_${Math.random().toString(36).substring(2, 15)}`,
-            amount,
-            status: 'succeeded',
-        };
+        if (error) throw new Error(error.message || 'Erro ao processar pagamento');
+        return data as PaymentIntent;
     },
 
     /**
      * Generate a PIX code.
      */
-    generatePix: async (amount: number): Promise<PaymentIntent> => {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+    generatePix: async (amount: number, customer?: CustomerData): Promise<PaymentIntent> => {
+        // Defaulting to Asaas for Pix as per plan preference or either
+        const { data, error } = await supabase.functions.invoke('process-payment', {
+            body: {
+                gateway: 'asaas', // or 'pagarme'
+                paymentMethod: 'pix',
+                amount,
+                customer: customer || {
+                    name: 'Cliente Teste',
+                    email: 'cliente@teste.com',
+                    document: '00000000000',
+                    phone: '11999999999'
+                }
+            }
+        });
 
-        return {
-            id: `pix_${Math.random().toString(36).substring(2, 15)}`,
-            amount,
-            status: 'pending',
-            pix_code: '00020126580014BR.GOV.BCB.PIX0136123e4567-e89b-12d3-a456-426614174000520400005303986540510.005802BR5913Theo Gift Store6008Brasilia62070503***630460F4',
-            pix_expiration: new Date(Date.now() + 30 * 60000).toISOString() // 30 minutes
-        };
+        if (error) throw new Error(error.message || 'Erro ao gerar Pix');
+        return data as PaymentIntent;
     },
 
     /**
      * Generate Boleto.
      */
-    generateBoleto: async (amount: number): Promise<PaymentIntent> => {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+    generateBoleto: async (amount: number, customer?: CustomerData): Promise<PaymentIntent> => {
+        const { data, error } = await supabase.functions.invoke('process-payment', {
+            body: {
+                gateway: 'asaas',
+                paymentMethod: 'boleto',
+                amount,
+                customer: customer || {
+                    name: 'Cliente Teste',
+                    email: 'cliente@teste.com',
+                    document: '00000000000',
+                    phone: '11999999999'
+                }
+            }
+        });
 
-        return {
-            id: `bol_${Math.random().toString(36).substring(2, 15)}`,
-            amount,
-            status: 'pending',
-            boleto_url: 'https://example.com/boleto.pdf'
-        };
+        if (error) throw new Error(error.message || 'Erro ao gerar Boleto');
+        return data as PaymentIntent;
     }
 };

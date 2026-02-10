@@ -147,12 +147,18 @@ export const Checkout: React.FC = () => {
   const [profileAutoFilled, setProfileAutoFilled] = useState(false);
 
   const { data: giftWraps } = useQuery({
-    queryKey: ['gift-wraps'],
+    queryKey: ['gift-wraps', cart.items],
     queryFn: async () => {
+      // Get distinct seller IDs from cart items
+      const sellerIds = Array.from(new Set(cart.items.map(item => item.product.seller_id)));
+
+      if (sellerIds.length === 0) return [];
+
       const { data, error } = await supabase
         .from('gift_wraps' as any)
         .select('*')
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .in('seller_id', sellerIds);
 
       if (error) {
         console.error('Error fetching gift wraps:', error);
@@ -162,6 +168,7 @@ export const Checkout: React.FC = () => {
       return (data as any) as GiftWrap[];
     },
     staleTime: 1000 * 60 * 10, // 10 minutes
+    enabled: cart.items.length > 0 // Only fetch if cart has items
   });
 
   // Auto-fill from profile if logged in and data is empty
