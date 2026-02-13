@@ -15,8 +15,11 @@ import {
     MapPin,
     Save,
     Loader2,
-    Camera
+    Camera,
+    Truck,
+    CreditCard
 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 
 export default function SellerStoreSettings() {
     const { user, profile, refreshProfile } = useAuth();
@@ -28,7 +31,9 @@ export default function SellerStoreSettings() {
         city: '',
         state: '',
         avatar_url: '',
-        store_banner_url: ''
+        store_banner_url: '',
+        seller_delivery_enabled: false,
+        max_installments: 12
     });
 
     useEffect(() => {
@@ -39,7 +44,9 @@ export default function SellerStoreSettings() {
                 city: (profile as any).city || '',
                 state: (profile as any).state || '',
                 avatar_url: profile.avatar_url || '',
-                store_banner_url: (profile as any).store_banner_url || ''
+                store_banner_url: (profile as any).store_banner_url || '',
+                seller_delivery_enabled: (profile as any).seller_delivery_enabled || false,
+                max_installments: (profile as any).max_installments || 12
             });
             setLoading(false);
         }
@@ -60,6 +67,8 @@ export default function SellerStoreSettings() {
                     state: formData.state,
                     avatar_url: formData.avatar_url,
                     store_banner_url: formData.store_banner_url,
+                    seller_delivery_enabled: formData.seller_delivery_enabled,
+                    max_installments: formData.max_installments,
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', user.id);
@@ -231,6 +240,45 @@ export default function SellerStoreSettings() {
                                     maxLength={2}
                                     className="h-11 rounded-xl"
                                 />
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Sales Settings */}
+                <Card className="border-gray-100 shadow-lg rounded-2xl overflow-hidden">
+                    <CardHeader className="bg-gray-50/50 border-b border-gray-100">
+                        <CardTitle className="text-xl flex items-center gap-2">
+                            <CreditCard className="h-5 w-5 text-wine" />
+                            Configurações de Pagamento
+                        </CardTitle>
+                        <CardDescription>Defina as condições de parcelamento para seus clientes</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-8">
+                        <div className="grid gap-4">
+                            <div className="flex items-center justify-between">
+                                <div className="space-y-0.5">
+                                    <Label htmlFor="max_installments">Máximo de Parcelas Sem Juros</Label>
+                                    <p className="text-sm text-muted-foreground">
+                                        Defina em até quantas vezes o cliente pode parcelar (1 a 12x)
+                                    </p>
+                                </div>
+                                <div className="w-[100px]">
+                                    <Input
+                                        id="max_installments"
+                                        type="number"
+                                        min="1"
+                                        max="12"
+                                        value={formData.max_installments}
+                                        onChange={(e) => {
+                                            const val = parseInt(e.target.value);
+                                            if (val >= 1 && val <= 12) {
+                                                setFormData(prev => ({ ...prev, max_installments: val }));
+                                            }
+                                        }}
+                                        className="h-11 rounded-xl"
+                                    />
+                                </div>
                             </div>
                         </div>
                     </CardContent>

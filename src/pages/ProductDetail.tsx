@@ -579,6 +579,25 @@ export const ProductDetail: React.FC = () => {
             I will add the Reviews section below it.
         */}
 
+        {/* Related Products Section (Moved up) */}
+        {relatedProducts.length > 0 && (
+          <div className="mb-20">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-2xl font-serif font-bold text-gray-900">
+                Você também pode gostar
+              </h2>
+              <Link to="/products" className="text-wine font-medium hover:underline text-sm">
+                Ver tudo
+              </Link>
+            </div>
+            <ProductGrid
+              products={relatedProducts}
+              loading={false}
+              className="grid-cols-2 lg:grid-cols-4 gap-6"
+            />
+          </div>
+        )}
+
         <div className="mb-16">
           <h3 className="text-2xl font-serif font-bold text-gray-900 mb-8">Avaliações dos Clientes</h3>
           {/* Using the Reviews Logic from before but simplified */}
@@ -610,24 +629,7 @@ export const ProductDetail: React.FC = () => {
           )}
         </div>
 
-        {/* Related Products Section */}
-        {relatedProducts.length > 0 && (
-          <div className="mb-20">
-            <div className="flex items-center justify-between mb-8">
-              <h2 className="text-2xl font-serif font-bold text-gray-900">
-                Você também pode gostar
-              </h2>
-              <Link to="/products" className="text-wine font-medium hover:underline text-sm">
-                Ver tudo
-              </Link>
-            </div>
-            <ProductGrid
-              products={relatedProducts}
-              loading={false}
-              className="grid-cols-2 lg:grid-cols-4 gap-6"
-            />
-          </div>
-        )}
+
       </div>
     </div>
   );

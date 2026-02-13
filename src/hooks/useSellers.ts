@@ -38,6 +38,7 @@ export interface Seller {
     shipping?: string;
     customization?: string;
   };
+  subscriptionPlan?: string;
 }
 
 export interface SellerFilters {
@@ -218,6 +219,19 @@ export const useSeller = (sellerId: string): UseSellerReturn => {
 
       if (data) {
         const s = data as any;
+
+        // Fetch active subscription
+        let subscriptionPlan = undefined;
+        const { data: subData } = await (supabase.from as any)('seller_subscriptions')
+          .select('plan:plan_id(name)')
+          .eq('seller_id', sellerId)
+          .eq('status', 'active')
+          .single();
+
+        if (subData && subData.plan) {
+          subscriptionPlan = (subData.plan as any).name;
+        }
+
         setSeller({
           id: s.id,
           name: s.name,
@@ -232,7 +246,8 @@ export const useSeller = (sellerId: string): UseSellerReturn => {
           responseTime: '2h',
           joinedAt: s.joined_at,
           productCount: Number(s.product_count || 0),
-          mainCategory: s.main_category
+          mainCategory: s.main_category,
+          subscriptionPlan
         });
       } else {
         setError('Vendedor não encontrado');

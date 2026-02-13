@@ -90,6 +90,30 @@ export const useCheckout = () => {
       }));
 
       const quotes = await LoggiService.calculateShipping({ zipCode, items: shippingItems });
+      // Add Seller Delivery option if enabled for this seller
+      // Assuming all items are from the same seller for now as per MVP or single-seller cart logic usually
+      const firstItem = items[0];
+      if (firstItem && firstItem.product.seller_id) {
+        const { data: sellerData } = await supabase
+          .from('profiles')
+          .select('seller_delivery_enabled')
+          .eq('id', firstItem.product.seller_id)
+          .single();
+
+        if (sellerData && (sellerData as any).seller_delivery_enabled) {
+          quotes.push({
+            id: 999,
+            name: 'Entrega Própria do Vendedor',
+            price: 15.00, // Fixed or calculated? For now fixed as placeholder or we could make it configurable
+            estimated_delivery: 'Combinar com vendedor',
+            company: {
+              name: 'Vendedor',
+              logo_url: ''
+            }
+          } as any);
+        }
+      }
+
       setShippingQuotes(quotes);
 
       // Default select the cheapest option

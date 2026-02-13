@@ -49,7 +49,7 @@ interface CheckoutFormData {
   state: string;
 
   // Payment
-  paymentMethod: 'credit' | 'debit' | 'pix' | 'boleto';
+  paymentMethod: 'credit' | 'debit' | 'pix';
   cardNumber: string;
   cardName: string;
   cardExpiry: string;
@@ -171,6 +171,31 @@ export const Checkout: React.FC = () => {
     enabled: cart.items.length > 0 // Only fetch if cart has items
   });
 
+  const { data: maxInstallments = 12 } = useQuery({
+    queryKey: ['max-installments', cart.items],
+    queryFn: async () => {
+      const sellerIds = Array.from(new Set(cart.items.map(item => item.product.seller_id)));
+      if (sellerIds.length === 0) return 12;
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('max_installments')
+        .in('id', sellerIds);
+
+      if (error) {
+        console.error('Error fetching max installments:', error);
+        return 12;
+      }
+
+      if (!data || data.length === 0) return 12;
+
+      // Find the minimum limit among all sellers in cart to ensure all allow it
+      const limits = data.map((p: any) => p.max_installments || 12);
+      return Math.min(...limits);
+    },
+    enabled: cart.items.length > 0
+  });
+
   // Auto-fill from profile if logged in and data is empty
   useEffect(() => {
     if (profile && !profileAutoFilled) {
@@ -207,8 +232,7 @@ export const Checkout: React.FC = () => {
   let discount = 0;
   if (formData.paymentMethod === 'pix') {
     discount = (subtotal + shippingCost + giftWrapPrice) * 0.05;
-  } else if (formData.paymentMethod === 'boleto') {
-    discount = (subtotal + shippingCost + giftWrapPrice) * 0.03;
+
   }
 
   const total = subtotal + shippingCost + giftWrapPrice - discount;
@@ -365,7 +389,6 @@ export const Checkout: React.FC = () => {
         'credit': 'credit_card',
         'debit': 'debit_card',
         'pix': 'pix',
-        'boleto': 'boleto'
       };
 
       // Construct CheckoutData expected by useCheckout
@@ -829,16 +852,7 @@ export const Checkout: React.FC = () => {
                         </Label>
                       </div>
 
-                      <div className="flex items-center space-x-2 p-4 border border-gray-200 rounded-lg">
-                        <RadioGroupItem value="boleto" id="boleto" />
-                        <Label htmlFor="boleto" className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-lg">📄</span>
-                            <span>Boleto Bancário</span>
-                            <Badge variant="secondary">3% desconto</Badge>
-                          </div>
-                        </Label>
-                      </div>
+
                     </div>
                   </RadioGroup>
 
@@ -915,7 +929,7 @@ export const Checkout: React.FC = () => {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {Array.from({ length: 12 }, (_, i) => i + 1).map((num) => (
+                              {Array.from({ length: maxInstallments }, (_, i) => i + 1).map((num) => (
                                 <SelectItem key={num} value={num.toString()}>
                                   {num}x de {formatPrice(summary.total / num)}
                                   {num === 1 ? ' à vista' : ` (Total: ${formatPrice(summary.total)})`}
@@ -938,15 +952,7 @@ export const Checkout: React.FC = () => {
                     </Alert>
                   )}
 
-                  {formData.paymentMethod === 'boleto' && (
-                    <Alert>
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertDescription>
-                        O boleto será gerado após a confirmação do pedido.
-                        O prazo de vencimento é de 3 dias úteis.
-                      </AlertDescription>
-                    </Alert>
-                  )}
+
                 </div>
               )}
 
@@ -1031,7 +1037,7 @@ export const Checkout: React.FC = () => {
                         {formData.paymentMethod === 'credit' && `Cartão de Crédito - ${formData.installments}x`}
                         {formData.paymentMethod === 'debit' && 'Cartão de Débito'}
                         {formData.paymentMethod === 'pix' && 'PIX'}
-                        {formData.paymentMethod === 'boleto' && 'Boleto Bancário'}
+
                       </p>
                     </div>
 

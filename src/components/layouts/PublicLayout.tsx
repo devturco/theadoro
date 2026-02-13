@@ -4,6 +4,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { CartProvider } from '@/contexts/CartContext';
 import { WishlistProvider } from '@/contexts/WishlistContext';
+import { FloatingWhatsApp } from '@/components/common/FloatingWhatsApp';
 
 interface PublicLayoutProps {
   children?: React.ReactNode;
@@ -16,6 +17,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
       <main className="container mx-auto px-4 py-8 pt-32">
         {children || <Outlet />}
       </main>
+      <FloatingWhatsApp />
       <Footer />
     </div>
   );

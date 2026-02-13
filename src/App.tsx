@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/toaster';
 import { Toaster as Sonner } from '@/components/ui/sonner';
+import TIAdoroAssistant from '@/components/TIAdoroAssistant';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { CartProvider } from '@/contexts/CartContext';
@@ -78,6 +79,9 @@ import BuyerAppointments from '@/pages/buyer/BuyerAppointments';
 import BuyerWishlist from '@/pages/buyer/BuyerWishlist';
 import BuyerProfile from '@/pages/buyer/BuyerProfile';
 import OrderDetail from '@/pages/buyer/OrderDetail';
+import BuyerCalendar from '@/pages/buyer/Calendar';
+import GiftLists from '@/pages/buyer/GiftLists';
+import GiftListDetail from '@/pages/buyer/GiftListDetail';
 import SellerOnboarding from '@/pages/SellerOnboarding';
 import AdminSellerApprovals from '@/pages/admin/AdminSellerApprovals';
 import AdminSubscriptions from '@/pages/admin/AdminSubscriptions';
@@ -100,6 +104,7 @@ function App() {
       <TooltipProvider>
         <Toaster />
         <Sonner />
+        <TIAdoroAssistant />
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <ScrollToTop />
           <AuthProvider>
@@ -221,6 +226,9 @@ function App() {
                               <Route path="orders" element={<BuyerOrders />} />
                               <Route path="orders/:id" element={<OrderDetail />} />
                               <Route path="appointments" element={<BuyerAppointments />} />
+                              <Route path="calendar" element={<BuyerCalendar />} />
+                              <Route path="lists" element={<GiftLists />} />
+                              <Route path="lists/:id" element={<GiftListDetail />} />
                               <Route path="wishlist" element={<BuyerWishlist />} />
                               <Route path="profile" element={<BuyerProfile />} />
                               <Route path="*" element={<BuyerDashboard />} />

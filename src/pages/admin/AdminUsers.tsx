@@ -42,6 +42,7 @@ import { UserRole } from '@/types/auth';
 interface UserFormData {
   name: string;
   email: string;
+  phone: string;
   role: string;
   status: string;
 }
@@ -54,6 +55,7 @@ const AdminUsers = () => {
   const [formData, setFormData] = useState<UserFormData>({
     name: '',
     email: '',
+    phone: '',
     role: 'buyer',
     status: 'approved'
   });
@@ -84,6 +86,7 @@ const AdminUsers = () => {
       if (editingUser) {
         await updateItem(editingUser.id, {
           full_name: formData.name,
+          phone: formData.phone,
           role: formData.role
         });
         toast.success('Usuário atualizado com sucesso!');
@@ -93,6 +96,7 @@ const AdminUsers = () => {
         await createItem({
           full_name: formData.name,
           email: formData.email,
+          phone: formData.phone,
           role: formData.role
         });
         toast.success('Usuário criado com sucesso!');
@@ -112,6 +116,7 @@ const AdminUsers = () => {
     setFormData({
       name: user.full_name || '',
       email: user.email || '',
+      phone: user.phone || '',
       role: user.role || 'buyer',
       status: 'approved' // Status logic might be deprecated or need specific column
     });
@@ -162,6 +167,7 @@ const AdminUsers = () => {
     setFormData({
       name: '',
       email: '',
+      phone: '',
       role: 'buyer',
       status: 'approved'
     });
@@ -177,6 +183,11 @@ const AdminUsers = () => {
     {
       key: 'email',
       title: 'Email'
+    },
+    {
+      key: 'phone',
+      title: 'Telefone',
+      render: (value: string) => value || '-'
     },
     {
       key: 'role',
@@ -280,6 +291,15 @@ const AdminUsers = () => {
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     disabled={!!editingUser}
                     required={!editingUser}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="phone">Telefone</Label>
+                  <Input
+                    id="phone"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    placeholder="(00) 00000-0000"
                   />
                 </div>
                 <div className="grid gap-2">

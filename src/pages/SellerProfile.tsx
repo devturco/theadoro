@@ -28,6 +28,7 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { useSeller } from '@/hooks/useSellers';
 import { useProducts } from '@/hooks/useProducts';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 
 // Reviews Component (Mock for now)
@@ -210,7 +211,21 @@ export const SellerProfile: React.FC = () => {
                     )}
                   </div>
 
-                  <h1 className="text-3xl font-bold text-gray-900 mb-2 leading-tight">{seller.name}</h1>
+                  <div className="flex flex-col items-center mb-2">
+                    <h1 className="text-3xl font-bold text-gray-900 leading-tight text-center">
+                      {seller.name}
+                    </h1>
+                    {seller.subscriptionPlan && (
+                      <Badge className={cn(
+                        "mt-2 text-xs uppercase tracking-wider",
+                        seller.subscriptionPlan.toLowerCase().includes('gold') || seller.subscriptionPlan.toLowerCase().includes('ouro') ? "bg-amber-400 hover:bg-amber-500 text-white border-none" :
+                          seller.subscriptionPlan.toLowerCase().includes('silver') || seller.subscriptionPlan.toLowerCase().includes('prata') ? "bg-slate-400 hover:bg-slate-500 text-white border-none" :
+                            "bg-wine text-white border-none"
+                      )}>
+                        {seller.subscriptionPlan}
+                      </Badge>
+                    )}
+                  </div>
 
                   <div className="flex items-center gap-1.5 mb-3 bg-champagne/10 px-3 py-1 rounded-full">
                     <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />

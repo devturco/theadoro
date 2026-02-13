@@ -312,7 +312,7 @@ const SellerGiftWraps = () => {
                                         <FileUpload
                                             onUpload={(urls) => setFormData({ ...formData, image_url: urls[0] })}
                                             accept="image/*"
-                                            options={{ bucket: 'gift-wraps' }}
+                                            options={{ bucket: 'products' }}
                                         />
                                     </div>
 

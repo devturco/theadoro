@@ -31,7 +31,7 @@ export const LoggiService = {
      * Calculates shipping quotes.
      * Use this method to eventually call 'supabase.functions.invoke("shipping-quote")'
      */
-    calculateShipping: async (data: ShippingRequest): Promise<ShippingQuote[]> => {
+    calculateShipping: async (data: ShippingRequest, options?: { expressTariff?: number }): Promise<ShippingQuote[]> => {
         // Simulate API latency
         await new Promise(resolve => setTimeout(resolve, 600));
 
@@ -48,7 +48,12 @@ export const LoggiService = {
         const weightMult = 1.0 + (totalItems * 0.2); // +20% cost per item
 
         const standardPrice = (basePrice * regionFactor * 0.5) + (5 * weightMult);
-        const expressPrice = standardPrice * 1.8;
+
+        // Calculate Express Price with Tariff
+        // Base express is 1.8x standard, plus the configured tariff percentage
+        const baseExpressPrice = standardPrice * 1.8;
+        const tariffPercent = options?.expressTariff || 0;
+        const expressPrice = baseExpressPrice * (1 + (tariffPercent / 100));
 
         const deliveryDays = Math.max(2, regionFactor + 2); // Minimum 2 days, +1 per region distance
 

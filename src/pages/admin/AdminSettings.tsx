@@ -42,6 +42,8 @@ const AdminSettings = () => {
     const [uberClientSecretId, setUberClientSecretId] = useState<string | null>(null);
     const [uberCustomerId, setUberCustomerId] = useState('');
     const [uberCustomerIdId, setUberCustomerIdId] = useState<string | null>(null);
+    const [expressTariff, setExpressTariff] = useState('');
+    const [expressTariffId, setExpressTariffId] = useState<string | null>(null);
 
     const [correiosEnabled, setCorreiosEnabled] = useState(false);
     const [correiosId, setCorreiosId] = useState<string | null>(null);
@@ -131,6 +133,12 @@ const AdminSettings = () => {
             if (uberCustomer) {
                 setUberCustomerId(String(uberCustomer.value));
                 setUberCustomerIdId(uberCustomer.id);
+            }
+
+            const tariff = settings.find(s => s.key === 'shipping_express_tariff');
+            if (tariff) {
+                setExpressTariff(String(tariff.value));
+                setExpressTariffId(tariff.id);
             }
 
             const correios = settings.find(s => s.key === 'shipping_correios_enabled');
@@ -302,6 +310,7 @@ const AdminSettings = () => {
             if (key === 'shipping_uber_client_id') setUberClientIdId(newId);
             if (key === 'shipping_uber_client_secret') setUberClientSecretId(newId);
             if (key === 'shipping_uber_customer_id') setUberCustomerIdId(newId);
+            if (key === 'shipping_express_tariff') setExpressTariffId(newId);
 
             if (key === 'shipping_correios_enabled') setCorreiosId(newId);
 
@@ -472,7 +481,7 @@ const AdminSettings = () => {
                                     <div className="flex items-center gap-2">
                                         <div className="h-8 w-8 bg-black rounded flex items-center justify-center text-white font-bold">U</div>
                                         <div>
-                                            <Label className="text-base">Uber Direct</Label>
+                                            <Label className="text-base">Uber Direct / Express</Label>
                                             <p className="text-xs text-muted-foreground">Entrega Flash (Moto/Carro)</p>
                                         </div>
                                     </div>
@@ -544,6 +553,26 @@ const AdminSettings = () => {
                                                     Salvar
                                                 </Button>
                                             </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="express-tariff">Tarifa Adicional Express (%)</Label>
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    id="express-tariff"
+                                                    type="number"
+                                                    value={expressTariff}
+                                                    onChange={(e) => setExpressTariff(e.target.value)}
+                                                    placeholder="Ex: 10 para 10%"
+                                                />
+                                                <Button
+                                                    onClick={() => handleSaveIntegration(expressTariffId, expressTariff, 'shipping_express_tariff', 'Tarifa Express')}
+                                                    disabled={updating}
+                                                    variant="secondary"
+                                                >
+                                                    Salvar
+                                                </Button>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">Porcentagem adicionada ao custo base calculado.</p>
                                         </div>
                                     </div>
                                 )}
