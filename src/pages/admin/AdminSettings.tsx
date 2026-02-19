@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { useSiteSettings, SiteSetting } from '@/hooks/useSiteSettings';
-import { Loader2, Settings, Truck, CreditCard, Store } from 'lucide-react';
+import { Loader2, Settings, Truck, CreditCard, Store, Sparkles, Brain } from 'lucide-react';
 import { toast } from 'sonner';
 
 const AdminSettings = () => {
@@ -62,8 +62,6 @@ const AdminSettings = () => {
     const [pagarmeEnabledId, setPagarmeEnabledId] = useState<string | null>(null);
     const [pagarmeSecretKey, setPagarmeSecretKey] = useState('');
     const [pagarmeSecretKeyId, setPagarmeSecretKeyId] = useState<string | null>(null);
-    const [pagarmeRecipientId, setPagarmeRecipientId] = useState('');
-    const [pagarmeRecipientIdId, setPagarmeRecipientIdId] = useState<string | null>(null);
 
     // Asaas State
     const [asaasEnabled, setAsaasEnabled] = useState(false);
@@ -72,6 +70,12 @@ const AdminSettings = () => {
     const [asaasApiKeyId, setAsaasApiKeyId] = useState<string | null>(null);
     const [asaasWalletId, setAsaasWalletId] = useState('');
     const [asaasWalletIdId, setAsaasWalletIdId] = useState<string | null>(null);
+
+    // AI Assistant State
+    const [geminiApiKey, setGeminiApiKey] = useState('');
+    const [geminiApiKeyId, setGeminiApiKeyId] = useState<string | null>(null);
+    const [aiEnabled, setAiEnabled] = useState(false);
+    const [aiEnabledId, setAiEnabledId] = useState<string | null>(null);
 
     const [updating, setUpdating] = useState(false);
 
@@ -177,11 +181,6 @@ const AdminSettings = () => {
                 setPagarmeSecretKey(String(pgKey.value));
                 setPagarmeSecretKeyId(pgKey.id);
             }
-            const pgRecipient = settings.find(s => s.key === 'payment_pagarme_recipient_id');
-            if (pgRecipient) {
-                setPagarmeRecipientId(String(pgRecipient.value));
-                setPagarmeRecipientIdId(pgRecipient.id);
-            }
 
             // Integrations - Asaas
             const asEnabled = settings.find(s => s.key === 'payment_asaas_enabled');
@@ -198,6 +197,18 @@ const AdminSettings = () => {
             if (asWallet) {
                 setAsaasWalletId(String(asWallet.value));
                 setAsaasWalletIdId(asWallet.id);
+            }
+
+            // AI Assistant
+            const aiKey = settings.find(s => s.key === 'ai_gemini_api_key');
+            if (aiKey) {
+                setGeminiApiKey(String(aiKey.value));
+                setGeminiApiKeyId(aiKey.id);
+            }
+            const aiOn = settings.find(s => s.key === 'ai_assistant_enabled');
+            if (aiOn) {
+                setAiEnabled(Boolean(aiOn.value));
+                setAiEnabledId(aiOn.id);
             }
         }
     }, [settings]);
@@ -300,7 +311,6 @@ const AdminSettings = () => {
             // Allow the UI to update with the new ID if one was created
             if (key === 'payment_pagarme_enabled') setPagarmeEnabledId(newId);
             if (key === 'payment_pagarme_secret_key') setPagarmeSecretKeyId(newId);
-            if (key === 'payment_pagarme_recipient_id') setPagarmeRecipientIdId(newId);
 
             if (key === 'payment_asaas_enabled') setAsaasEnabledId(newId);
             if (key === 'payment_asaas_api_key') setAsaasApiKeyId(newId);
@@ -317,6 +327,9 @@ const AdminSettings = () => {
             if (key === 'payment_mercadopago_enabled') setMpEnabledId(newId);
             if (key === 'payment_mercadopago_public_key') setMpPublicKeyId(newId);
             if (key === 'payment_mercadopago_access_token') setMpAccessTokenId(newId);
+
+            if (key === 'ai_gemini_api_key') setGeminiApiKeyId(newId);
+            if (key === 'ai_assistant_enabled') setAiEnabledId(newId);
 
         } catch (error) {
             console.error(error);
@@ -357,6 +370,10 @@ const AdminSettings = () => {
                 <TabsList>
                     <TabsTrigger value="general">Geral</TabsTrigger>
                     <TabsTrigger value="integrations">Integrações</TabsTrigger>
+                    <TabsTrigger value="ai" className="flex items-center gap-2">
+                        <Sparkles className="h-4 w-4" />
+                        Assistente IA
+                    </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="general" className="space-y-6">
@@ -651,25 +668,6 @@ const AdminSettings = () => {
                                                 </Button>
                                             </div>
                                         </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="pagarme-recipient">Recipient ID (Plataforma)</Label>
-                                            <div className="flex gap-2">
-                                                <Input
-                                                    id="pagarme-recipient"
-                                                    value={pagarmeRecipientId}
-                                                    onChange={(e) => setPagarmeRecipientId(e.target.value)}
-                                                    placeholder="re_..."
-                                                />
-                                                <Button
-                                                    onClick={() => handleSaveIntegration(pagarmeRecipientIdId, pagarmeRecipientId, 'payment_pagarme_recipient_id', 'Pagar.me Recipient ID')}
-                                                    disabled={updating}
-                                                    variant="secondary"
-                                                >
-                                                    Salvar
-                                                </Button>
-                                            </div>
-                                            <p className="text-xs text-muted-foreground">ID do recebedor principal que receberá as taxas da plataforma.</p>
-                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -805,8 +803,82 @@ const AdminSettings = () => {
                         </CardContent>
                     </Card>
                 </TabsContent>
+
+                <TabsContent value="ai" className="space-y-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Brain className="h-5 w-5" />
+                                Inteligência Artificial (Gemini)
+                            </CardTitle>
+                            <CardDescription>Configure o assistente virtual tIAdoro para sugestão de presentes</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="flex items-center justify-between space-x-2 border p-4 rounded-lg bg-muted/20">
+                                <div className="space-y-1">
+                                    <Label htmlFor="ai-enabled" className="text-base font-medium">Ativar Assistente</Label>
+                                    <p className="text-sm text-muted-foreground">
+                                        Habilita o botão flutuante de I.A. para os usuários.
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Switch
+                                        id="ai-enabled"
+                                        checked={aiEnabled}
+                                        onCheckedChange={(checked) => {
+                                            setAiEnabled(checked);
+                                            handleSaveIntegration(aiEnabledId, checked, 'ai_assistant_enabled', 'AI Assistant Enabled', 'ai');
+                                        }}
+                                        disabled={updating}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-4 border p-4 rounded-lg">
+                                <div className="space-y-2">
+                                    <Label htmlFor="gemini-key">Gemini API Key</Label>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            id="gemini-key"
+                                            type="password"
+                                            value={geminiApiKey}
+                                            onChange={(e) => setGeminiApiKey(e.target.value)}
+                                            placeholder="Cole sua chave da Google AI Studio aqui..."
+                                        />
+                                        <Button
+                                            onClick={() => handleSaveIntegration(geminiApiKeyId, geminiApiKey, 'ai_gemini_api_key', 'Gemini API Key', 'ai')}
+                                            disabled={updating}
+                                        >
+                                            Salvar
+                                        </Button>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mt-2">
+                                        Você pode obter uma chave gratuita no <a href="https://aistudio.google.com/" target="_blank" rel="noreferrer" className="text-primary hover:underline">Google AI Studio</a>.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <Card className="bg-blue-50/50 border-blue-100">
+                                <CardContent className="pt-6">
+                                    <div className="flex gap-4">
+                                        <div className="h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
+                                            <Sparkles className="h-5 w-5 text-blue-600" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="text-sm font-medium text-blue-900">Como funciona?</p>
+                                            <p className="text-sm text-blue-800/80 leading-relaxed">
+                                                A tIAdoro utiliza o modelo Gemini para entender as necessidades dos seus clientes e recomendar
+                                                os produtos da sua loja de forma humanizada. Ela leva em conta a idade, interesses e perfil que o usuário descrever.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
             </Tabs>
-        </div >
+        </div>
     );
 };
 

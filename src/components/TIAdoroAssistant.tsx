@@ -18,6 +18,7 @@ interface Message {
 
 export default function TIAdoroAssistant() {
     const [isOpen, setIsOpen] = useState(false);
+    const [isEnabled, setIsEnabled] = useState(true);
     const [messages, setMessages] = useState<Message[]>([
         {
             id: '1',
@@ -36,6 +37,24 @@ export default function TIAdoroAssistant() {
         }
     }, [messages, isOpen]);
 
+    useEffect(() => {
+        const checkEnabled = async () => {
+            try {
+                const { data } = await (supabase.from as any)('site_settings')
+                    .select('value')
+                    .eq('key', 'ai_assistant_enabled')
+                    .maybeSingle(); // maybeSingle is safer if it doesn't exist yet
+
+                if (data) {
+                    setIsEnabled(Boolean(data.value));
+                }
+            } catch (e) {
+                console.error('Error checking AI status', e);
+            }
+        };
+        checkEnabled();
+    }, []);
+
     const handleSendMessage = async () => {
         if (!inputValue.trim()) return;
 
@@ -50,40 +69,40 @@ export default function TIAdoroAssistant() {
         setInputValue('');
         setIsTyping(true);
 
-        // Simulate AI processing
-        setTimeout(async () => {
-            let aiResponseText = '';
-            let products: any[] = [];
+        // Call real AI processing via Edge Function
+        try {
+            const history = messages.slice(-5).map(msg => ({
+                role: msg.sender === 'ai' ? 'assistant' : 'user',
+                content: msg.text
+            }));
 
-            const lowerInput = userMessage.text.toLowerCase();
+            const { data, error } = await supabase.functions.invoke('ai-gift-assistant', {
+                body: { message: inputValue, history }
+            });
 
-            if (lowerInput.includes('aniversário') || lowerInput.includes('birthday')) {
-                aiResponseText = 'Para aniversários, temos ótimas opções! Que tal algo personalizado? Aqui estão algumas sugestões populares:';
-                products = await fetchSuggestedProducts('personalizado');
-            } else if (lowerInput.includes('casamento') || lowerInput.includes('wedding')) {
-                aiResponseText = 'Casamentos pedem presentes elegantes e memoráveis. Veja o que separei para você:';
-                products = await fetchSuggestedProducts('decoração');
-            } else if (lowerInput.includes('namorad')) {
-                aiResponseText = 'Ah, o amor! ❤️ Para o Dia dos Namorados ou uma surpresa romântica, recomendo:';
-                products = await fetchSuggestedProducts('romântico');
-            } else if (lowerInput.includes('mãe') || lowerInput.includes('pai')) {
-                aiResponseText = 'Presentear os pais é sempre especial. Eles costumam amar estas opções:';
-                products = await fetchSuggestedProducts('família');
-            } else {
-                aiResponseText = 'Entendi! Posso te ajudar a encontrar o presente ideal. Me conte mais: é para quem? Alguma ocasião especial?';
-            }
+            if (error) throw error;
 
             const aiMessage: Message = {
-                id: (Date.now() + 1).toString(),
-                text: aiResponseText,
+                id: Date.now().toString(),
+                text: data.text || 'Desculpe, tive um pequeno problema técnico. Pode repetir?',
                 sender: 'ai',
                 timestamp: new Date(),
-                products: products.length > 0 ? products : undefined
+                products: data.products?.length > 0 ? data.products : undefined
             };
 
             setMessages(prev => [...prev, aiMessage]);
+        } catch (err) {
+            console.error('AI Error:', err);
+            const errorMessage: Message = {
+                id: Date.now().toString(),
+                text: 'Ops! Meu sistema deu uma piscada aqui. 😅 Pode tentar enviar de novo em alguns instantes?',
+                sender: 'ai',
+                timestamp: new Date()
+            };
+            setMessages(prev => [...prev, errorMessage]);
+        } finally {
             setIsTyping(false);
-        }, 1500);
+        }
     };
 
     const fetchSuggestedProducts = async (term: string) => {
@@ -98,6 +117,8 @@ export default function TIAdoroAssistant() {
             return [];
         }
     };
+
+    if (!isEnabled) return null;
 
     return (
         <div className="fixed bottom-24 right-6 z-50 flex flex-col items-end pointer-events-none">

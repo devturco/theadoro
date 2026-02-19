@@ -29,13 +29,14 @@ serve(async (req) => {
             orderId
         } = await req.json()
 
+        const sanitize = (str: string) => str ? str.replace(/\D/g, '') : ''
+
         // 1. Fetch Settings
         const { data: settings, error: settingsError } = await supabaseClient
             .from('site_settings')
             .select('*')
             .in('key', [
                 'payment_pagarme_secret_key',
-                'payment_pagarme_recipient_id',
                 'payment_asaas_api_key',
                 'payment_asaas_wallet_id'
             ])
@@ -44,7 +45,7 @@ serve(async (req) => {
 
         const getSetting = (key: string) => settings.find((s: any) => s.key === key)?.value
 
-        let result;
+        let result: any;
 
         if (gateway === 'pagarme') {
             const secretKey = getSetting('payment_pagarme_secret_key')
@@ -68,12 +69,16 @@ serve(async (req) => {
                         name: customer.name,
                         email: customer.email,
                         type: 'individual',
-                        document: customer.document, // CPF
+                        document: sanitize(customer.document), // CPF
                         phones: {
                             mobile_phone: {
                                 country_code: '55',
-                                area_code: customer.phone.substring(0, 2),
-                                number: customer.phone.substring(2)
+                                area_code: sanitize(customer.phone).length > 11
+                                    ? sanitize(customer.phone).substring(2, 4)
+                                    : sanitize(customer.phone).substring(0, 2),
+                                number: sanitize(customer.phone).length > 11
+                                    ? sanitize(customer.phone).substring(4)
+                                    : sanitize(customer.phone).substring(2)
                             }
                         }
                     },
@@ -135,7 +140,7 @@ serve(async (req) => {
                     body: JSON.stringify({
                         name: customer.name,
                         email: customer.email,
-                        cpfCnpj: customer.document
+                        cpfCnpj: sanitize(customer.document)
                     })
                 }).then(res => res.json())
                 asaasCustomerId = newCustomer.id
@@ -197,7 +202,7 @@ serve(async (req) => {
         )
     } catch (error) {
         return new Response(
-            JSON.stringify({ error: error.message }),
+            JSON.stringify({ error: (error as any).message }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
         )
     }
