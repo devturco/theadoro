@@ -17,7 +17,8 @@ import {
   MessageCircle,
   ThumbsUp,
   Eye,
-  Check
+  Check,
+  CheckCircle
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -460,9 +461,14 @@ export const ProductDetail: React.FC = () => {
 
                   <div className="flex-1 min-w-0">
                     <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Vendido por</p>
-                    <h3 className="text-sm font-bold text-gray-900 truncate">
-                      {product.seller.name}
-                    </h3>
+                    <div className="flex items-center gap-1">
+                      <h3 className="text-sm font-bold text-gray-900 truncate">
+                        {product.seller.name}
+                      </h3>
+                      {product.seller.verified && (
+                        <CheckCircle className="h-3.5 w-3.5 text-blue-500 fill-white" />
+                      )}
+                    </div>
                   </div>
                   <ChevronRight className="h-4 w-4 text-gray-300" />
                 </div>

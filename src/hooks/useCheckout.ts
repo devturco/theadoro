@@ -90,8 +90,16 @@ export const useCheckout = () => {
       }));
 
       const quotes = await LoggiService.calculateShipping({ zipCode, items: shippingItems });
+
+      // Fetch Site Settings for Uber
+      const { data: settings } = await (supabase.from as any)('site_settings')
+        .select('*')
+        .in('key', ['shipping_uber_enabled', 'shipping_express_tariff']);
+
+      const uberEnabled = settings?.find(s => s.key === 'shipping_uber_enabled')?.value === true || settings?.find(s => s.key === 'shipping_uber_enabled')?.value === 'true';
+      const expressTariff = Number(settings?.find(s => s.key === 'shipping_express_tariff')?.value || 0);
+
       // Add Seller Delivery option if enabled for this seller
-      // Assuming all items are from the same seller for now as per MVP or single-seller cart logic usually
       const firstItem = items[0];
       if (firstItem && firstItem.product.seller_id) {
         const { data: sellerData } = await supabase
@@ -102,16 +110,30 @@ export const useCheckout = () => {
 
         if (sellerData && (sellerData as any).seller_delivery_enabled) {
           quotes.push({
-            id: 999,
-            name: 'Entrega Própria do Vendedor',
-            price: 15.00, // Fixed or calculated? For now fixed as placeholder or we could make it configurable
-            estimated_delivery: 'Combinar com vendedor',
+            id: 'seller-delivery',
+            name: 'Entrega Própria (Sede do Vendedor)',
+            price: 0, // Combinar ou valor fixo?
+            estimated_delivery: 'A combinar com vendedor',
             company: {
               name: 'Vendedor',
               logo_url: ''
             }
           } as any);
         }
+      }
+
+      // Add Uber Direct if enabled
+      if (uberEnabled) {
+        quotes.push({
+          id: 'uber-direct',
+          name: `Uber Flash (Express) ${expressTariff > 0 ? `+${expressTariff}%` : ''}`,
+          price: 18.90 * (1 + (expressTariff / 100)), // Simulate Uber base + tariff
+          estimated_delivery: 'Entrega em até 90 min',
+          company: {
+            name: 'Uber',
+            logo_url: '/uber-logo.png'
+          }
+        } as any);
       }
 
       setShippingQuotes(quotes);

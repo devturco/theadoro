@@ -38,9 +38,19 @@ const buyerMenuItems = [
     icon: ShoppingCart,
   },
   {
+    title: 'Calendário',
+    url: '/buyer/calendar',
+    icon: Calendar,
+  },
+  {
+    title: 'Minhas Listas',
+    url: '/buyer/lists',
+    icon: Gift,
+  },
+  {
     title: 'Agendamentos',
     url: '/buyer/appointments',
-    icon: Calendar,
+    icon: Clock,
   },
   {
     title: 'Lista de Desejos',

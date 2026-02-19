@@ -139,7 +139,7 @@ export const useSellers = (initialFilters: SellerFilters = {}): UseSellersReturn
         rating: Number(s.rating || 0),
         reviewCount: Number(s.review_count || 0),
         location: s.location || 'Brasil',
-        verified: !!s.is_seller,
+        verified: !!s.verified,
         specialties: [], // This would need another join or a new column
         responseTime: '2h', // Default
         joinedAt: s.joined_at,

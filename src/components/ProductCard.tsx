@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, Star, ShoppingBag, MapPin } from 'lucide-react';
+import { Heart, Star, ShoppingBag, MapPin, CheckCircle } from 'lucide-react';
 import { Product } from '@/types/product';
 import { useWishlist } from '@/hooks/useWishlist';
 import { useCart } from '@/hooks/useCart';
@@ -102,6 +102,19 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             {product.name}
           </h3>
         </Link>
+
+        {/* Seller Info */}
+        {product.seller && (
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-gray-400">por </span>
+            <Link to={`/sellers/${product.seller.id}`} className="text-[10px] font-medium text-gray-500 hover:text-wine hover:underline truncate">
+              {product.seller.name}
+            </Link>
+            {product.seller.verified && (
+              <CheckCircle className="h-3 w-3 text-blue-500 fill-white" />
+            )}
+          </div>
+        )}
 
         {/* Price Block */}
         <div className="mt-1">

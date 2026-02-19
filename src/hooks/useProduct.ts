@@ -46,7 +46,10 @@ export const useProduct = (productId: string | undefined) => {
           profiles:profiles!fk_products_profiles (
             id,
             full_name,
-            avatar_url
+            avatar_url,
+            location,
+            verified,
+            seller_delivery_enabled
           )
         `);
 
@@ -75,6 +78,8 @@ export const useProduct = (productId: string | undefined) => {
         .select('*', { count: 'exact', head: true })
         .eq('product_id', data.id);
 
+      const sellerInfo = Array.isArray(data.profiles) ? data.profiles[0] : data.profiles;
+
       // Transform data to match Product interface
       const transformedProduct: Product = {
         id: data.id,
@@ -92,7 +97,7 @@ export const useProduct = (productId: string | undefined) => {
         is_active: data.is_active,
         is_service: data.is_service,
         sold_count: soldCount || 0,
-        seller_id: Array.isArray(data.profiles) ? data.profiles[0]?.id : data.profiles?.id || '',
+        seller_id: sellerInfo?.id || '',
         created_at: data.created_at,
         updated_at: data.updated_at,
         category: data.categories || {
@@ -101,13 +106,13 @@ export const useProduct = (productId: string | undefined) => {
           slug: 'sem-categoria',
         },
         seller: {
-          id: Array.isArray(data.profiles) ? data.profiles[0]?.id : data.profiles?.id || '',
-          name: Array.isArray(data.profiles) ? data.profiles[0]?.full_name : data.profiles?.full_name || 'Vendedor',
-          avatar: Array.isArray(data.profiles) ? data.profiles[0]?.avatar_url : data.profiles?.avatar_url,
-          location: Array.isArray(data.profiles) ? data.profiles[0]?.location : data.profiles?.location || '',
+          id: sellerInfo?.id || '',
+          name: sellerInfo?.full_name || 'Vendedor',
+          avatar: sellerInfo?.avatar_url,
+          location: sellerInfo?.location || '',
           rating: 0,
           reviewCount: 0,
-          verified: false,
+          verified: !!sellerInfo?.verified,
           specialties: [],
           responseTime: '',
           joinedAt: '',
@@ -151,7 +156,8 @@ export const useProduct = (productId: string | undefined) => {
           profiles!fk_products_profiles (
             id,
             full_name,
-            avatar_url
+            avatar_url,
+            verified
           )
         `)
         .eq('category_id', categoryId)
@@ -160,42 +166,48 @@ export const useProduct = (productId: string | undefined) => {
 
       if (error) throw error;
 
-      const transformedProducts: Product[] = (data || []).map(item => ({
-        id: item.id,
-        name: item.name,
-        slug: item.slug,
-        description: item.description,
-        price: item.price,
-        original_price: item.original_price,
-        images: item.images || [],
-        rating: item.rating || 0,
-        review_count: item.review_count || 0,
-        in_stock: item.in_stock,
-        stock_quantity: item.stock_quantity || 0,
-        tags: item.tags || [],
-        is_service: item.is_service,
-        created_at: item.created_at,
-        updated_at: item.updated_at,
-        category: {
-          id: item.categories?.id || '',
-          name: item.categories?.name || 'Sem categoria',
-          slug: item.categories?.slug || 'sem-categoria',
-          image: item.categories?.image_url,
-        },
-        seller: {
-          id: item.profiles?.id || '',
-          name: item.profiles?.full_name || 'Vendedor',
-          avatar: item.profiles?.avatar_url,
-          location: '',
-          rating: 0,
-          reviewCount: 0,
-          verified: false,
-          specialties: [],
-          responseTime: '',
-          joinedAt: '',
-          description: '',
-        }
-      }));
+      const transformedProducts: Product[] = (data || []).map(item => {
+        const sellerInfo = Array.isArray(item.profiles) ? item.profiles[0] : item.profiles;
+
+        return {
+          id: item.id,
+          name: item.name,
+          slug: item.slug,
+          description: item.description,
+          price: item.price,
+          original_price: (item as any).original_price,
+          images: item.images || [],
+          rating: (item as any).rating || 0,
+          review_count: (item as any).review_count || 0,
+          in_stock: (item as any).in_stock,
+          stock_quantity: item.stock_quantity || 0,
+          tags: (item as any).tags || [],
+          is_active: item.is_active ?? true,
+          seller_id: item.seller_id,
+          is_service: item.type === 'service',
+          created_at: item.created_at,
+          updated_at: item.updated_at,
+          category: {
+            id: item.categories?.id || '',
+            name: item.categories?.name || 'Sem categoria',
+            slug: item.categories?.slug || 'sem-categoria',
+            image: item.categories?.image_url,
+          },
+          seller: {
+            id: sellerInfo?.id || '',
+            name: sellerInfo?.full_name || 'Vendedor',
+            avatar: sellerInfo?.avatar_url,
+            location: '',
+            rating: 0,
+            reviewCount: 0,
+            verified: !!sellerInfo?.verified,
+            specialties: [],
+            responseTime: '',
+            joinedAt: '',
+            description: '',
+          }
+        };
+      });
 
       setRelatedProducts(transformedProducts);
     } catch (err) {
