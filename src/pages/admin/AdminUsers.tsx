@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
   DialogContent,
@@ -24,7 +23,9 @@ import {
 } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRole } from '@/hooks/useRole';
-import { useCRUD } from '@/hooks/useCRUD';
+import { useUsers } from '@/hooks/useUsers';
+import { userService } from '@/services/user.service';
+import { UserProfile, UserRole } from '@/types/auth';
 import {
   Users,
   Plus,
@@ -32,45 +33,39 @@ import {
   Trash2,
   Shield,
   ShieldCheck,
-  UserCheck,
-  UserX,
-  Search
+  UserCheck
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { UserRole } from '@/types/auth';
 
 interface UserFormData {
   name: string;
   email: string;
   phone: string;
-  role: string;
-  status: string;
+  role: UserRole;
+  status: 'active' | 'inactive' | 'pending';
 }
 
 const AdminUsers = () => {
   const { user } = useAuth();
   const { isAdmin } = useRole();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<any>(null);
+  const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [formData, setFormData] = useState<UserFormData>({
     name: '',
     email: '',
     phone: '',
     role: 'buyer',
-    status: 'approved'
+    status: 'active'
   });
 
   const {
-    data: users,
+    users,
     loading,
-    createItem,
-    updateItem,
-    deleteItem,
-    refetch
-  } = useCRUD({
-    table: 'profiles',
-    select: '*, user_roles(role)'
-  });
+    fetchUsers,
+    assignRole,
+    deleteUser,
+    toggleStatus
+  } = useUsers({ fetchOnMount: true });
 
   useEffect(() => {
     if (!isAdmin) {
@@ -84,83 +79,79 @@ const AdminUsers = () => {
 
     try {
       if (editingUser) {
-        await updateItem(editingUser.id, {
+        // Update existing user
+        const { error } = await userService.updateProfile(editingUser.id, {
           full_name: formData.name,
           phone: formData.phone,
-          role: formData.role
+          status: formData.status
+          // Role is handled via assignRole but we can try to update it here too if needed, 
+          // but assignRole is better for consistency.
         });
+
+        if (error) throw error;
+
+        // If role changed, call assignRole
+        if (editingUser.role !== formData.role && formData.role) {
+          await userService.assignRole(editingUser.id, formData.role);
+        }
+
         toast.success('Usuário atualizado com sucesso!');
       } else {
-        // Note: Creating a profile directly might not create the auth user. 
-        // Ideally should use an edge function or admin API to create both.
-        await createItem({
+        // Create new user (Profile only - Auth user creation requires server-side admin API)
+        // For now we just create the profile, but in reality this is incomplete without Auth.
+        // Assuming there is a way to create users via this UI in the future.
+        const { error } = await userService.create({
           full_name: formData.name,
           email: formData.email,
           phone: formData.phone,
-          role: formData.role
-        });
-        toast.success('Usuário criado com sucesso!');
+          role: formData.role,
+          status: formData.status
+        } as any); // Type cast due to strict UserProfile vs CreateDTO
+
+        if (error) throw error;
+        toast.success('Perfil de usuário criado com sucesso!');
       }
 
       setIsDialogOpen(false);
       resetForm();
-      refetch();
+      fetchUsers();
     } catch (error) {
       console.error('Erro ao salvar usuário:', error);
       toast.error('Erro ao salvar usuário');
     }
   };
 
-  const handleEdit = (user: any) => {
+  const handleEdit = (user: UserProfile) => {
     setEditingUser(user);
     setFormData({
       name: user.full_name || '',
       email: user.email || '',
       phone: user.phone || '',
       role: user.role || 'buyer',
-      status: 'approved' // Status logic might be deprecated or need specific column
+      status: user.status || 'active'
     });
     setIsDialogOpen(true);
   };
 
   const handleDelete = async (userId: string) => {
     if (!confirm('Tem certeza que deseja excluir este usuário?')) return;
+    await deleteUser(userId);
+  };
 
-    try {
-      await deleteItem(userId);
-      toast.success('Usuário excluído com sucesso!');
-      refetch();
-    } catch (error) {
-      console.error('Erro ao excluir usuário:', error);
-      toast.error('Erro ao excluir usuário');
+  const handleRoleToggle = async (user: UserProfile) => {
+    // Defines the next role in a cycle or simple toggle
+    // Logic: Buyer -> Seller -> Start over? 
+    // Or just "Promote to Seller" / "Demote to Buyer"
+    const currentRole = user.role || 'buyer';
+    const newRole = currentRole === 'seller' ? 'buyer' : 'seller';
+
+    if (confirm(`Deseja alterar a função de ${currentRole} para ${newRole}?`)) {
+      await assignRole(user.id, newRole);
     }
   };
 
-  const handleToggleStatus = async (user: any) => {
-    // Logic adapted: If 'buyer', promote to 'seller'. If 'seller', demote to 'buyer'.
-    const dbRoles = user.user_roles?.map((r: any) => r.role) || [];
-    const currentRole = dbRoles.includes('seller') ? 'seller' : 'buyer';
-    const newRole = currentRole === 'seller' ? 'buyer' : 'seller';
-
-    try {
-      // 1. Update user_roles table (Atomic Source of Truth)
-      if (newRole === 'seller') {
-        await supabase.from('user_roles').upsert({ user_id: user.id, role: 'seller' }, { onConflict: 'user_id,role' });
-      } else {
-        await supabase.from('user_roles').delete().eq('user_id', user.id).eq('role', 'seller');
-      }
-
-      // 2. Sync profile role (Legacy Compatibility)
-      await updateItem(user.id, {
-        role: newRole
-      });
-
-      toast.success(`Usuário alterado para ${newRole === 'seller' ? 'Vendedor' : 'Comprador'} com sucesso!`);
-      refetch();
-    } catch (error) {
-      console.error('Erro ao alterar papel:', error);
-      toast.error('Erro ao alterar papel do usuário');
-    }
+  const handleStatusToggle = async (user: UserProfile) => {
+    await toggleStatus(user.id);
   };
 
   const resetForm = () => {
@@ -169,7 +160,7 @@ const AdminUsers = () => {
       email: '',
       phone: '',
       role: 'buyer',
-      status: 'approved'
+      status: 'active'
     });
     setEditingUser(null);
   };
@@ -185,27 +176,32 @@ const AdminUsers = () => {
       title: 'Email'
     },
     {
-      key: 'phone',
-      title: 'Telefone',
-      render: (value: string) => value || '-'
-    },
-    {
       key: 'role',
       title: 'Função',
-      render: (_: string, row: any) => {
-        // Source of truth: user_roles table, fallback to profile role
-        const dbRoles = row.user_roles?.map((r: any) => r.role) || [];
-        const role = dbRoles.includes('admin') ? 'admin' :
-          dbRoles.includes('seller') ? 'seller' :
-            row.role || 'buyer';
+      render: (_: string, row: UserProfile) => {
+        // Source of truth: user_roles table (row.roles), fallback to profile role
+        const roles = row.roles?.map((r: any) => r.role) || [];
+        // Check if roles is populated, otherwise use row.role
+        const displayRole = roles.length > 0
+          ? (roles.includes('admin') ? 'admin' : roles.includes('seller') ? 'seller' : 'buyer')
+          : row.role || 'buyer';
 
         return (
-          <Badge variant={role === 'admin' ? 'destructive' : role === 'seller' ? 'default' : 'secondary'}>
-            {role === 'admin' ? 'Administrador' :
-              role === 'seller' ? 'Vendedor' : 'Comprador'}
+          <Badge variant={displayRole === 'admin' ? 'destructive' : displayRole === 'seller' ? 'default' : 'secondary'}>
+            {displayRole === 'admin' ? 'Administrador' :
+              displayRole === 'seller' ? 'Vendedor' : 'Comprador'}
           </Badge>
         );
       }
+    },
+    {
+      key: 'status',
+      title: 'Status',
+      render: (value: string) => (
+        <Badge variant={value === 'active' ? 'outline' : 'secondary'}>
+          {value === 'active' ? 'Ativo' : value === 'pending' ? 'Pendente' : 'Inativo'}
+        </Badge>
+      )
     },
     {
       key: 'created_at',
@@ -218,19 +214,24 @@ const AdminUsers = () => {
     {
       label: 'Editar',
       icon: <Edit className="h-4 w-4" />,
-      onClick: (item: any) => handleEdit(item)
+      onClick: (item: UserProfile) => handleEdit(item)
+    },
+    {
+      label: 'Alterar Função',
+      icon: <ShieldCheck className="h-4 w-4" />,
+      onClick: (item: UserProfile) => handleRoleToggle(item)
     },
     {
       label: 'Alterar Status',
       icon: <UserCheck className="h-4 w-4" />,
-      onClick: (item: any) => handleToggleStatus(item)
+      onClick: (item: UserProfile) => handleStatusToggle(item)
     },
     {
       label: 'Excluir',
       icon: <Trash2 className="h-4 w-4" />,
-      onClick: (item: any) => handleDelete(item.id),
+      onClick: (item: UserProfile) => handleDelete(item.id),
       variant: 'destructive' as const,
-      show: (item: any) => item.id !== user?.id
+      show: (item: UserProfile) => item.id !== user?.id
     }
   ];
 
@@ -306,7 +307,7 @@ const AdminUsers = () => {
                   <Label htmlFor="role">Função</Label>
                   <Select
                     value={formData.role}
-                    onValueChange={(value) => setFormData({ ...formData, role: value })}
+                    onValueChange={(value) => setFormData({ ...formData, role: value as UserRole })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione uma função" />
@@ -322,13 +323,14 @@ const AdminUsers = () => {
                   <Label htmlFor="status">Status</Label>
                   <Select
                     value={formData.status}
-                    onValueChange={(value) => setFormData({ ...formData, status: value })}
+                    onValueChange={(value) => setFormData({ ...formData, status: value as 'active' | 'inactive' | 'pending' })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione um status" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="approved">Aprovado</SelectItem>
+                      <SelectItem value="active">Ativo</SelectItem>
+                      <SelectItem value="inactive">Inativo</SelectItem>
                       <SelectItem value="pending">Pendente</SelectItem>
                     </SelectContent>
                   </Select>

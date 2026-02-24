@@ -18,7 +18,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRole } from '@/hooks/useRole';
-import { useCRUD } from '@/hooks/useCRUD';
+import { useCategories } from '@/hooks/useCategories';
 import {
   FolderOpen,
   Plus,
@@ -27,6 +27,13 @@ import {
   ToggleLeft,
   ToggleRight
 } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from 'sonner';
 import { Category } from '@/types/product';
 
@@ -36,6 +43,7 @@ interface CategoryFormData {
   description: string;
   image_url: string;
   is_active: boolean;
+  parent_id?: string;
 }
 
 const AdminCategories = () => {
@@ -52,13 +60,13 @@ const AdminCategories = () => {
   });
 
   const {
-    data: categories,
+    categories,
     loading,
-    createItem,
-    updateItem,
-    deleteItem,
-    refetch
-  } = useCRUD({ table: 'categories' });
+    createCategory,
+    updateCategory,
+    deleteCategory,
+    error
+  } = useCategories({ scope: 'all' });
 
   useEffect(() => {
     if (!isAdmin) {
@@ -67,43 +75,23 @@ const AdminCategories = () => {
     }
   }, [isAdmin]);
 
-  /* Helper to generate slug */
-  const generateSlug = (text: string) => {
-    return text
-      .toString()
-      .toLowerCase()
-      .normalize('NFD') // Separate accents
-      .replace(/[\u0300-\u036f]/g, '') // Remove accents
-      .replace(/\s+/g, '-') // Replace spaces with -
-      .replace(/[^\w\-]+/g, '') // Remove all non-word chars
-      .replace(/\-\-+/g, '-') // Replace multiple - with single -
-      .replace(/^-+/, '') // Trim - from start
-      .replace(/-+$/, ''); // Trim - from end
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     try {
-      const payload = {
-        ...formData,
-        slug: formData.slug || generateSlug(formData.name)
-      };
+      const payload = { ...formData };
 
       if (editingCategory) {
-        await updateItem(editingCategory.id, payload);
-        toast.success('Categoria atualizada com sucesso!');
+        await updateCategory(editingCategory.id, payload);
       } else {
-        await createItem(payload);
-        toast.success('Categoria criada com sucesso!');
+        await createCategory(payload);
       }
 
       setIsDialogOpen(false);
       resetForm();
-      refetch();
     } catch (error) {
-      console.error('Erro ao salvar categoria:', error);
-      toast.error('Erro ao salvar categoria');
+      console.error('Error handling category submit:', error);
+      // Toast handled by hook
     }
   };
 
@@ -112,8 +100,10 @@ const AdminCategories = () => {
     setFormData({
       name: category.name,
       description: category.description || '',
-      is_active: category.is_active,
-      slug: category.slug || ''
+      is_active: category.is_active ?? true,
+      slug: category.slug || '',
+      image_url: category.image_url || '',
+      parent_id: category.parent_id
     });
     setIsDialogOpen(true);
   };
@@ -122,25 +112,19 @@ const AdminCategories = () => {
     if (!confirm('Tem certeza que deseja excluir esta categoria? Todos os produtos associados serão afetados.')) return;
 
     try {
-      await deleteItem(categoryId);
-      toast.success('Categoria excluída com sucesso!');
-      refetch();
+      await deleteCategory(categoryId);
     } catch (error) {
-      console.error('Erro ao excluir categoria:', error);
-      toast.error('Erro ao excluir categoria. Verifique se não há produtos associados.');
+      console.error('Error deleting category:', error);
     }
   };
 
   const handleToggleStatus = async (category: Category) => {
     try {
-      await updateItem(category.id, {
+      await updateCategory(category.id, {
         is_active: !category.is_active
       });
-      toast.success(`Categoria ${category.is_active ? 'desativada' : 'ativada'} com sucesso!`);
-      refetch();
     } catch (error) {
-      console.error('Erro ao alterar status:', error);
-      toast.error('Erro ao alterar status da categoria');
+      console.error('Error toggling status:', error);
     }
   };
 
@@ -150,7 +134,8 @@ const AdminCategories = () => {
       slug: '',
       description: '',
       image_url: '',
-      is_active: true
+      is_active: true,
+      parent_id: undefined
     });
     setEditingCategory(null);
   };
@@ -178,8 +163,9 @@ const AdminCategories = () => {
       key: 'product_count',
       label: 'Produtos',
       render: (_: any, row: Category) => {
-        // This would need to be calculated from products data
-        return '0'; // Placeholder
+        // This would need to be calculated from products data, hook usage mismatch?
+        // Category type in hook vs type in DataTable might differ slightly or just be optional
+        return row.productCount || row.product_count || '0';
       }
     },
     {
@@ -270,6 +256,29 @@ const AdminCategories = () => {
                     placeholder="Ex: Eletrônicos, Roupas, Casa..."
                     required
                   />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="parent_id">Categoria Pai (Opcional)</Label>
+                  <Select
+                    value={formData.parent_id || "none"}
+                    onValueChange={(value) => setFormData({ ...formData, parent_id: value === "none" ? undefined : value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione uma categoria pai se for subcategoria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhuma (Categoria Principal)</SelectItem>
+                      {categories
+                        ?.filter((c: Category) => c.id !== editingCategory?.id) // Prevent self-parenting
+                        .map((category: Category) => (
+                          <SelectItem key={category.id} value={category.id}>
+                            {category.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Selecione uma categoria pai apenas se esta for uma subcategoria.</p>
                 </div>
 
                 <div className="grid gap-2">

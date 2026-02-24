@@ -1,97 +1,7 @@
-import { BaseService, BaseEntity } from './base.service';
+import { BaseService } from './base.service';
 import { supabase } from '@/integrations/supabase/client';
 import { PostgrestError } from '@supabase/supabase-js';
-
-export interface OrderItem {
-  id: string;
-  order_id: string;
-  product_id: string;
-  quantity: number;
-  unit_price: number;
-  total_price: number;
-  product?: {
-    id: string;
-    name: string;
-    images: string[];
-    seller_id: string;
-  };
-}
-
-export interface Order extends BaseEntity {
-  order_number: string;
-  buyer_id: string;
-  seller_id: string;
-  status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
-  payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
-  payment_method: 'credit_card' | 'debit_card' | 'pix' | 'bank_transfer';
-  subtotal: number;
-  shipping_cost: number;
-  tax_amount: number;
-  discount_amount: number;
-  total_amount: number;
-  shipping_address: {
-    street: string;
-    city: string;
-    state: string;
-    zip_code: string;
-    country: string;
-    recipient_name: string;
-    recipient_phone: string;
-  };
-  billing_address?: {
-    street: string;
-    city: string;
-    state: string;
-    zip_code: string;
-    country: string;
-  };
-  tracking_number?: string;
-  estimated_delivery?: string;
-  delivered_at?: string;
-  cancelled_at?: string;
-  cancellation_reason?: string;
-  notes?: string;
-  // Relations
-  buyer?: {
-    id: string;
-    full_name: string;
-    email: string;
-    avatar_url?: string;
-  };
-  seller?: {
-    id: string;
-    full_name: string;
-    email: string;
-    avatar_url?: string;
-  };
-  order_items?: OrderItem[];
-}
-
-export interface OrderStats {
-  total_orders: number;
-  pending_orders: number;
-  confirmed_orders: number;
-  shipped_orders: number;
-  delivered_orders: number;
-  cancelled_orders: number;
-  total_revenue: number;
-  average_order_value: number;
-  orders_this_month: number;
-  revenue_this_month: number;
-  growth_percentage: number;
-}
-
-export interface OrderFilters {
-  buyer_id?: string;
-  seller_id?: string;
-  status?: Order['status'];
-  payment_status?: Order['payment_status'];
-  date_from?: string;
-  date_to?: string;
-  min_amount?: number;
-  max_amount?: number;
-  search?: string;
-}
+import { Order, OrderItem, OrderStats, OrderFilters, OrderStatus } from '@/types/order';
 
 class OrderService extends BaseService<Order> {
   constructor() {
@@ -112,7 +22,7 @@ class OrderService extends BaseService<Order> {
           *,
           buyer:profiles!orders_buyer_id_fkey(id, full_name, email, avatar_url),
           seller:profiles!orders_seller_id_fkey(id, full_name, email, avatar_url),
-          order_items(
+          items:order_items(
             id,
             product_id,
             quantity,
@@ -188,19 +98,29 @@ class OrderService extends BaseService<Order> {
   /**
    * Get order statistics
    */
-  async getOrderStats(): Promise<{ data: OrderStats | null; error: PostgrestError | null }> {
+  async getOrderStats(filters: { buyer_id?: string; seller_id?: string } = {}): Promise<{ data: OrderStats | null; error: PostgrestError | null }> {
     try {
+      const { buyer_id, seller_id } = filters;
+
+      const buildQuery = (status?: string) => {
+        let query = supabase.from(this.tableName).select('*', { count: 'exact', head: true });
+        if (buyer_id) query = query.eq('buyer_id', buyer_id);
+        if (seller_id) query = query.eq('seller_id', seller_id);
+        if (status) query = query.eq('status', status);
+        return query;
+      };
+
       // Get total orders
-      const { count: totalOrders, error: totalError } = await this.count();
+      const { count: totalOrders, error: totalError } = await buildQuery();
       if (totalError) throw totalError;
 
       // Get orders by status
       const statusCounts = await Promise.all([
-        this.count({ status: 'pending' }),
-        this.count({ status: 'confirmed' }),
-        this.count({ status: 'shipped' }),
-        this.count({ status: 'delivered' }),
-        this.count({ status: 'cancelled' })
+        buildQuery('pending'),
+        buildQuery('confirmed'),
+        buildQuery('shipped'),
+        buildQuery('delivered'),
+        buildQuery('cancelled')
       ]);
 
       const [pendingResult, confirmedResult, shippedResult, deliveredResult, cancelledResult] = statusCounts;
@@ -210,26 +130,36 @@ class OrderService extends BaseService<Order> {
       }
 
       // Get revenue statistics
-      const { data: revenueData, error: revenueError } = await supabase
+      let revenueQuery = supabase
         .from(this.tableName)
         .select('total_amount, created_at')
         .in('status', ['confirmed', 'processing', 'shipped', 'delivered']);
 
+      if (buyer_id) revenueQuery = revenueQuery.eq('buyer_id', buyer_id);
+      if (seller_id) revenueQuery = revenueQuery.eq('seller_id', seller_id);
+
+      const { data: revenueData, error: revenueError } = await revenueQuery;
+
       if (revenueError) throw revenueError;
 
       const totalRevenue = revenueData?.reduce((sum, order) => sum + order.total_amount, 0) || 0;
-      const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+      const averageOrderValue = totalOrders && totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
       // Get this month's data
       const startOfMonth = new Date();
       startOfMonth.setDate(1);
       startOfMonth.setHours(0, 0, 0, 0);
 
-      const { data: thisMonthData, error: thisMonthError } = await supabase
+      let thisMonthQuery = supabase
         .from(this.tableName)
         .select('total_amount')
         .gte('created_at', startOfMonth.toISOString())
         .in('status', ['confirmed', 'processing', 'shipped', 'delivered']);
+
+      if (buyer_id) thisMonthQuery = thisMonthQuery.eq('buyer_id', buyer_id);
+      if (seller_id) thisMonthQuery = thisMonthQuery.eq('seller_id', seller_id);
+
+      const { data: thisMonthData, error: thisMonthError } = await thisMonthQuery;
 
       if (thisMonthError) throw thisMonthError;
 
@@ -242,27 +172,32 @@ class OrderService extends BaseService<Order> {
       lastMonth.setDate(1);
       lastMonth.setHours(0, 0, 0, 0);
 
-      const { data: lastMonthData, error: lastMonthError } = await supabase
+      let lastMonthQuery = supabase
         .from(this.tableName)
         .select('total_amount')
         .gte('created_at', lastMonth.toISOString())
         .lt('created_at', startOfMonth.toISOString())
         .in('status', ['confirmed', 'processing', 'shipped', 'delivered']);
 
+      if (buyer_id) lastMonthQuery = lastMonthQuery.eq('buyer_id', buyer_id);
+      if (seller_id) lastMonthQuery = lastMonthQuery.eq('seller_id', seller_id);
+
+      const { data: lastMonthData, error: lastMonthError } = await lastMonthQuery;
+
       if (lastMonthError) throw lastMonthError;
 
       const revenueLastMonth = lastMonthData?.reduce((sum, order) => sum + order.total_amount, 0) || 0;
-      const growthPercentage = revenueLastMonth > 0 
-        ? ((revenueThisMonth - revenueLastMonth) / revenueLastMonth) * 100 
+      const growthPercentage = revenueLastMonth > 0
+        ? ((revenueThisMonth - revenueLastMonth) / revenueLastMonth) * 100
         : 0;
 
       const stats: OrderStats = {
-        total_orders: totalOrders,
-        pending_orders: pendingResult.count,
-        confirmed_orders: confirmedResult.count,
-        shipped_orders: shippedResult.count,
-        delivered_orders: deliveredResult.count,
-        cancelled_orders: cancelledResult.count,
+        total_orders: totalOrders || 0,
+        pending_orders: pendingResult.count || 0,
+        confirmed_orders: confirmedResult.count || 0,
+        shipped_orders: shippedResult.count || 0,
+        delivered_orders: deliveredResult.count || 0,
+        cancelled_orders: cancelledResult.count || 0,
         total_revenue: totalRevenue,
         average_order_value: Math.round(averageOrderValue * 100) / 100,
         orders_this_month: ordersThisMonth,
@@ -281,7 +216,7 @@ class OrderService extends BaseService<Order> {
    * Create order with items
    */
   async createOrderWithItems(
-    orderData: Omit<Order, 'id' | 'created_at' | 'updated_at' | 'order_number'>,
+    orderData: Omit<Order, 'id' | 'created_at' | 'updated_at' | 'order_number' | 'items'>,
     items: Omit<OrderItem, 'id' | 'order_id'>[]
   ): Promise<{ data: Order | null; error: PostgrestError | null }> {
     try {
@@ -316,7 +251,7 @@ class OrderService extends BaseService<Order> {
 
       // Return order with items
       const { data: completeOrder, error: fetchError } = await this.getOrderWithItems(order.id);
-      
+
       return {
         data: completeOrder,
         error: fetchError
@@ -331,6 +266,76 @@ class OrderService extends BaseService<Order> {
   }
 
   /**
+   * Create order with items and handle business logic (stock, appointments)
+   */
+  async createOrderWithItemsAndLogic(
+    orderData: Omit<Order, 'id' | 'created_at' | 'updated_at' | 'order_number' | 'items'>,
+    items: { product: any; quantity: number; variant?: any; gift_message?: string }[],
+    options: { updateStock?: boolean; createAppointments?: boolean; deliverySchedule?: any } = {}
+  ): Promise<{ data: Order | null; error: Error | PostgrestError | null }> {
+    try {
+      // 1. Create the order using existing method or inline logic
+      const orderItemsData = items.map(item => ({
+        product_id: item.product.id,
+        quantity: item.quantity,
+        unit_price: item.product.price,
+        total_price: item.quantity * item.product.price,
+        variant_id: item.variant?.id || null,
+        seller_id: item.product.seller_id || item.product.seller?.id || '00000000-0000-0000-0000-000000000000',
+        gift_message: item.gift_message || null
+      }));
+
+      const { data: order, error: orderError } = await this.createOrderWithItems(
+        orderData,
+        orderItemsData
+      );
+
+      if (orderError || !order) return { data: null, error: orderError };
+
+      // 2. Handle Stock Updates
+      if (options.updateStock) {
+        for (const item of items) {
+          if (!item.product.is_service && item.product.stock_quantity !== null) {
+            await supabase
+              .from('products')
+              .update({
+                stock_quantity: Math.max(0, item.product.stock_quantity - item.quantity)
+              })
+              .eq('id', item.product.id);
+          }
+        }
+      }
+
+      // 3. Handle Appointments for Services
+      if (options.createAppointments) {
+        for (const item of items) {
+          if (item.product.is_service) {
+            const shippingAddr = typeof order.shipping_address === 'string'
+              ? JSON.parse(order.shipping_address)
+              : order.shipping_address;
+
+            await supabase.from('appointments').insert({
+              buyer_id: order.buyer_id,
+              seller_id: item.product.seller_id || item.product.seller?.id,
+              product_id: item.product.id,
+              appointment_date: options.deliverySchedule?.scheduled_date || new Date().toISOString().split('T')[0],
+              appointment_time: options.deliverySchedule?.scheduled_slot || '09:00',
+              service_address: shippingAddr ? `${shippingAddr.street}, ${shippingAddr.number || ''}` : '',
+              status: 'pending',
+              notes: `Agendamento automático via pedido #${order.id.slice(0, 8)}.`
+            });
+          }
+        }
+      }
+
+      return { data: order, error: null };
+    } catch (error: any) {
+      console.error('Error in createOrderWithItemsAndLogic:', error);
+      return { data: null, error };
+    }
+  }
+
+  /**
    * Get order with items
    */
   async getOrderWithItems(orderId: string): Promise<{ data: Order | null; error: PostgrestError | null }> {
@@ -341,7 +346,7 @@ class OrderService extends BaseService<Order> {
           *,
           buyer:profiles!orders_buyer_id_fkey(id, full_name, email, avatar_url),
           seller:profiles!orders_seller_id_fkey(id, full_name, email, avatar_url),
-          order_items(
+          items:order_items(
             id,
             product_id,
             quantity,
@@ -370,8 +375,8 @@ class OrderService extends BaseService<Order> {
    * Update order status
    */
   async updateOrderStatus(
-    orderId: string, 
-    status: Order['status'],
+    orderId: string,
+    status: OrderStatus,
     trackingNumber?: string
   ): Promise<{ data: Order | null; error: PostgrestError | null }> {
     try {
@@ -403,7 +408,7 @@ class OrderService extends BaseService<Order> {
    * Cancel order
    */
   async cancelOrder(
-    orderId: string, 
+    orderId: string,
     reason: string
   ): Promise<{ data: Order | null; error: PostgrestError | null }> {
     try {
@@ -431,7 +436,7 @@ class OrderService extends BaseService<Order> {
         .select(`
           *,
           seller:profiles!orders_seller_id_fkey(id, full_name, email, avatar_url),
-          order_items(
+          items:order_items(
             id,
             product_id,
             quantity,
@@ -466,7 +471,7 @@ class OrderService extends BaseService<Order> {
         .select(`
           *,
           buyer:profiles!orders_buyer_id_fkey(id, full_name, email, avatar_url),
-          order_items(
+          items:order_items(
             id,
             product_id,
             quantity,
@@ -543,7 +548,7 @@ class OrderService extends BaseService<Order> {
           created_at,
           total_amount,
           status,
-          order_items(quantity, unit_price, total_price)
+          items:order_items(quantity, unit_price, total_price)
         `)
         .gte('created_at', startDate)
         .lte('created_at', endDate)
@@ -563,8 +568,8 @@ class OrderService extends BaseService<Order> {
       const reportData = {
         total_orders: data?.length || 0,
         total_revenue: data?.reduce((sum, order) => sum + order.total_amount, 0) || 0,
-        total_items_sold: data?.reduce((sum, order) => 
-          sum + (order.order_items?.reduce((itemSum, item) => itemSum + item.quantity, 0) || 0), 0
+        total_items_sold: data?.reduce((sum: number, order: any) =>
+          sum + (order.items?.reduce((itemSum: number, item: any) => itemSum + item.quantity, 0) || 0), 0
         ) || 0,
         daily_sales: this.groupSalesByDay(data || []),
         status_breakdown: this.groupSalesByStatus(data || [])
@@ -591,7 +596,7 @@ class OrderService extends BaseService<Order> {
       return acc;
     }, {} as Record<string, any>);
 
-    return Object.values(dailySales).sort((a: any, b: any) => 
+    return Object.values(dailySales).sort((a: any, b: any) =>
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
   }

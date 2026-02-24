@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRole } from '@/hooks/useRole';
-import { useCRUD } from '@/hooks/useCRUD';
+import { useOrders } from '@/hooks/useOrders';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -17,15 +17,11 @@ import {
   CheckCircle,
   Star
 } from 'lucide-react';
+import { Order } from '@/types/order';
 
 interface BuyerMetrics {
-  totalOrders: number;
-  pendingOrders: number;
-  completedOrders: number;
-  totalSpent: number;
   wishlistItems: number;
   upcomingAppointments: number;
-  recentOrders: any[];
   favoriteProducts: any[];
 }
 
@@ -33,43 +29,36 @@ export default function BuyerDashboard() {
   const { user, profile } = useAuth();
   const { hasRole } = useRole();
   const navigate = useNavigate();
-  const [metrics, setMetrics] = useState<BuyerMetrics>({
-    totalOrders: 0,
-    pendingOrders: 0,
-    completedOrders: 0,
-    totalSpent: 0,
+  const [extraMetrics, setExtraMetrics] = useState<BuyerMetrics>({
     wishlistItems: 0,
     upcomingAppointments: 0,
-    recentOrders: [],
     favoriteProducts: []
   });
-  const [loading, setLoading] = useState(true);
+  const [loadingExtra, setLoadingExtra] = useState(true);
 
   const isBuyer = hasRole('buyer');
 
+  const {
+    orders,
+    stats,
+    loading: loadingOrders,
+    fetchStats,
+    fetchOrders
+  } = useOrders({
+    scope: 'buyer',
+    fetchOnMount: true
+  });
+
   useEffect(() => {
     if (user && isBuyer) {
-      loadBuyerMetrics();
+      loadExtraMetrics();
+      fetchStats();
     }
-  }, [user, isBuyer]);
+  }, [user, isBuyer, fetchStats]);
 
-  const loadBuyerMetrics = async () => {
+  const loadExtraMetrics = async () => {
     try {
-      setLoading(true);
-
-      const { data: ordData, error: ordError } = await supabase
-        .from('orders')
-        .select(`
-          *,
-          order_items (
-            *,
-            products (*)
-          )
-        `)
-        .eq('buyer_id', user?.id)
-        .order('created_at', { ascending: false });
-
-      if (ordError) throw ordError;
+      setLoadingExtra(true);
 
       const { count: wishCount, error: wishError } = await supabase
         .from('wishlist')
@@ -86,45 +75,25 @@ export default function BuyerDashboard() {
 
       if (apptError) throw apptError;
 
-      const totalOrders = ordData?.length || 0;
-      const pendingOrders = ordData?.filter(o => o.status === 'pending').length || 0;
-      const completedOrders = ordData?.filter(o => o.status === 'delivered').length || 0;
-      const totalSpent = ordData?.reduce((acc, curr) => acc + (curr.total_amount || 0), 0) || 0;
-
-      const recentOrders = ordData?.slice(0, 5).map(order => ({
-        id: order.id,
-        seller_name: 'Vendedor', // We might need to fetch profile for each item's seller_id
-        total_amount: order.total_amount,
-        status: order.status,
-        created_at: order.created_at,
-        items: order.order_items?.map((item: any) => ({
-          product_name: item.products?.name || 'Produto',
-          quantity: item.quantity
-        })) || []
-      })) || [];
-
-      setMetrics({
-        totalOrders,
-        pendingOrders,
-        completedOrders,
-        totalSpent,
+      setExtraMetrics({
         wishlistItems: wishCount || 0,
         upcomingAppointments: apptData?.length || 0,
-        recentOrders,
         favoriteProducts: [] // TODO: Fetch from wishlist with product details
       });
 
     } catch (error: any) {
-      console.error('Error loading buyer metrics:', error);
+      console.error('Error loading extra metrics:', error);
       toast({
         variant: "destructive",
         title: "Erro ao carregar dados",
         description: error.message
       });
     } finally {
-      setLoading(false);
+      setLoadingExtra(false);
     }
   };
+
+  const recentOrders = orders.slice(0, 5);
 
   if (!isBuyer) {
     return (
@@ -153,9 +122,9 @@ export default function BuyerDashboard() {
             <ShoppingCart className="h-4 w-4 text-wine" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics.totalOrders}</div>
+            <div className="text-2xl font-bold">{stats?.total_orders || 0}</div>
             <p className="text-xs text-muted-foreground">
-              {metrics.pendingOrders} pendentes
+              {stats?.pending_orders || 0} pendentes
             </p>
           </CardContent>
         </Card>
@@ -166,7 +135,7 @@ export default function BuyerDashboard() {
             <Calendar className="h-4 w-4 text-wine" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics.upcomingAppointments}</div>
+            <div className="text-2xl font-bold">{extraMetrics.upcomingAppointments}</div>
             <p className="text-xs text-muted-foreground">
               próximos
             </p>
@@ -179,7 +148,7 @@ export default function BuyerDashboard() {
             <Heart className="h-4 w-4 text-wine" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics.wishlistItems}</div>
+            <div className="text-2xl font-bold">{extraMetrics.wishlistItems}</div>
             <p className="text-xs text-muted-foreground">
               produtos salvos
             </p>
@@ -192,9 +161,9 @@ export default function BuyerDashboard() {
             <Package className="h-4 w-4 text-wine" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">R$ {metrics.totalSpent.toFixed(2)}</div>
+            <div className="text-2xl font-bold">R$ {(stats?.total_revenue || 0).toFixed(2)}</div>
             <p className="text-xs text-muted-foreground">
-              em {metrics.completedOrders} pedidos
+              em {stats?.delivered_orders || 0} pedidos entregues
             </p>
           </CardContent>
         </Card>
@@ -212,15 +181,15 @@ export default function BuyerDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {metrics.recentOrders.length > 0 ? (
-              metrics.recentOrders.map((order) => (
+            {recentOrders.length > 0 ? (
+              recentOrders.map((order) => (
                 <div key={order.id} className="flex items-center justify-between p-4 border rounded-lg">
                   <div className="space-y-1">
                     <p className="font-medium">#{order.id.slice(0, 8)}</p>
-                    <p className="text-sm text-muted-foreground">{order.seller_name}</p>
+                    <p className="text-sm text-muted-foreground">{order.seller?.full_name || 'Vendedor'}</p>
                     <p className="text-sm text-muted-foreground">
-                      {order.items[0]?.product_name}
-                      {order.items.length > 1 && ` +${order.items.length - 1} mais`}
+                      {order.items?.[0]?.product?.name || 'Produto'}
+                      {(order.items?.length || 0) > 1 && ` +${(order.items?.length || 0) - 1} mais`}
                     </p>
                   </div>
                   <div className="text-right space-y-1">
@@ -255,8 +224,8 @@ export default function BuyerDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {metrics.favoriteProducts.length > 0 ? (
-              metrics.favoriteProducts.map((product) => (
+            {extraMetrics.favoriteProducts.length > 0 ? (
+              extraMetrics.favoriteProducts.map((product) => (
                 <div key={product.id} className="flex items-center gap-4 p-4 border rounded-lg">
                   <img
                     src={product.image_url}
@@ -294,7 +263,7 @@ export default function BuyerDashboard() {
             <Clock className="h-4 w-4 text-orange-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics.pendingOrders}</div>
+            <div className="text-2xl font-bold">{stats?.pending_orders || 0}</div>
           </CardContent>
         </Card>
 
@@ -304,7 +273,7 @@ export default function BuyerDashboard() {
             <CheckCircle className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics.completedOrders}</div>
+            <div className="text-2xl font-bold">{stats?.delivered_orders || 0}</div>
           </CardContent>
         </Card>
 

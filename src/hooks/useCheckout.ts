@@ -99,7 +99,10 @@ export const useCheckout = () => {
       const uberEnabled = settings?.find(s => s.key === 'shipping_uber_enabled')?.value === true || settings?.find(s => s.key === 'shipping_uber_enabled')?.value === 'true';
       const expressTariff = Number(settings?.find(s => s.key === 'shipping_express_tariff')?.value || 0);
 
-      // Add Seller Delivery option if enabled for this seller
+      // Check Product specific shipping options (from the first item as main reference)
+      const productShippingOptions = items[0]?.product.shipping_options;
+
+      // Add Seller Delivery option if enabled for this product OR seller profile
       const firstItem = items[0];
       if (firstItem && firstItem.product.seller_id) {
         const { data: sellerData } = await supabase
@@ -108,12 +111,15 @@ export const useCheckout = () => {
           .eq('id', firstItem.product.seller_id)
           .single();
 
-        if (sellerData && (sellerData as any).seller_delivery_enabled) {
+        // Check if enabled in Product (new way) or Profile (legacy way)
+        const ownDeliveryEnabled = productShippingOptions?.own_delivery || (sellerData as any)?.seller_delivery_enabled;
+
+        if (ownDeliveryEnabled) {
           quotes.push({
             id: 'seller-delivery',
-            name: 'Entrega Própria (Sede do Vendedor)',
-            price: 0, // Combinar ou valor fixo?
-            estimated_delivery: 'A combinar com vendedor',
+            name: 'Entrega Própria (A combinar)',
+            price: 0,
+            estimated_delivery: 'Combinar com vendedor',
             company: {
               name: 'Vendedor',
               logo_url: ''
@@ -122,16 +128,24 @@ export const useCheckout = () => {
         }
       }
 
-      // Add Uber Direct if enabled
-      if (uberEnabled) {
+      // Add Uber Direct if enabled in Product OR Site Settings
+      // We check product first.
+      const productUberEnabled = productShippingOptions?.express_delivery;
+
+      if (productUberEnabled || uberEnabled) {
+        // Only add if not already added by some other logic, but quotes logic is simple here.
+        // Ensure we don't duplicate if site settings enabled it AND product enabled it.
+        // Actually, let's treat product setting as an override or specific enabler.
+        // If product explicitly enables 'express_delivery', show it.
+
         quotes.push({
           id: 'uber-direct',
           name: `Uber Flash (Express) ${expressTariff > 0 ? `+${expressTariff}%` : ''}`,
-          price: 18.90 * (1 + (expressTariff / 100)), // Simulate Uber base + tariff
+          price: 18.90 * (1 + (expressTariff / 100)), // Base calculation
           estimated_delivery: 'Entrega em até 90 min',
           company: {
             name: 'Uber',
-            logo_url: '/uber-logo.png'
+            logo_url: 'https://images.tcdn.com.br/img/editor/up/1277028/uber.png' // Add a valid placeholder logo or keep empty
           }
         } as any);
       }
@@ -234,7 +248,7 @@ export const useCheckout = () => {
         name: `${checkoutData.firstName} ${checkoutData.lastName}`.trim(),
         email: checkoutData.email,
         phone: checkoutData.phone,
-        document: user?.user_metadata?.cpf || '00000000000' // TODO: Ensure CPF is collected in checkout if not in profile
+        document: (user?.user_metadata as any)?.cpf || '00000000000' // TODO: Ensure CPF is collected in checkout if not in profile
       };
 
       let paymentResult;

@@ -9,15 +9,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
 import { useRole } from '@/hooks/useRole';
+import { useOrders } from '@/hooks/useOrders';
+import { useProfile } from '@/hooks/useProfile';
+import { UserProfile } from '@/types/auth';
 import {
   User,
-  Mail,
-  Phone,
   MapPin,
-  Calendar,
   Bell,
   Shield,
   Camera,
@@ -28,165 +26,100 @@ import {
   ShoppingCart
 } from 'lucide-react';
 
-interface UserProfile {
-  id: string;
-  email: string;
-  full_name: string;
-  phone: string;
-  birth_date: string;
-  address: {
-    street: string;
-    number: string;
-    complement: string;
-    neighborhood: string;
-    city: string;
-    state: string;
-    zip_code: string;
-  };
-  avatar_url: string;
-  bio: string;
-  preferences: {
-    email_notifications: boolean;
-    sms_notifications: boolean;
-    marketing_emails: boolean;
-    order_updates: boolean;
-  };
-  stats: {
-    total_orders: number;
-    total_spent: number;
-    wishlist_items: number;
-    reviews_given: number;
-  };
-}
-
 export default function BuyerProfile() {
   const { user } = useAuth();
   const { hasRole } = useRole();
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const {
+    profile: authProfile,
+    loading: profileLoading,
+    activity,
+    fetchActivity,
+    updateProfile,
+    updateAvatar
+  } = useProfile();
+
+  const [localProfile, setLocalProfile] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
   const isBuyer = hasRole('buyer');
 
+  const { stats, fetchStats } = useOrders({
+    scope: 'buyer',
+    fetchOnMount: true
+  });
+
   useEffect(() => {
     if (user && isBuyer) {
-      loadProfile();
+      fetchStats();
+      fetchActivity();
     }
-  }, [user, isBuyer]);
+  }, [user, isBuyer, fetchStats, fetchActivity]);
 
-  const loadProfile = async () => {
-    try {
-      setLoading(true);
-
-      const { data: profData, error: profError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user?.id)
-        .single();
-
-      if (profError) throw profError;
-
-      const { data: ordData, error: ordError } = await supabase
-        .from('orders')
-        .select('total_amount, status')
-        .eq('buyer_id', user?.id);
-
-      if (ordError) throw ordError;
-
-      const { count: wishCount, error: wishError } = await supabase
-        .from('wishlist')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user?.id);
-
-      if (wishError) throw wishError;
-
-      // Map Supabase profile to UI state
-      const mappedProfile: UserProfile = {
-        id: profData.id,
-        email: profData.email,
-        full_name: profData.full_name || '',
-        phone: profData.phone || '',
-        birth_date: (profData as any).birth_date || '',
-        address: {
-          street: profData.address || '',
-          number: (profData as any).address_number || '',
-          complement: (profData as any).address_complement || '',
-          neighborhood: (profData as any).neighborhood || '',
-          city: profData.city || '',
-          state: profData.state || '',
-          zip_code: profData.postal_code || ''
-        },
-        avatar_url: profData.avatar_url || '',
-        bio: profData.bio || '',
-        preferences: (profData as any).preferences || {
+  useEffect(() => {
+    if (authProfile) {
+      // Map flat profile to UI structure (if we want to keep the UI structure)
+      // Or we can adjust the UI. Let's map for minimal UI disruption.
+      // Actually, let's use the local state to hold the form data.
+      setLocalProfile({
+        ...authProfile,
+        // Ensure preferences object exists
+        preferences: authProfile.preferences || {
           email_notifications: true,
           sms_notifications: false,
           marketing_emails: true,
           order_updates: true
         },
-        stats: {
-          total_orders: ordData?.length || 0,
-          total_spent: ordData?.reduce((acc, curr) => acc + (curr.total_amount || 0), 0) || 0,
-          wishlist_items: wishCount || 0,
-          reviews_given: 0 // TODO: Fetch from reviews table
-        }
-      };
-
-      setProfile(mappedProfile);
-    } catch (error: any) {
-      console.error('Error loading profile:', error);
-      toast({
-        variant: "destructive",
-        title: "Erro ao carregar perfil",
-        description: error.message
+        // Normalize address for the form if needed, or just use flat fields
+        // The previous UI used a nested 'address' object. 
+        // Let's reconstruct it for the form state to match existing input bindings,
+        // OR update the input bindings to use flat fields.
+        // Updating input bindings is cleaner.
+        addressStr: authProfile.address || '',
+        addressNumber: (authProfile as any).address_number || '',
+        addressComplement: (authProfile as any).address_complement || '',
+        neighborhood: (authProfile as any).neighborhood || '',
+        city: authProfile.city || '',
+        state: authProfile.state || '',
+        zipCode: authProfile.postal_code || '',
+        birthDate: (authProfile as any).birth_date || ''
       });
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [authProfile]);
 
   const handleSaveProfile = async () => {
-    if (!profile || !user) return;
+    if (!localProfile || !user) return;
 
     try {
       setSaving(true);
 
-      const updates = {
-        full_name: profile.full_name,
-        phone: profile.phone,
-        birth_date: profile.birth_date || null,
-        address: profile.address.street,
-        address_number: profile.address.number,
-        address_complement: profile.address.complement,
-        neighborhood: profile.address.neighborhood,
-        city: profile.address.city,
-        state: profile.address.state,
-        postal_code: profile.address.zip_code,
-        bio: profile.bio,
-        updated_at: new Date().toISOString(),
+      const updates: Partial<UserProfile> = {
+        full_name: localProfile.full_name,
+        phone: localProfile.phone,
+        bio: localProfile.bio,
+        // Map back to flat fields
+        address: localProfile.addressStr,
+        city: localProfile.city,
+        state: localProfile.state,
+        postal_code: localProfile.zipCode,
+        // Extra fields that might need to be added to UserProfile or passed as any if strict
+        preferences: localProfile.preferences,
       };
 
-      const { error } = await supabase
-        .from('profiles')
-        .update(updates)
-        .eq('id', user.id);
+      // Handle extra fields via 'any' cast if they are not in UserProfile yet (like birth_date)
+      // or add them to UserProfile. I'll cast for now.
+      const extraUpdates = {
+        birth_date: localProfile.birthDate,
+        address_number: localProfile.addressNumber,
+        address_complement: localProfile.addressComplement,
+        neighborhood: localProfile.neighborhood,
+      };
 
-      if (error) throw error;
-
-      toast({
-        title: "Sucesso",
-        description: "Perfil atualizado com sucesso!"
-      });
+      await updateProfile({ ...updates, ...extraUpdates } as any);
 
       setIsEditing(false);
     } catch (error: any) {
       console.error('Error saving profile:', error);
-      toast({
-        variant: "destructive",
-        title: "Erro ao salvar",
-        description: error.message
-      });
     } finally {
       setSaving(false);
     }
@@ -194,43 +127,8 @@ export default function BuyerProfile() {
 
   const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file && profile && user) {
-      try {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${user.id}-${Math.random()}.${fileExt}`;
-        const filePath = `avatars/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('avatars')
-          .upload(filePath, file);
-
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('avatars')
-          .getPublicUrl(filePath);
-
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({ avatar_url: publicUrl })
-          .eq('id', user.id);
-
-        if (updateError) throw updateError;
-
-        setProfile({ ...profile, avatar_url: publicUrl });
-
-        toast({
-          title: "Sucesso",
-          description: "Foto atualizada com sucesso!"
-        });
-      } catch (error: any) {
-        console.error('Error uploading avatar:', error);
-        toast({
-          variant: "destructive",
-          title: "Erro ao enviar foto",
-          description: error.message
-        });
-      }
+    if (file) {
+      await updateAvatar(file);
     }
   };
 
@@ -242,39 +140,13 @@ export default function BuyerProfile() {
     );
   }
 
-  if (loading) {
+  if (profileLoading || !localProfile) {
     return (
-      <div className="space-y-6">
-        <div className="animate-pulse">
-          <div className="h-8 bg-muted rounded w-48 mb-2" />
-          <div className="h-4 bg-muted rounded w-64" />
+      <div className="space-y-6 container mx-auto px-4 pb-12">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-muted rounded w-48" />
+          <div className="h-64 bg-muted rounded" />
         </div>
-        <div className="grid gap-6 md:grid-cols-2">
-          {[...Array(4)].map((_, i) => (
-            <Card key={i} className="animate-pulse">
-              <CardHeader>
-                <div className="h-6 bg-muted rounded w-32" />
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="h-4 bg-muted rounded" />
-                  <div className="h-4 bg-muted rounded w-3/4" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (!profile) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64 text-center">
-        <User className="h-16 w-16 text-muted-foreground mb-4" />
-        <h2 className="text-xl font-semibold mb-2">Não foi possível carregar o perfil</h2>
-        <p className="text-muted-foreground mb-4">Ocorreu um erro ao buscar seus dados ou sua conta ainda não está totalmente configurada.</p>
-        <Button onClick={loadProfile}>Tentar Novamente</Button>
       </div>
     );
   }
@@ -314,7 +186,7 @@ export default function BuyerProfile() {
             <ShoppingCart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{profile.stats.total_orders}</div>
+            <div className="text-2xl font-bold">{stats?.total_orders || 0}</div>
           </CardContent>
         </Card>
 
@@ -324,7 +196,7 @@ export default function BuyerProfile() {
             <CreditCard className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">R$ {profile.stats.total_spent.toFixed(2)}</div>
+            <div className="text-2xl font-bold">R$ {(stats?.total_revenue || 0).toFixed(2)}</div>
           </CardContent>
         </Card>
 
@@ -334,7 +206,7 @@ export default function BuyerProfile() {
             <Heart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{profile.stats.wishlist_items}</div>
+            <div className="text-2xl font-bold">{activity?.wishlist_count || 0}</div>
           </CardContent>
         </Card>
 
@@ -344,7 +216,7 @@ export default function BuyerProfile() {
             <Badge className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{profile.stats.reviews_given}</div>
+            <div className="text-2xl font-bold">{activity?.reviews_count || 0}</div>
           </CardContent>
         </Card>
       </div>
@@ -369,9 +241,9 @@ export default function BuyerProfile() {
               {/* Avatar */}
               <div className="flex items-center gap-4">
                 <Avatar className="h-20 w-20">
-                  <AvatarImage src={profile.avatar_url} />
+                  <AvatarImage src={localProfile.avatar_url} />
                   <AvatarFallback>
-                    {profile.full_name.split(' ').map(n => n[0]).join('')}
+                    {localProfile.full_name?.split(' ').map((n: string) => n[0]).join('') || 'U'}
                   </AvatarFallback>
                 </Avatar>
                 {isEditing && (
@@ -400,8 +272,8 @@ export default function BuyerProfile() {
                   <Label htmlFor="full_name">Nome Completo</Label>
                   <Input
                     id="full_name"
-                    value={profile.full_name}
-                    onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
+                    value={localProfile.full_name || ''}
+                    onChange={(e) => setLocalProfile({ ...localProfile, full_name: e.target.value })}
                     disabled={!isEditing}
                   />
                 </div>
@@ -410,7 +282,7 @@ export default function BuyerProfile() {
                   <Input
                     id="email"
                     type="email"
-                    value={profile.email}
+                    value={localProfile.email || ''}
                     disabled
                   />
                 </div>
@@ -418,8 +290,8 @@ export default function BuyerProfile() {
                   <Label htmlFor="phone">Telefone</Label>
                   <Input
                     id="phone"
-                    value={profile.phone}
-                    onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                    value={localProfile.phone || ''}
+                    onChange={(e) => setLocalProfile({ ...localProfile, phone: e.target.value })}
                     disabled={!isEditing}
                   />
                 </div>
@@ -428,8 +300,8 @@ export default function BuyerProfile() {
                   <Input
                     id="birth_date"
                     type="date"
-                    value={profile.birth_date}
-                    onChange={(e) => setProfile({ ...profile, birth_date: e.target.value })}
+                    value={localProfile.birthDate || ''}
+                    onChange={(e) => setLocalProfile({ ...localProfile, birthDate: e.target.value })}
                     disabled={!isEditing}
                   />
                 </div>
@@ -439,8 +311,8 @@ export default function BuyerProfile() {
                 <Label htmlFor="bio">Biografia</Label>
                 <Textarea
                   id="bio"
-                  value={profile.bio}
-                  onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
+                  value={localProfile.bio || ''}
+                  onChange={(e) => setLocalProfile({ ...localProfile, bio: e.target.value })}
                   disabled={!isEditing}
                   rows={3}
                 />
@@ -463,11 +335,8 @@ export default function BuyerProfile() {
                   <Label htmlFor="street">Rua</Label>
                   <Input
                     id="street"
-                    value={profile.address.street}
-                    onChange={(e) => setProfile({
-                      ...profile,
-                      address: { ...profile.address, street: e.target.value }
-                    })}
+                    value={localProfile.addressStr || ''}
+                    onChange={(e) => setLocalProfile({ ...localProfile, addressStr: e.target.value })}
                     disabled={!isEditing}
                   />
                 </div>
@@ -475,11 +344,8 @@ export default function BuyerProfile() {
                   <Label htmlFor="number">Número</Label>
                   <Input
                     id="number"
-                    value={profile.address.number}
-                    onChange={(e) => setProfile({
-                      ...profile,
-                      address: { ...profile.address, number: e.target.value }
-                    })}
+                    value={localProfile.addressNumber || ''}
+                    onChange={(e) => setLocalProfile({ ...localProfile, addressNumber: e.target.value })}
                     disabled={!isEditing}
                   />
                 </div>
@@ -490,11 +356,8 @@ export default function BuyerProfile() {
                   <Label htmlFor="complement">Complemento</Label>
                   <Input
                     id="complement"
-                    value={profile.address.complement}
-                    onChange={(e) => setProfile({
-                      ...profile,
-                      address: { ...profile.address, complement: e.target.value }
-                    })}
+                    value={localProfile.addressComplement || ''}
+                    onChange={(e) => setLocalProfile({ ...localProfile, addressComplement: e.target.value })}
                     disabled={!isEditing}
                   />
                 </div>
@@ -502,11 +365,8 @@ export default function BuyerProfile() {
                   <Label htmlFor="neighborhood">Bairro</Label>
                   <Input
                     id="neighborhood"
-                    value={profile.address.neighborhood}
-                    onChange={(e) => setProfile({
-                      ...profile,
-                      address: { ...profile.address, neighborhood: e.target.value }
-                    })}
+                    value={localProfile.neighborhood || ''}
+                    onChange={(e) => setLocalProfile({ ...localProfile, neighborhood: e.target.value })}
                     disabled={!isEditing}
                   />
                 </div>
@@ -517,11 +377,8 @@ export default function BuyerProfile() {
                   <Label htmlFor="city">Cidade</Label>
                   <Input
                     id="city"
-                    value={profile.address.city}
-                    onChange={(e) => setProfile({
-                      ...profile,
-                      address: { ...profile.address, city: e.target.value }
-                    })}
+                    value={localProfile.city || ''}
+                    onChange={(e) => setLocalProfile({ ...localProfile, city: e.target.value })}
                     disabled={!isEditing}
                   />
                 </div>
@@ -529,11 +386,8 @@ export default function BuyerProfile() {
                   <Label htmlFor="state">Estado</Label>
                   <Input
                     id="state"
-                    value={profile.address.state}
-                    onChange={(e) => setProfile({
-                      ...profile,
-                      address: { ...profile.address, state: e.target.value }
-                    })}
+                    value={localProfile.state || ''}
+                    onChange={(e) => setLocalProfile({ ...localProfile, state: e.target.value })}
                     disabled={!isEditing}
                   />
                 </div>
@@ -541,11 +395,8 @@ export default function BuyerProfile() {
                   <Label htmlFor="zip_code">CEP</Label>
                   <Input
                     id="zip_code"
-                    value={profile.address.zip_code}
-                    onChange={(e) => setProfile({
-                      ...profile,
-                      address: { ...profile.address, zip_code: e.target.value }
-                    })}
+                    value={localProfile.zipCode || ''}
+                    onChange={(e) => setLocalProfile({ ...localProfile, zipCode: e.target.value })}
                     disabled={!isEditing}
                   />
                 </div>
@@ -571,10 +422,10 @@ export default function BuyerProfile() {
                   </p>
                 </div>
                 <Switch
-                  checked={profile.preferences.email_notifications}
-                  onCheckedChange={(checked) => setProfile({
-                    ...profile,
-                    preferences: { ...profile.preferences, email_notifications: checked }
+                  checked={localProfile.preferences?.email_notifications}
+                  onCheckedChange={(checked) => setLocalProfile({
+                    ...localProfile,
+                    preferences: { ...localProfile.preferences, email_notifications: checked }
                   })}
                   disabled={!isEditing}
                 />
@@ -588,10 +439,10 @@ export default function BuyerProfile() {
                   </p>
                 </div>
                 <Switch
-                  checked={profile.preferences.sms_notifications}
-                  onCheckedChange={(checked) => setProfile({
-                    ...profile,
-                    preferences: { ...profile.preferences, sms_notifications: checked }
+                  checked={localProfile.preferences?.sms_notifications}
+                  onCheckedChange={(checked) => setLocalProfile({
+                    ...localProfile,
+                    preferences: { ...localProfile.preferences, sms_notifications: checked }
                   })}
                   disabled={!isEditing}
                 />
@@ -605,10 +456,10 @@ export default function BuyerProfile() {
                   </p>
                 </div>
                 <Switch
-                  checked={profile.preferences.marketing_emails}
-                  onCheckedChange={(checked) => setProfile({
-                    ...profile,
-                    preferences: { ...profile.preferences, marketing_emails: checked }
+                  checked={localProfile.preferences?.marketing_emails}
+                  onCheckedChange={(checked) => setLocalProfile({
+                    ...localProfile,
+                    preferences: { ...localProfile.preferences, marketing_emails: checked }
                   })}
                   disabled={!isEditing}
                 />
@@ -622,10 +473,10 @@ export default function BuyerProfile() {
                   </p>
                 </div>
                 <Switch
-                  checked={profile.preferences.order_updates}
-                  onCheckedChange={(checked) => setProfile({
-                    ...profile,
-                    preferences: { ...profile.preferences, order_updates: checked }
+                  checked={localProfile.preferences?.order_updates}
+                  onCheckedChange={(checked) => setLocalProfile({
+                    ...localProfile,
+                    preferences: { ...localProfile.preferences, order_updates: checked }
                   })}
                   disabled={!isEditing}
                 />

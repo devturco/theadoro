@@ -6,7 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { CategoryService } from '@/services/CategoryService';
+import { useCategories } from '@/hooks/useCategories';
 import { cn } from '@/lib/utils';
 
 interface FilterSidebarProps {
@@ -26,7 +26,8 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
   isOpen = true,
   onClose,
 }) => {
-  const [categories, setCategories] = useState<Category[]>([]);
+  const { categories } = useCategories();
+
   const [expandedSections, setExpandedSections] = useState({
     categories: true,
     price: true,
@@ -51,19 +52,6 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     'moderno',
     'clássico',
   ];
-
-  useEffect(() => {
-    loadCategories();
-  }, []);
-
-  const loadCategories = async () => {
-    try {
-      const categoriesData = await CategoryService.getCategories();
-      setCategories(categoriesData);
-    } catch (error) {
-      console.error('Error loading categories:', error);
-    }
-  };
 
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections(prev => ({

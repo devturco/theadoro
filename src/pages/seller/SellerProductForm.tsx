@@ -20,19 +20,9 @@ import { toast } from 'sonner';
 import { Package, ArrowLeft, Loader2 } from 'lucide-react';
 import { ProductType } from '@/types/product';
 import { supabase } from '@/integrations/supabase/client';
+import { productService } from '@/services/product.service';
 
-const generateSlug = (text: string) => {
-    return text
-        .toString()
-        .toLowerCase()
-        .normalize('NFD') // decomposes accents
-        .replace(/[\u0300-\u036f]/g, '') // removes accents
-        .replace(/\s+/g, '-') // spaces to dashes
-        .replace(/[^\w\-]+/g, '') // remove non-words
-        .replace(/\-\-+/g, '-') // collapse dashes
-        .replace(/^-+/, '') // trim start
-        .replace(/-+$/, ''); // trim end
-};
+
 
 export default function SellerProductForm() {
     const { id } = useParams();
@@ -64,11 +54,7 @@ export default function SellerProductForm() {
 
     const fetchProduct = async () => {
         try {
-            const { data, error } = await supabase
-                .from('products')
-                .select('*')
-                .eq('id', id)
-                .single();
+            const { data, error } = await productService.getByIdOrSlug(id!);
 
             if (error) throw error;
             if (data) {
@@ -78,8 +64,8 @@ export default function SellerProductForm() {
                     price: data.price,
                     stock_quantity: data.stock_quantity || 0,
                     category_id: data.category_id || '',
-                    type: data.type as ProductType,
-                    is_active: data.is_active,
+                    type: data.type as ProductType || 'physical',
+                    is_active: data.is_active !== undefined ? data.is_active : true,
                     images: data.images || [],
                     slug: (data as any).slug || ''
                 });
@@ -166,8 +152,7 @@ export default function SellerProductForm() {
                                             const name = e.target.value;
                                             setFormData({
                                                 ...formData,
-                                                name,
-                                                slug: generateSlug(name)
+                                                name
                                             });
                                         }}
                                         placeholder="Ex: Colar de Prata com Pingente"
@@ -176,21 +161,7 @@ export default function SellerProductForm() {
                                     />
                                 </div>
 
-                                <div className="grid gap-2">
-                                    <Label htmlFor="slug" className="text-sm font-semibold text-gray-700">Link Permanente (URL)</Label>
-                                    <div className="flex rounded-xl border border-gray-100 h-11 bg-white overflow-hidden items-center group focus-within:ring-2 focus-within:ring-wine/20 focus-within:border-wine transition-all">
-                                        <div className="bg-gray-50 px-3 h-full flex items-center text-[10px] md:text-xs text-gray-400 border-r border-gray-100 shrink-0 font-medium">
-                                            theadoro.com.br/product/
-                                        </div>
-                                        <Input
-                                            id="slug"
-                                            value={formData.slug}
-                                            onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                                            className="border-0 shadow-none focus-visible:ring-0 rounded-none h-full text-xs"
-                                            placeholder="link-do-produto"
-                                        />
-                                    </div>
-                                </div>
+
 
                                 <div className="grid gap-2">
                                     <Label htmlFor="description" className="text-sm font-semibold text-gray-700">Descrição Detalhada</Label>

@@ -10,10 +10,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRole } from '@/hooks/useRole';
 import { useCRUD } from '@/hooks/useCRUD';
+import { supabase } from '@/integrations/supabase/client';
 import {
   BarChart3,
   TrendingUp,
@@ -25,7 +32,8 @@ import {
   Calendar,
   Download,
   Eye,
-  Star
+  Star,
+  FileText
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -207,6 +215,121 @@ const AdminReports = () => {
     // Here you would implement actual export functionality
   };
 
+  const exportSellersData = async () => {
+    try {
+      const toastId = toast.loading('Buscando dados de vendedores...');
+
+      const { data, error } = await supabase
+        .from('seller_applications')
+        .select('*, user:profiles(full_name, email), category:categories(name)');
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        toast.dismiss(toastId);
+        toast.error('Nenhum dado de vendedor encontrado.');
+        return;
+      }
+
+      toast.loading('Gerando arquivo CSV...', { id: toastId });
+
+      // Format data for CSV
+      const headers = [
+        'ID da Solicitacao',
+        'Status',
+        'Tipo (PF/PJ)',
+        'Nome/Razao Social',
+        'Nome Fantasia da Loja',
+        'CPF',
+        'CNPJ',
+        'Email',
+        'Telefone',
+        'Data de Nascimento',
+        'CEP',
+        'Endereco',
+        'Numero',
+        'Bairro',
+        'Cidade',
+        'UF',
+        'Categoria',
+        'Sugestao de Categoria',
+        'Aceitou Termos',
+        'Data Aceite Termos',
+        'IP Aceite Termos',
+        'URL Selfie',
+        'URL Doc Frente',
+        'URL Doc Verso',
+        'URL Doc CNPJ',
+        'Data da Solicitacao'
+      ];
+
+      const escapeCSV = (str: any) => {
+        if (str === null || str === undefined) return '""';
+        const stringified = String(str);
+        if (stringified.includes(',') || stringified.includes('"') || stringified.includes('\n')) {
+          return `"${stringified.replace(/"/g, '""')}"`;
+        }
+        return stringified;
+      };
+
+      const csvRows = [headers.join(',')];
+
+      for (const row of data) {
+        const userEmail = row.user && Array.isArray(row.user) ? row.user[0]?.email : row.user?.email || '';
+        const categoryName = row.category && Array.isArray(row.category) ? row.category[0]?.name : row.category?.name || '';
+
+        const values = [
+          row.id,
+          row.status === 'approved' ? 'Aprovado' : row.status === 'pending' ? 'Pendente' : 'Reprovado',
+          row.type === 'pf' ? 'Pessoa Fisica' : 'Pessoa Juridica',
+          row.type === 'pf' ? row.full_name : row.company_name,
+          row.store_name,
+          row.cpf || '',
+          row.cnpj || '',
+          userEmail,
+          row.phone || '',
+          row.birth_date || '',
+          row.postal_code || '',
+          row.address || '',
+          row.address_number || '',
+          row.neighborhood || '',
+          row.city || '',
+          row.state || '',
+          categoryName,
+          row.custom_category_suggestion || '',
+          row.accepted_terms ? 'Sim' : 'Nao',
+          row.accepted_legal_at ? new Date(row.accepted_legal_at).toLocaleString('pt-BR') : '',
+          row.accepted_legal_ip || '',
+          row.selfie_url || '',
+          row.id_front_url || '',
+          row.id_back_url || '',
+          row.cnpj_doc_url || '',
+          row.created_at ? new Date(row.created_at).toLocaleString('pt-BR') : ''
+        ];
+        csvRows.push(values.map(escapeCSV).join(','));
+      }
+
+      // Add BOM for Excel UTF-8 display
+      const csvString = '\uFEFF' + csvRows.join('\n');
+      const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `vendedores_export_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast.dismiss(toastId);
+      toast.success('Dados de vendedores exportados com sucesso!');
+    } catch (error: any) {
+      console.error('Error exporting sellers:', error);
+      toast.dismiss();
+      toast.error('Erro ao exportar dados de vendedores: ' + error.message);
+    }
+  };
+
   const calculateGrowth = (current: number, previous: number) => {
     if (previous === 0) return 0;
     return ((current - previous) / previous) * 100;
@@ -251,10 +374,24 @@ const AdminReports = () => {
             </SelectContent>
           </Select>
 
-          <Button variant="outline" onClick={() => exportReport('geral')}>
-            <Download className="h-4 w-4 mr-2" />
-            Exportar
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="bg-white hover:bg-gray-50 text-indigo-700 border-indigo-200">
+                <Download className="h-4 w-4 mr-2" />
+                Exportar Dados
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem onClick={() => exportReport('Geral')} className="cursor-pointer">
+                <BarChart3 className="h-4 w-4 mr-2 text-gray-500" />
+                Estatísticas Gerais (Tela)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportSellersData} className="cursor-pointer">
+                <FileText className="h-4 w-4 mr-2 text-indigo-500" />
+                <span className="font-medium">Cadastros de Vendedores</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 

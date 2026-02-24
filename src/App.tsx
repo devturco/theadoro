@@ -64,6 +64,7 @@ import AdminGiftWraps from '@/pages/admin/AdminGiftWraps';
 import SellerDashboard from '@/pages/seller/SellerDashboard';
 import SellerProducts from '@/pages/seller/Products';
 import SellerProductForm from '@/pages/seller/SellerProductForm';
+import ProductWizard from '@/pages/seller/ProductWizard';
 import SellerSales from '@/pages/seller/SellerSales';
 import SellerAppointments from '@/pages/seller/SellerAppointments';
 import SellerReports from '@/pages/seller/SellerReports';
@@ -197,7 +198,7 @@ function App() {
                             <Routes>
                               <Route path="dashboard" element={<SellerDashboard />} />
                               <Route path="products" element={<SellerProducts />} />
-                              <Route path="products/new" element={<SellerProductForm />} />
+                              <Route path="products/new" element={<ProductWizard />} />
                               <Route path="products/:id" element={<SellerProductForm />} />
                               <Route path="sales" element={<SellerSales />} />
                               <Route path="appointments" element={<SellerAppointments />} />

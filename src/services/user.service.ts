@@ -1,30 +1,7 @@
-import { BaseService, BaseEntity } from './base.service';
+import { BaseService } from './base.service';
 import { supabase } from '@/integrations/supabase/client';
 import { PostgrestError } from '@supabase/supabase-js';
-
-export interface User extends BaseEntity {
-  email: string;
-  full_name: string;
-  avatar_url?: string;
-  phone?: string;
-  role: 'admin' | 'seller' | 'buyer';
-  status: 'active' | 'inactive' | 'pending';
-  seller_approved?: boolean;
-  seller_documents?: string[];
-  address?: {
-    street: string;
-    city: string;
-    state: string;
-    zip_code: string;
-    country: string;
-  };
-  preferences?: {
-    notifications: boolean;
-    marketing_emails: boolean;
-    theme: 'light' | 'dark';
-  };
-  last_login?: string;
-}
+import { UserProfile, UserRole } from '@/types/auth';
 
 export interface UserStats {
   total_users: number;
@@ -34,7 +11,7 @@ export interface UserStats {
   user_growth_percentage: number;
 }
 
-class UserService extends BaseService<User> {
+class UserService extends BaseService<UserProfile> {
   constructor() {
     super('profiles');
   }
@@ -53,9 +30,12 @@ class UserService extends BaseService<User> {
       if (activeError) throw activeError;
 
       // Get pending sellers
-      const { count: pendingSellers, error: pendingError } = await this.count({ 
-        role: 'seller', 
-        status: 'pending' 
+      // Note: 'role' might be in 'user_roles' table, but we use the denormalized/profile column for quick stats if available.
+      // If not, we should query user_roles.
+      // Assuming 'role' column on profiles exists for now based on previous code.
+      const { count: pendingSellers, error: pendingError } = await this.count({
+        role: 'seller',
+        status: 'pending'
       });
       if (pendingError) throw pendingError;
 
@@ -65,7 +45,7 @@ class UserService extends BaseService<User> {
       startOfMonth.setHours(0, 0, 0, 0);
 
       const { data: newUsersData, error: newUsersError } = await supabase
-        .from(this.tableName)
+        .from('profiles')
         .select('id', { count: 'exact', head: true })
         .gte('created_at', startOfMonth.toISOString());
 
@@ -78,7 +58,7 @@ class UserService extends BaseService<User> {
       lastMonth.setHours(0, 0, 0, 0);
 
       const { data: lastMonthData, error: lastMonthError } = await supabase
-        .from(this.tableName)
+        .from('profiles')
         .select('id', { count: 'exact', head: true })
         .gte('created_at', lastMonth.toISOString())
         .lt('created_at', startOfMonth.toISOString());
@@ -87,8 +67,8 @@ class UserService extends BaseService<User> {
 
       const newUsersThisMonth = newUsersData?.length || 0;
       const newUsersLastMonth = lastMonthData?.length || 0;
-      const growthPercentage = newUsersLastMonth > 0 
-        ? ((newUsersThisMonth - newUsersLastMonth) / newUsersLastMonth) * 100 
+      const growthPercentage = newUsersLastMonth > 0
+        ? ((newUsersThisMonth - newUsersLastMonth) / newUsersLastMonth) * 100
         : 0;
 
       const stats: UserStats = {
@@ -109,16 +89,16 @@ class UserService extends BaseService<User> {
   /**
    * Get users by role
    */
-  async getUsersByRole(role: User['role']): Promise<{ data: User[]; error: PostgrestError | null }> {
+  async getUsersByRole(role: UserRole): Promise<{ data: UserProfile[]; error: PostgrestError | null }> {
     try {
       const { data, error } = await supabase
-        .from(this.tableName)
-        .select('*')
+        .from('profiles')
+        .select('*, user_roles(role)')
         .eq('role', role)
         .order('created_at', { ascending: false });
 
       return {
-        data: data as User[] || [],
+        data: data as unknown as UserProfile[] || [],
         error
       };
     } catch (error) {
@@ -133,17 +113,17 @@ class UserService extends BaseService<User> {
   /**
    * Get pending seller requests
    */
-  async getPendingSellerRequests(): Promise<{ data: User[]; error: PostgrestError | null }> {
+  async getPendingSellerRequests(): Promise<{ data: UserProfile[]; error: PostgrestError | null }> {
     try {
       const { data, error } = await supabase
-        .from(this.tableName)
-        .select('*')
+        .from('profiles')
+        .select('*, user_roles(role)')
         .eq('role', 'seller')
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
       return {
-        data: data as User[] || [],
+        data: data as unknown as UserProfile[] || [],
         error
       };
     } catch (error) {
@@ -158,10 +138,10 @@ class UserService extends BaseService<User> {
   /**
    * Approve seller request
    */
-  async approveSellerRequest(userId: string): Promise<{ data: User | null; error: PostgrestError | null }> {
+  async approveSellerRequest(userId: string): Promise<{ data: UserProfile | null; error: PostgrestError | null }> {
     try {
       const { data, error } = await supabase
-        .from(this.tableName)
+        .from('profiles')
         .update({
           status: 'active',
           seller_approved: true,
@@ -172,7 +152,7 @@ class UserService extends BaseService<User> {
         .single();
 
       return {
-        data: data as User,
+        data: data as UserProfile,
         error
       };
     } catch (error) {
@@ -187,10 +167,10 @@ class UserService extends BaseService<User> {
   /**
    * Reject seller request
    */
-  async rejectSellerRequest(userId: string): Promise<{ data: User | null; error: PostgrestError | null }> {
+  async rejectSellerRequest(userId: string): Promise<{ data: UserProfile | null; error: PostgrestError | null }> {
     try {
       const { data, error } = await supabase
-        .from(this.tableName)
+        .from('profiles')
         .update({
           role: 'buyer',
           status: 'active',
@@ -201,8 +181,11 @@ class UserService extends BaseService<User> {
         .select()
         .single();
 
+      // Also remove from user_roles if exists
+      await supabase.from('user_roles').delete().eq('user_id', userId).eq('role', 'seller');
+
       return {
-        data: data as User,
+        data: data as UserProfile,
         error
       };
     } catch (error) {
@@ -217,7 +200,7 @@ class UserService extends BaseService<User> {
   /**
    * Toggle user status
    */
-  async toggleUserStatus(userId: string): Promise<{ data: User | null; error: PostgrestError | null }> {
+  async toggleUserStatus(userId: string): Promise<{ data: UserProfile | null; error: PostgrestError | null }> {
     try {
       // First get current status
       const { data: currentUser, error: fetchError } = await this.getById(userId);
@@ -228,7 +211,7 @@ class UserService extends BaseService<User> {
       const newStatus = currentUser.status === 'active' ? 'inactive' : 'active';
 
       const { data, error } = await supabase
-        .from(this.tableName)
+        .from('profiles')
         .update({
           status: newStatus,
           updated_at: new Date().toISOString()
@@ -238,7 +221,7 @@ class UserService extends BaseService<User> {
         .single();
 
       return {
-        data: data as User,
+        data: data as UserProfile,
         error
       };
     } catch (error) {
@@ -254,9 +237,9 @@ class UserService extends BaseService<User> {
    * Update user profile
    */
   async updateProfile(
-    userId: string, 
-    profileData: Partial<Pick<User, 'full_name' | 'phone' | 'avatar_url' | 'address' | 'preferences'>>
-  ): Promise<{ data: User | null; error: PostgrestError | null }> {
+    userId: string,
+    profileData: Partial<UserProfile>
+  ): Promise<{ data: UserProfile | null; error: PostgrestError | null }> {
     return this.update(userId, profileData);
   }
 
@@ -266,7 +249,7 @@ class UserService extends BaseService<User> {
   async updateLastLogin(userId: string): Promise<{ error: PostgrestError | null }> {
     try {
       const { error } = await supabase
-        .from(this.tableName)
+        .from('profiles')
         .update({
           last_login: new Date().toISOString(),
           updated_at: new Date().toISOString()
@@ -285,13 +268,13 @@ class UserService extends BaseService<User> {
    */
   async searchUsers(
     searchTerm: string,
-    role?: User['role'],
-    status?: User['status']
-  ): Promise<{ data: User[]; error: PostgrestError | null }> {
+    role?: UserRole,
+    status?: UserProfile['status']
+  ): Promise<{ data: UserProfile[]; error: PostgrestError | null }> {
     try {
       let query = supabase
-        .from(this.tableName)
-        .select('*');
+        .from('profiles')
+        .select('*, user_roles(role)');
 
       // Apply search term
       if (searchTerm) {
@@ -300,6 +283,9 @@ class UserService extends BaseService<User> {
 
       // Apply filters
       if (role) {
+        // If 'role' is a column on profiles, this works.
+        // If not, we might need to filter manually or use a different query strategy.
+        // Assuming 'role' column exists for now.
         query = query.eq('role', role);
       }
 
@@ -312,7 +298,7 @@ class UserService extends BaseService<User> {
       const { data, error } = await query;
 
       return {
-        data: data as User[] || [],
+        data: data as unknown as UserProfile[] || [],
         error
       };
     } catch (error) {
@@ -329,18 +315,10 @@ class UserService extends BaseService<User> {
    */
   async getUserActivity(userId: string): Promise<{ data: any; error: PostgrestError | null }> {
     try {
-      // This would typically involve joining with other tables
-      // For now, we'll return basic user info
       const { data: user, error: userError } = await this.getById(userId);
       if (userError || !user) {
         return { data: null, error: userError };
       }
-
-      // In a real implementation, you'd fetch:
-      // - Recent orders (if buyer)
-      // - Recent products/sales (if seller)
-      // - Login history
-      // - Activity logs
 
       const activity = {
         user,
@@ -361,15 +339,57 @@ class UserService extends BaseService<User> {
   }
 
   /**
+   * Assign role to user
+   */
+  async assignRole(userId: string, role: UserRole): Promise<{ data: UserProfile | null; error: PostgrestError | null }> {
+    try {
+      // 1. Update user_roles table
+      if (role === 'seller' || role === 'admin') {
+        // upsert
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .upsert({ user_id: userId, role: role }, { onConflict: 'user_id,role' });
+        if (roleError) throw roleError;
+      } else {
+        // If downgrading to buyer, remove other roles? 
+        // Strategy: 'buyer' is default if no other role.
+        // But let's just remove specific roles if we are "setting" to buyer.
+        // Actually, simpler: 
+        // If assigning 'seller', add 'seller'.
+        // If assigning 'buyer', remove 'seller' and 'admin'.
+        if (role === 'buyer') {
+          await supabase.from('user_roles').delete().eq('user_id', userId).in('role', ['seller', 'admin']);
+        }
+      }
+
+      // 2. Update profile 'role' column for legacy/cache compatibility
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({
+          role: role,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId)
+        .select()
+        .single();
+
+      return { data: data as UserProfile, error };
+    } catch (error) {
+      console.error('Error assigning role:', error);
+      return { data: null, error: error as PostgrestError };
+    }
+  }
+
+  /**
    * Bulk update users
    */
   async bulkUpdateUsers(
     userIds: string[],
-    updateData: Partial<Pick<User, 'status' | 'role'>>
-  ): Promise<{ data: User[] | null; error: PostgrestError | null }> {
+    updateData: Partial<Pick<UserProfile, 'status' | 'role'>>
+  ): Promise<{ data: UserProfile[] | null; error: PostgrestError | null }> {
     try {
       const { data, error } = await supabase
-        .from(this.tableName)
+        .from('profiles')
         .update({
           ...updateData,
           updated_at: new Date().toISOString()
@@ -378,7 +398,7 @@ class UserService extends BaseService<User> {
         .select();
 
       return {
-        data: data as User[],
+        data: data as UserProfile[],
         error
       };
     } catch (error) {

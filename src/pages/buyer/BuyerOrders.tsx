@@ -6,17 +6,10 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRole } from '@/hooks/useRole';
-import { useCRUD } from '@/hooks/useCRUD';
-import { supabase } from '@/integrations/supabase/client';
+import { useOrders } from '@/hooks/useOrders';
+import { OrderStatus, Order } from '@/types/order';
 import { useNavigate } from 'react-router-dom';
 import {
   ShoppingCart,
@@ -28,99 +21,45 @@ import {
   Filter,
   Star
 } from 'lucide-react';
-
-interface OrderStats {
-  total: number;
-  pending: number;
-  confirmed: number;
-  shipped: number;
-  delivered: number;
-  cancelled: number;
-}
+import { toast } from 'sonner';
 
 export default function BuyerOrders() {
   const { user } = useAuth();
   const { hasRole } = useRole();
-  const [orders, setOrders] = useState<any[]>([]);
-  const [stats, setStats] = useState<OrderStats>({
-    total: 0,
-    pending: 0,
-    confirmed: 0,
-    shipped: 0,
-    delivered: 0,
-    cancelled: 0
-  });
-  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
 
   const isBuyer = hasRole('buyer');
 
+  const {
+    orders,
+    loading,
+    stats,
+    updateOrderStatus,
+    fetchStats,
+    filterByStatus,
+    searchOrders,
+    pagination
+  } = useOrders({
+    scope: 'buyer',
+    fetchOnMount: true
+  });
+
   useEffect(() => {
     if (user && isBuyer) {
-      loadOrders();
+      fetchStats();
     }
-  }, [user, isBuyer, statusFilter]);
+  }, [user, isBuyer, fetchStats]);
 
-  const loadOrders = async () => {
-    try {
-      setLoading(true);
+  const handleDisplayStatusFilterChange = (value: string) => {
+    setStatusFilter(value);
+    filterByStatus(value === 'all' ? 'all' : value as OrderStatus);
+  };
 
-      let query = supabase
-        .from('orders')
-        .select(`
-          *,
-          order_items (
-            *,
-            products (*)
-          )
-        `)
-        .eq('buyer_id', user?.id)
-        .order('created_at', { ascending: false });
-
-      if (statusFilter !== 'all') {
-        query = query.eq('status', statusFilter as any);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      // Calculate stats based on all personal orders
-      const { data: allOrders, error: statsError } = await supabase
-        .from('orders')
-        .select('status')
-        .eq('buyer_id', user?.id);
-
-      if (statsError) throw statsError;
-
-      const mockStats: OrderStats = {
-        total: allOrders?.length || 0,
-        pending: allOrders?.filter(o => o.status === 'pending').length || 0,
-        confirmed: allOrders?.filter(o => o.status === 'confirmed').length || 0,
-        shipped: allOrders?.filter(o => o.status === 'shipped').length || 0,
-        delivered: allOrders?.filter(o => o.status === 'delivered').length || 0,
-        cancelled: allOrders?.filter(o => o.status === 'cancelled').length || 0
-      };
-
-      const formattedOrders = data?.map(order => ({
-        ...order,
-        seller_name: 'Vendedor', // Logic to fetch seller name if needed
-        items: order.order_items?.map((item: any) => ({
-          product_name: item.products?.name || 'Produto',
-          quantity: item.quantity,
-          price: item.unit_price
-        })) || []
-      })) || [];
-
-      setOrders(formattedOrders);
-      setStats(mockStats);
-    } catch (error) {
-      console.error('Error loading orders:', error);
-    } finally {
-      setLoading(false);
-    }
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    searchOrders(value);
   };
 
   const handleViewOrder = (order: any) => {
@@ -128,18 +67,13 @@ export default function BuyerOrders() {
   };
 
   const handleCancelOrder = async (orderId: string) => {
+    if (!confirm('Tem certeza que deseja cancelar este pedido?')) return;
+
     try {
-      const { error } = await supabase
-        .from('orders')
-        .update({ status: 'cancelled' })
-        .eq('id', orderId);
-
-      if (error) throw error;
-
-      // Reload everything
-      loadOrders();
+      await updateOrderStatus(orderId, 'cancelled');
+      fetchStats(); // Update stats after cancellation
     } catch (error) {
-      console.error('Error cancelling order:', error);
+      // Error handled in hook
     }
   };
 
@@ -150,9 +84,9 @@ export default function BuyerOrders() {
       render: (value: string) => `#${value.slice(0, 8)}`
     },
     {
-      key: 'seller_name',
+      key: 'seller',
       title: 'Vendedor',
-      render: (value: string) => value || 'N/A'
+      render: (_: any, row: Order) => row.seller?.full_name || row.seller?.email || 'Vendedor'
     },
     {
       key: 'total_amount',
@@ -169,7 +103,8 @@ export default function BuyerOrders() {
           processing: { label: 'Processando', variant: 'default' as const },
           shipped: { label: 'Enviado', variant: 'default' as const },
           delivered: { label: 'Entregue', variant: 'default' as const },
-          cancelled: { label: 'Cancelado', variant: 'destructive' as const }
+          cancelled: { label: 'Cancelado', variant: 'destructive' as const },
+          refunded: { label: 'Reembolsado', variant: 'destructive' as const }
         };
         const status = statusMap[value as keyof typeof statusMap] || statusMap.pending;
         return <Badge variant={status.variant}>{status.label}</Badge>;
@@ -183,7 +118,7 @@ export default function BuyerOrders() {
     {
       key: 'actions',
       title: 'Ações',
-      render: (_: any, row: any) => (
+      render: (_: any, row: Order) => (
         <div className="flex gap-2">
           <Button
             variant="outline"
@@ -198,6 +133,7 @@ export default function BuyerOrders() {
               variant="outline"
               size="sm"
               onClick={() => handleCancelOrder(row.id)}
+              className="text-red-600 hover:text-red-700 hover:bg-red-50"
             >
               <XCircle className="h-4 w-4 mr-1" />
               Cancelar
@@ -216,13 +152,6 @@ export default function BuyerOrders() {
       )
     }
   ];
-
-  const filteredOrders = orders.filter(order => {
-    const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
-    const matchesSearch = order.seller_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.id.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesStatus && matchesSearch;
-  });
 
   if (!isBuyer) {
     return (
@@ -251,7 +180,7 @@ export default function BuyerOrders() {
             <ShoppingCart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
+            <div className="text-2xl font-bold">{stats?.total_orders || 0}</div>
           </CardContent>
         </Card>
 
@@ -261,7 +190,7 @@ export default function BuyerOrders() {
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.pending}</div>
+            <div className="text-2xl font-bold">{stats?.pending_orders || 0}</div>
           </CardContent>
         </Card>
 
@@ -271,7 +200,7 @@ export default function BuyerOrders() {
             <CheckCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.confirmed}</div>
+            <div className="text-2xl font-bold">{stats?.confirmed_orders || 0}</div>
           </CardContent>
         </Card>
 
@@ -281,7 +210,7 @@ export default function BuyerOrders() {
             <Truck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.shipped}</div>
+            <div className="text-2xl font-bold">{stats?.shipped_orders || 0}</div>
           </CardContent>
         </Card>
 
@@ -291,7 +220,7 @@ export default function BuyerOrders() {
             <CheckCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.delivered}</div>
+            <div className="text-2xl font-bold">{stats?.delivered_orders || 0}</div>
           </CardContent>
         </Card>
 
@@ -301,7 +230,7 @@ export default function BuyerOrders() {
             <XCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.cancelled}</div>
+            <div className="text-2xl font-bold">{stats?.cancelled_orders || 0}</div>
           </CardContent>
         </Card>
       </div>
@@ -322,12 +251,12 @@ export default function BuyerOrders() {
                 id="search"
                 placeholder="ID do pedido ou nome do vendedor..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={statusFilter} onValueChange={handleDisplayStatusFilterChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o status" />
                 </SelectTrigger>
@@ -353,9 +282,16 @@ export default function BuyerOrders() {
         </CardHeader>
         <CardContent>
           <DataTable
-            data={filteredOrders}
+            data={orders}
             columns={orderColumns}
             loading={loading}
+            pagination={{
+              page: pagination.page,
+              pageSize: pagination.pageSize,
+              total: pagination.totalCount,
+              totalPages: pagination.totalPages
+            }}
+            onPageChange={pagination.setPage}
           />
         </CardContent>
       </Card>

@@ -16,14 +16,33 @@ export interface UserProfile {
   phone: string | null;
   avatar_url: string | null;
   bio: string | null;
+
+  // Address fields (Flat structure matches DB usually)
+  address: string | null; // Street
   city: string | null;
   state: string | null;
-  address: string | null;
   postal_code: string | null;
+  country?: string | null;
+
   created_at: string;
   updated_at: string;
-  role?: UserRole;
-  roles?: UserRole[];
+
+  // Role & Status
+  role?: UserRole; // From profile column (legacy/cache)
+  roles?: UserRole[]; // From user_roles relation
+  status?: 'active' | 'inactive' | 'pending';
+  seller_approved?: boolean;
+
+  // JSONB fields
+  preferences?: {
+    notifications?: boolean;
+    marketing_emails?: boolean;
+    theme?: 'light' | 'dark';
+    [key: string]: any;
+  };
+
+  last_login?: string;
+  seller_documents?: string[];
 }
 
 export interface UserRoleRecord {

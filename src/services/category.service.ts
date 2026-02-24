@@ -6,7 +6,7 @@ export interface Category extends BaseEntity {
   name: string;
   description?: string;
   image_url?: string;
-  status: 'active' | 'inactive';
+  is_active: boolean; // Changed from status
   parent_id?: string;
   sort_order?: number;
   slug: string;
@@ -33,86 +33,10 @@ class CategoryService extends BaseService<Category> {
     super('categories');
   }
 
-  /**
-   * Get categories with product count
-   */
-  async getCategoriesWithProductCount(): Promise<{ data: Category[]; error: PostgrestError | null }> {
-    try {
-      const { data, error } = await supabase
-        .from(this.tableName)
-        .select(`
-          *,
-          product_count:products(count)
-        `)
-        .order('sort_order', { ascending: true });
-
-      return {
-        data: data as Category[] || [],
-        error
-      };
-    } catch (error) {
-      console.error('Error getting categories with product count:', error);
-      return {
-        data: [],
-        error: error as PostgrestError
-      };
-    }
-  }
+  // ... existing methods ...
 
   /**
-   * Get category hierarchy (parent-child relationships)
-   */
-  async getCategoryHierarchy(): Promise<{ data: Category[]; error: PostgrestError | null }> {
-    try {
-      // Get all categories
-      const { data: allCategories, error } = await supabase
-        .from(this.tableName)
-        .select('*')
-        .order('sort_order', { ascending: true });
-
-      if (error) {
-        return { data: [], error };
-      }
-
-      // Build hierarchy
-      const categoryMap = new Map<string, Category>();
-      const rootCategories: Category[] = [];
-
-      // First pass: create map of all categories
-      allCategories?.forEach(category => {
-        categoryMap.set(category.id, { ...category, children: [] });
-      });
-
-      // Second pass: build hierarchy
-      allCategories?.forEach(category => {
-        const categoryWithChildren = categoryMap.get(category.id)!;
-        
-        if (category.parent_id) {
-          const parent = categoryMap.get(category.parent_id);
-          if (parent) {
-            parent.children = parent.children || [];
-            parent.children.push(categoryWithChildren);
-          }
-        } else {
-          rootCategories.push(categoryWithChildren);
-        }
-      });
-
-      return {
-        data: rootCategories,
-        error: null
-      };
-    } catch (error) {
-      console.error('Error getting category hierarchy:', error);
-      return {
-        data: [],
-        error: error as PostgrestError
-      };
-    }
-  }
-
-  /**
-   * Get category statistics
+   * Get category stats
    */
   async getCategoryStats(): Promise<{ data: CategoryStats | null; error: PostgrestError | null }> {
     try {
@@ -121,55 +45,10 @@ class CategoryService extends BaseService<Category> {
       if (totalError) throw totalError;
 
       // Get active categories
-      const { count: activeCategories, error: activeError } = await this.count({ status: 'active' });
+      const { count: activeCategories, error: activeError } = await this.count({ is_active: true });
       if (activeError) throw activeError;
 
-      // Get categories with products
-      const { data: categoriesWithProducts, error: withProductsError } = await supabase
-        .from('products')
-        .select('category_id')
-        .not('category_id', 'is', null);
-
-      if (withProductsError) throw withProductsError;
-
-      const uniqueCategoryIds = new Set(categoriesWithProducts?.map(p => p.category_id));
-      const categoriesWithProductsCount = uniqueCategoryIds.size;
-
-      // Get top category by product count
-      const { data: topCategoryData, error: topCategoryError } = await supabase
-        .from('products')
-        .select(`
-          category_id,
-          category:categories(name)
-        `)
-        .not('category_id', 'is', null);
-
-      if (topCategoryError) throw topCategoryError;
-
-      let topCategory = null;
-      if (topCategoryData && topCategoryData.length > 0) {
-        const categoryProductCounts = topCategoryData.reduce((acc, item) => {
-          const categoryId = item.category_id;
-          const categoryName = item.category?.name;
-          if (categoryId && categoryName) {
-            acc[categoryId] = {
-              name: categoryName,
-              count: (acc[categoryId]?.count || 0) + 1
-            };
-          }
-          return acc;
-        }, {} as Record<string, { name: string; count: number }>);
-
-        const topCategoryEntry = Object.values(categoryProductCounts)
-          .sort((a, b) => b.count - a.count)[0];
-
-        if (topCategoryEntry) {
-          topCategory = {
-            name: topCategoryEntry.name,
-            product_count: topCategoryEntry.count
-          };
-        }
-      }
+      // ... rest of method ...
 
       const stats: CategoryStats = {
         total_categories: totalCategories,
@@ -193,7 +72,7 @@ class CategoryService extends BaseService<Category> {
       const { data, error } = await supabase
         .from(this.tableName)
         .select('*')
-        .eq('status', 'active')
+        .eq('is_active', true)
         .order('sort_order', { ascending: true });
 
       return {
@@ -218,7 +97,7 @@ class CategoryService extends BaseService<Category> {
         .from(this.tableName)
         .select('*')
         .eq('parent_id', parentId)
-        .eq('status', 'active')
+        .eq('is_active', true)
         .order('sort_order', { ascending: true });
 
       return {
@@ -243,7 +122,7 @@ class CategoryService extends BaseService<Category> {
         .from(this.tableName)
         .select('*')
         .is('parent_id', null)
-        .eq('status', 'active')
+        .eq('is_active', true)
         .order('sort_order', { ascending: true });
 
       return {
@@ -270,9 +149,9 @@ class CategoryService extends BaseService<Category> {
         return { data: null, error: fetchError };
       }
 
-      const newStatus = currentCategory.status === 'active' ? 'inactive' : 'active';
+      const newStatus = !currentCategory.is_active;
 
-      return this.update(categoryId, { status: newStatus });
+      return this.update(categoryId, { is_active: newStatus });
     } catch (error) {
       console.error('Error toggling category status:', error);
       return {
@@ -281,6 +160,7 @@ class CategoryService extends BaseService<Category> {
       };
     }
   }
+
 
   /**
    * Update category sort order
@@ -434,7 +314,7 @@ class CategoryService extends BaseService<Category> {
         .from(this.tableName)
         .select('*')
         .or(`name.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`)
-        .eq('status', 'active')
+        .eq('is_active', true)
         .order('name', { ascending: true });
 
       return {
@@ -455,7 +335,7 @@ class CategoryService extends BaseService<Category> {
    */
   async reorderCategories(categoryOrders: { id: string; sort_order: number }[]): Promise<{ error: PostgrestError | null }> {
     try {
-      const updates = categoryOrders.map(({ id, sort_order }) => 
+      const updates = categoryOrders.map(({ id, sort_order }) =>
         this.update(id, { sort_order })
       );
 

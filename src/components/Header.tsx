@@ -247,13 +247,13 @@ const Header = () => {
                         <p className="font-bold text-gray-900 truncate text-sm">{profile?.full_name || user.email}</p>
                       </div>
                       <DropdownMenuSeparator className="my-1" />
-                      {profile?.role === 'admin' && (
+                      {isAdmin && (
                         <DropdownMenuItem className="flex items-center gap-3 p-2 cursor-pointer rounded-lg hover:bg-wine/5 hover:text-wine transition-colors" onClick={() => navigate('/admin/dashboard')}>
                           <LayoutDashboard className="h-4 w-4" />
                           <span className="font-medium">Painel Admin</span>
                         </DropdownMenuItem>
                       )}
-                      {profile?.role === 'seller' && (
+                      {isSeller && (
                         <DropdownMenuItem className="flex items-center gap-3 p-2 cursor-pointer rounded-lg hover:bg-wine/5 hover:text-wine transition-colors" onClick={() => navigate('/seller/dashboard')}>
                           <LayoutDashboard className="h-4 w-4" />
                           <span className="font-medium">Painel Vendedor</span>

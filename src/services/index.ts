@@ -4,7 +4,7 @@ export type { BaseEntity, PaginationOptions, FilterOptions } from './base.servic
 
 // User service
 export { userService } from './user.service';
-export type { User, UserStats } from './user.service';
+export type { UserProfile, UserStats } from '@/types/auth';
 
 // Product service
 export { productService } from './product.service';
@@ -16,11 +16,15 @@ export type { Category, CategoryStats } from './category.service';
 
 // Order service
 export { orderService } from './order.service';
-export type { Order, OrderItem, OrderStats, OrderFilters } from './order.service';
+export type { Order, OrderItem, OrderStats, OrderFilters, OrderStatus } from '@/types/order';
 
 // Storage service
 export { storageService } from './storage.service';
 export type { UploadOptions, UploadResult, DeleteResult } from './storage.service';
+
+// Payment service
+export { paymentService } from './payment.service';
+export type { PaymentIntent, PaymentMethod as PaymentMethodType } from './payment.service';
 
 // Service instances for easy access
 export const services = {
@@ -28,16 +32,25 @@ export const services = {
   product: productService,
   category: categoryService,
   order: orderService,
-  storage: storageService
+  storage: storageService,
+  payment: paymentService
 } as const;
 
 // Real-time subscription helpers
+export { RealtimeManager } from './index'; // Wait, RealtimeManager was defined in index.ts itself.
+
+/**
+ * RealtimeManager is defined here to avoid circular dependencies
+ * and provide a central place for subscription management.
+ */
+import { BaseService as BaseServiceClass } from './base.service';
+
 export class RealtimeManager {
   private static subscriptions = new Map<string, any>();
 
   static subscribe(
     key: string,
-    service: BaseService<any>,
+    service: BaseServiceClass<any>,
     callback: (payload: any) => void,
     filter?: string
   ) {
@@ -72,10 +85,11 @@ export class RealtimeManager {
 }
 
 // Utility functions for common operations
+export { serviceUtils, handleServiceError, ServiceError, ServiceCache } from './index';
+
+import { PostgrestError } from '@supabase/supabase-js';
+
 export const serviceUtils = {
-  /**
-   * Format currency values
-   */
   formatCurrency: (amount: number, currency: string = 'BRL'): string => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -83,9 +97,6 @@ export const serviceUtils = {
     }).format(amount);
   },
 
-  /**
-   * Format date values
-   */
   formatDate: (date: string | Date, options?: Intl.DateTimeFormatOptions): string => {
     const dateObj = typeof date === 'string' ? new Date(date) : date;
     return new Intl.DateTimeFormat('pt-BR', {
@@ -96,61 +107,42 @@ export const serviceUtils = {
     }).format(dateObj);
   },
 
-  /**
-   * Format relative time
-   */
   formatRelativeTime: (date: string | Date): string => {
     const dateObj = typeof date === 'string' ? new Date(date) : date;
     const now = new Date();
     const diffInSeconds = Math.floor((now.getTime() - dateObj.getTime()) / 1000);
 
-    if (diffInSeconds < 60) {
-      return 'Agora mesmo';
-    } else if (diffInSeconds < 3600) {
+    if (diffInSeconds < 60) return 'Agora mesmo';
+    if (diffInSeconds < 3600) {
       const minutes = Math.floor(diffInSeconds / 60);
       return `${minutes} minuto${minutes > 1 ? 's' : ''} atrás`;
-    } else if (diffInSeconds < 86400) {
+    }
+    if (diffInSeconds < 86400) {
       const hours = Math.floor(diffInSeconds / 3600);
       return `${hours} hora${hours > 1 ? 's' : ''} atrás`;
-    } else if (diffInSeconds < 2592000) {
+    }
+    if (diffInSeconds < 2592000) {
       const days = Math.floor(diffInSeconds / 86400);
       return `${days} dia${days > 1 ? 's' : ''} atrás`;
-    } else {
-      return serviceUtils.formatDate(dateObj);
     }
+    return serviceUtils.formatDate(dateObj);
   },
 
-  /**
-   * Generate pagination info
-   */
-  generatePaginationInfo: (
-    currentPage: number,
-    totalItems: number,
-    itemsPerPage: number
-  ) => {
+  generatePaginationInfo: (currentPage: number, totalItems: number, itemsPerPage: number) => {
     const totalPages = Math.ceil(totalItems / itemsPerPage);
-    const startItem = (currentPage - 1) * itemsPerPage + 1;
-    const endItem = Math.min(currentPage * itemsPerPage, totalItems);
-
     return {
       currentPage,
       totalPages,
       totalItems,
       itemsPerPage,
-      startItem,
-      endItem,
+      startItem: (currentPage - 1) * itemsPerPage + 1,
+      endItem: Math.min(currentPage * itemsPerPage, totalItems),
       hasNextPage: currentPage < totalPages,
       hasPreviousPage: currentPage > 1
     };
   },
 
-  /**
-   * Debounce function for search
-   */
-  debounce: <T extends (...args: any[]) => any>(
-    func: T,
-    wait: number
-  ): ((...args: Parameters<T>) => void) => {
+  debounce: <T extends (...args: any[]) => any>(func: T, wait: number): ((...args: Parameters<T>) => void) => {
     let timeout: NodeJS.Timeout;
     return (...args: Parameters<T>) => {
       clearTimeout(timeout);
@@ -158,61 +150,29 @@ export const serviceUtils = {
     };
   },
 
-  /**
-   * Validate email format
-   */
-  isValidEmail: (email: string): boolean => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  },
+  isValidEmail: (email: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email),
 
-  /**
-   * Validate phone format (Brazilian)
-   */
-  isValidPhone: (phone: string): boolean => {
-    const phoneRegex = /^\(\d{2}\)\s\d{4,5}-\d{4}$/;
-    return phoneRegex.test(phone);
-  },
+  isValidPhone: (phone: string): boolean => /^\(\d{2}\)\s\d{4,5}-\d{4}$/.test(phone),
 
-  /**
-   * Format phone number
-   */
   formatPhone: (phone: string): string => {
     const cleaned = phone.replace(/\D/g, '');
-    if (cleaned.length === 11) {
-      return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7)}`;
-    } else if (cleaned.length === 10) {
-      return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 6)}-${cleaned.slice(6)}`;
-    }
+    if (cleaned.length === 11) return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7)}`;
+    if (cleaned.length === 10) return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 6)}-${cleaned.slice(6)}`;
     return phone;
   },
 
-  /**
-   * Generate random ID
-   */
-  generateId: (): string => {
-    return Math.random().toString(36).substring(2) + Date.now().toString(36);
-  },
+  generateId: (): string => Math.random().toString(36).substring(2) + Date.now().toString(36),
 
-  /**
-   * Calculate percentage change
-   */
   calculatePercentageChange: (current: number, previous: number): number => {
     if (previous === 0) return current > 0 ? 100 : 0;
     return ((current - previous) / previous) * 100;
   },
 
-  /**
-   * Truncate text
-   */
   truncateText: (text: string, maxLength: number): string => {
     if (text.length <= maxLength) return text;
     return text.substring(0, maxLength) + '...';
   },
 
-  /**
-   * Convert file size to human readable format
-   */
   formatFileSize: (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -221,95 +181,51 @@ export const serviceUtils = {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   },
 
-  /**
-   * Get file extension from filename
-   */
-  getFileExtension: (filename: string): string => {
-    return filename.split('.').pop()?.toLowerCase() || '';
-  },
+  getFileExtension: (filename: string): string => filename.split('.').pop()?.toLowerCase() || '',
 
-  /**
-   * Check if file is image
-   */
   isImageFile: (filename: string): boolean => {
     const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
-    const extension = serviceUtils.getFileExtension(filename);
-    return imageExtensions.includes(extension);
+    return imageExtensions.includes(serviceUtils.getFileExtension(filename));
   }
 };
 
-// Error handling utilities
 export class ServiceError extends Error {
-  constructor(
-    message: string,
-    public code?: string,
-    public statusCode?: number,
-    public details?: any
-  ) {
+  constructor(message: string, public code?: string, public statusCode?: number, public details?: any) {
     super(message);
     this.name = 'ServiceError';
   }
 }
 
 export const handleServiceError = (error: any): ServiceError => {
-  if (error instanceof ServiceError) {
-    return error;
-  }
-
-  if (error?.message) {
-    return new ServiceError(error.message, error.code, error.statusCode, error);
-  }
-
+  if (error instanceof ServiceError) return error;
+  if (error?.message) return new ServiceError(error.message, error.code, error.statusCode, error);
   return new ServiceError('An unexpected error occurred', 'UNKNOWN_ERROR', 500, error);
 };
 
-// Cache utilities for better performance
 export class ServiceCache {
   private static cache = new Map<string, { data: any; timestamp: number; ttl: number }>();
-
   static set(key: string, data: any, ttlInSeconds: number = 300): void {
-    this.cache.set(key, {
-      data,
-      timestamp: Date.now(),
-      ttl: ttlInSeconds * 1000
-    });
+    this.cache.set(key, { data, timestamp: Date.now(), ttl: ttlInSeconds * 1000 });
   }
-
   static get<T>(key: string): T | null {
     const cached = this.cache.get(key);
     if (!cached) return null;
-
-    const isExpired = Date.now() - cached.timestamp > cached.ttl;
-    if (isExpired) {
+    if (Date.now() - cached.timestamp > cached.ttl) {
       this.cache.delete(key);
       return null;
     }
-
     return cached.data as T;
   }
-
-  static delete(key: string): void {
-    this.cache.delete(key);
-  }
-
-  static clear(): void {
-    this.cache.clear();
-  }
-
+  static delete(key: string): void { this.cache.delete(key); }
+  static clear(): void { this.cache.clear(); }
   static has(key: string): boolean {
     const cached = this.cache.get(key);
     if (!cached) return false;
-
-    const isExpired = Date.now() - cached.timestamp > cached.ttl;
-    if (isExpired) {
+    if (Date.now() - cached.timestamp > cached.ttl) {
       this.cache.delete(key);
       return false;
     }
-
     return true;
   }
-
-  static size(): number {
-    return this.cache.size;
-  }
+  static size(): number { return this.cache.size; }
 }

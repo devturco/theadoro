@@ -58,10 +58,13 @@ const AdminOrders = () => {
     orders,
     loading,
     updateOrderStatus,
-    getOrderStats,
+    stats: orderStats,
+    fetchStats,
     deleteOrder,
-    refresh
-  } = useOrders();
+    refresh,
+    pagination,
+    filterByStatus
+  } = useOrders({ scope: 'admin', fetchOnMount: true });
 
   const [stats, setStats] = useState({
     total: 0,
@@ -80,35 +83,36 @@ const AdminOrders = () => {
       return;
     }
 
-    calculateStats();
-  }, [isAdmin, orders]);
+    loadStats();
+  }, [isAdmin, fetchStats]); // Depend on fetchStats, not orders, to avoid loops if stats depend on orders differently
 
-  const calculateStats = async () => {
-    if (!orders) return;
+  const loadStats = async () => {
+    const fetchedStats = await fetchStats();
 
     // Fetch appointments count
     const { count: appointmentsCount } = await supabase
       .from('appointments')
       .select('*', { count: 'exact', head: true });
 
-    const newStats = {
-      total: orders.length,
-      pending: orders.filter(o => o.status === 'pending').length,
-      confirmed: orders.filter(o => o.status === 'confirmed').length,
-      shipped: orders.filter(o => o.status === 'shipped').length,
-      delivered: orders.filter(o => o.status === 'delivered').length,
-      cancelled: orders.filter(o => o.status === 'cancelled').length,
-      totalRevenue: orders.reduce((sum, order) => sum + (order.total_amount || 0), 0),
-      appointments: appointmentsCount || 0
-    };
-
-    setStats(newStats);
+    if (fetchedStats) {
+      setStats({
+        total: fetchedStats.total_orders,
+        pending: fetchedStats.pending_orders,
+        confirmed: fetchedStats.confirmed_orders,
+        shipped: fetchedStats.shipped_orders,
+        delivered: fetchedStats.delivered_orders,
+        cancelled: fetchedStats.cancelled_orders,
+        totalRevenue: fetchedStats.total_revenue,
+        appointments: appointmentsCount || 0
+      });
+    }
   };
 
   const handleStatusUpdate = async (orderId: string, newStatus: OrderStatus) => {
     try {
       await updateOrderStatus(orderId, newStatus);
-      refresh();
+      refresh(); // Refresh list to update status in UI
+      loadStats(); // Refresh stats
     } catch (error: any) {
       console.error('Erro ao atualizar status:', error);
       const details = error.details || error.message || '';
@@ -121,17 +125,20 @@ const AdminOrders = () => {
 
     try {
       await deleteOrder(orderId);
-      toast.success('Pedido excluído com sucesso!');
-      refresh();
+      loadStats(); // Refresh stats
     } catch (error: any) {
-      console.error('Erro ao excluir pedido:', error);
-      toast.error('Erro ao excluir pedido');
+      // Error handled in hook
     }
   };
 
   const handleViewDetails = (order: Order) => {
     setSelectedOrder(order);
     setIsDetailsOpen(true);
+  };
+
+  const handleFilterChange = (value: OrderStatus | 'all') => {
+    setStatusFilter(value);
+    filterByStatus(value);
   };
 
   const getStatusBadge = (status: OrderStatus) => {
@@ -141,7 +148,8 @@ const AdminOrders = () => {
       processing: 'default',
       shipped: 'default',
       delivered: 'default',
-      cancelled: 'destructive'
+      cancelled: 'destructive',
+      refunded: 'destructive' // Added refunded
     } as const;
 
     const labels = {
@@ -150,33 +158,16 @@ const AdminOrders = () => {
       processing: 'Processando',
       shipped: 'Enviado',
       delivered: 'Entregue',
-      cancelled: 'Cancelado'
+      cancelled: 'Cancelado',
+      refunded: 'Reembolsado'
     };
 
     return (
-      <Badge variant={variants[status]}>
-        {labels[status]}
+      <Badge variant={variants[status] || 'default'}>
+        {labels[status] || status}
       </Badge>
     );
   };
-
-  const getStatusIcon = (status: OrderStatus) => {
-    const icons = {
-      pending: Clock,
-      confirmed: CheckCircle,
-      processing: Clock,
-      shipped: Truck,
-      delivered: Package,
-      cancelled: XCircle
-    };
-
-    const Icon = icons[status];
-    return <Icon className="h-4 w-4" />;
-  };
-
-  const filteredOrders = statusFilter === 'all'
-    ? orders
-    : orders?.filter(order => order.status === statusFilter);
 
   const columns = [
     {
@@ -235,6 +226,7 @@ const AdminOrders = () => {
               <SelectItem value="shipped">Enviado</SelectItem>
               <SelectItem value="delivered">Entregue</SelectItem>
               <SelectItem value="cancelled">Cancelado</SelectItem>
+              <SelectItem value="refunded">Reembolsado</SelectItem>
             </SelectContent>
           </Select>
           <Button
@@ -363,7 +355,7 @@ const AdminOrders = () => {
               <Label>Status</Label>
               <Select
                 value={statusFilter}
-                onValueChange={(value: OrderStatus | 'all') => setStatusFilter(value)}
+                onValueChange={handleFilterChange}
               >
                 <SelectTrigger className="w-48">
                   <SelectValue />
@@ -375,6 +367,7 @@ const AdminOrders = () => {
                   <SelectItem value="shipped">Enviados</SelectItem>
                   <SelectItem value="delivered">Entregues</SelectItem>
                   <SelectItem value="cancelled">Cancelados</SelectItem>
+                  <SelectItem value="refunded">Reembolsado</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -392,9 +385,16 @@ const AdminOrders = () => {
         </CardHeader>
         <CardContent>
           <DataTable
-            data={filteredOrders || []}
+            data={orders || []}
             columns={columns}
             loading={loading}
+            pagination={{
+              page: pagination.page,
+              pageSize: pagination.pageSize,
+              total: pagination.totalCount,
+              totalPages: pagination.totalPages
+            }}
+            onPageChange={pagination.setPage}
           />
         </CardContent>
       </Card>
@@ -415,9 +415,17 @@ const AdminOrders = () => {
             const shippingAddress = selectedOrder.shipping_address ? (typeof selectedOrder.shipping_address === 'string' ? JSON.parse(selectedOrder.shipping_address) : selectedOrder.shipping_address) : null;
 
             // Safe accessors
-            const giftOptions = notes.giftOptions;
-            const deliverySchedule = notes.deliverySchedule;
+            const giftOptions = notes.giftOptions || selectedOrder.gift_options;
+            const deliverySchedule = notes.deliverySchedule || selectedOrder.delivery_schedule;
             const paymentInfo = notes.paymentInfo;
+
+            // Derived amounts with fallback to notes
+            const giftWrapPrice = notes.gift_wrap_price || notes.giftWrapPrice || 0;
+            const shippingCost = selectedOrder.shipping_cost || notes.shipping_cost || notes.shippingCost || 0;
+            const discountAmount = selectedOrder.discount_amount || notes.discount_amount || notes.discountAmount || 0;
+            // Calculate subtotal if missing, based on total
+            const subtotal = selectedOrder.subtotal || notes.subtotal || notes.subtotal_amount ||
+              (selectedOrder.total_amount - shippingCost - giftWrapPrice + discountAmount);
 
             return (
               <div className="space-y-6">
@@ -453,9 +461,9 @@ const AdminOrders = () => {
                       <div className="bg-white border rounded-lg p-3 text-sm space-y-1">
                         {shippingAddress ? (
                           <>
-                            <p>{shippingAddress.address}</p>
+                            <p>{shippingAddress.address || shippingAddress.street}</p>
                             <p>{shippingAddress.neighborhood} - {shippingAddress.city}/{shippingAddress.state}</p>
-                            <p>CEP: {shippingAddress.zipCode}</p>
+                            <p>CEP: {shippingAddress.zipCode || shippingAddress.zip_code}</p>
                             <p>{shippingAddress.country}</p>
                           </>
                         ) : (
@@ -484,22 +492,22 @@ const AdminOrders = () => {
                       <div className="bg-white border rounded-lg p-3 text-sm space-y-2">
                         <div className="flex justify-between text-muted-foreground text-xs">
                           <span>Produtos:</span>
-                          <span>R$ {(selectedOrder.subtotal_amount || (selectedOrder.total_amount - (selectedOrder.shipping_cost || 0) - (selectedOrder.gift_wrap_price || 0) + (selectedOrder.discount_amount || 0))).toFixed(2)}</span>
+                          <span>R$ {subtotal.toFixed(2)}</span>
                         </div>
-                        {selectedOrder.gift_wrap_price > 0 && (
+                        {giftWrapPrice > 0 && (
                           <div className="flex justify-between text-muted-foreground text-xs">
                             <span>Embalagem:</span>
-                            <span>R$ {selectedOrder.gift_wrap_price.toFixed(2)}</span>
+                            <span>R$ {giftWrapPrice.toFixed(2)}</span>
                           </div>
                         )}
                         <div className="flex justify-between text-muted-foreground text-xs">
                           <span>Frete:</span>
-                          <span>R$ {(selectedOrder.shipping_cost || 0).toFixed(2)}</span>
+                          <span>R$ {shippingCost.toFixed(2)}</span>
                         </div>
-                        {selectedOrder.discount_amount > 0 && (
+                        {discountAmount > 0 && (
                           <div className="flex justify-between text-green-600 text-xs">
                             <span>Desconto:</span>
-                            <span>-R$ {selectedOrder.discount_amount.toFixed(2)}</span>
+                            <span>-R$ {discountAmount.toFixed(2)}</span>
                           </div>
                         )}
                         <Separator className="my-1" />
@@ -545,6 +553,7 @@ const AdminOrders = () => {
                               <div className="text-xs text-purple-700 mt-1">
                                 <p>De: {giftOptions.sender_name || 'Anônimo'}</p>
                                 <p>Para: {giftOptions.recipient_name || 'Destinatário'}</p>
+                                <p>Tel: {giftOptions.recipient_phone}</p>
                               </div>
                             </div>
                           </div>

@@ -1,286 +1,271 @@
-import { useState, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useState, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
-import { useCRUD } from './useCRUD';
-import type { Order, OrderStatus, OrderItem } from '@/types/order';
+import {
+  Order,
+  OrderStatus,
+  OrderItem,
+  OrderFilters,
+  OrderStats
+} from '@/types/order';
+import { orderService } from '@/services/order.service';
+import { useAuth } from '@/contexts/AuthContext';
 
-// Static, stable references to prevent infinite loops in useCRUD
-const ORDER_BY = { column: 'created_at', ascending: false };
-const NO_FILTERS = {};
+interface UseOrdersOptions {
+  scope?: 'admin' | 'buyer' | 'seller';
+  fetchOnMount?: boolean;
+}
 
-export const useOrders = () => {
-  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+export const useOrders = (options: UseOrdersOptions = {}) => {
+  const { scope = 'admin', fetchOnMount = true } = options;
+  const { user } = useAuth();
+
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = useState<OrderStats | null>(null);
+  const [items, setItems] = useState<OrderItem[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
 
-  const {
-    data: orders,
-    loading,
-    error,
-    pagination,
-    create,
-    update,
-    remove,
-    getById,
-    refresh,
-    changePage,
-    search
-  } = useCRUD<Order>({
-    table: 'orders',
-    select: `
-      *,
-      buyer:profiles!buyer_id(id, full_name, email, phone),
-      seller:profiles!seller_id(id, full_name, email, phone),
-      items:order_items(
-        id,
-        quantity,
-        unit_price,
-        total_price,
-        product:products(id, name, images, price)
-      )
-    `,
-    orderBy: ORDER_BY,
-    filters: NO_FILTERS,
-    realtime: true,
-    pageSize: 10
-  });
+  // Filters state
+  const [filters, setFilters] = useState<OrderFilters>({});
 
-  // Create order with items
-  const createOrder = useCallback(async (orderData: {
-    buyer_id: string;
-    seller_id: string;
-    items: Array<{
-      product_id: string;
-      quantity: number;
-      unit_price: number;
-    }>;
-    delivery_address?: string;
-    notes?: string;
-  }): Promise<Order> => {
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalCount, setTotalCount] = useState(0);
+
+  /**
+   * Fetch orders based on current scope and filters
+   */
+  const fetchOrders = useCallback(async () => {
+    if (!user && scope !== 'admin') return;
+
+    setLoading(true);
+    setError(null);
+
     try {
-      const { items, ...orderInfo } = orderData;
+      let result;
+      const currentFilters = { ...filters };
 
-      // Calculate total
-      const total_amount = items.reduce((sum, item) =>
-        sum + (item.quantity * item.unit_price), 0
+      // Apply scope-specific filters
+      if (scope === 'buyer' && user) {
+        currentFilters.buyer_id = user.id;
+      } else if (scope === 'seller' && user) {
+        currentFilters.seller_id = user.id;
+      }
+
+      const { data, count, error } = await orderService.getOrdersWithRelations(
+        currentFilters,
+        { page, limit: pageSize }
       );
 
-      // Create order
-      const order = await create({
-        ...orderInfo,
-        total_amount,
-        status: 'pending' as OrderStatus
-      } as any);
+      if (error) throw error;
 
-      // Create order items
-      const orderItemsData = items.map(item => ({
-        order_id: order.id,
-        product_id: item.product_id,
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-        total_price: item.quantity * item.unit_price
-      }));
+      setOrders(data || []);
+      setTotalCount(count);
+    } catch (err: any) {
+      console.error('Error fetching orders:', err);
+      setError(err.message);
+      toast.error('Erro ao carregar pedidos');
+    } finally {
+      setLoading(false);
+    }
+  }, [user, scope, filters, page, pageSize]);
 
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItemsData as any);
+  /**
+   * Fetch order stats based on current scope
+   */
+  const fetchStats = useCallback(async () => {
+    try {
+      const statsFilters: { buyer_id?: string; seller_id?: string } = {};
 
-      if (itemsError) throw itemsError;
+      if (scope === 'buyer' && user) {
+        statsFilters.buyer_id = user.id;
+      } else if (scope === 'seller' && user) {
+        statsFilters.seller_id = user.id;
+      }
+
+      const { data, error } = await orderService.getOrderStats(statsFilters);
+      if (error) throw error;
+      setStats(data);
+      return data;
+    } catch (err: any) {
+      console.error('Error fetching stats:', err);
+      return null;
+    }
+  }, [scope, user]);
+
+  /**
+   * Create order
+   */
+  const createOrder = useCallback(async (
+    orderData: Omit<Order, 'id' | 'created_at' | 'updated_at' | 'order_number' | 'items'>,
+    items: Omit<OrderItem, 'id' | 'order_id'>[]
+  ) => {
+    setLoading(true);
+    try {
+      const { data, error } = await orderService.createOrderWithItems(orderData, items);
+
+      if (error) throw error;
 
       toast.success('Pedido criado com sucesso!');
-      return order;
-    } catch (error) {
-      throw error;
-    }
-  }, [create]);
 
-  // Update order status
+      // Refresh list if appropriate
+      if (scope === 'buyer' || scope === 'admin') {
+        fetchOrders();
+      }
+
+      return data;
+    } catch (err: any) {
+      console.error('Error creating order:', err);
+      toast.error('Erro ao criar pedido: ' + err.message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchOrders, scope]);
+
+  /**
+   * Update order status
+   */
   const updateOrderStatus = useCallback(async (
     orderId: string,
     status: OrderStatus,
-    notes?: string
-  ): Promise<void> => {
+    trackingNumber?: string
+  ) => {
     try {
-      const updateData: any = { status };
-      if (notes) updateData.notes = notes;
-
-      await update(orderId, updateData);
-
-      const statusMessages = {
-        pending: 'Pedido marcado como pendente',
-        confirmed: 'Pedido confirmado',
-        processing: 'Pedido em processamento',
-        shipped: 'Pedido enviado',
-        delivered: 'Pedido entregue',
-        cancelled: 'Pedido cancelado'
-      };
-
-      toast.success(statusMessages[status] || 'Status do pedido atualizado');
-    } catch (error) {
-      throw error;
-    }
-  }, [update]);
-
-  // Get orders by buyer
-  const getOrdersByBuyer = useCallback(async (buyerId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('orders')
-        .select(`
-          *,
-          seller:profiles!seller_id(id, full_name, email, phone),
-          items:order_items(
-            id,
-            quantity,
-            unit_price,
-            total_price,
-            product:products(id, name, images, price)
-          )
-        `)
-        .eq('buyer_id', buyerId)
-        .order('created_at', { ascending: false });
+      const { data, error } = await orderService.updateOrderStatus(orderId, status, trackingNumber);
 
       if (error) throw error;
 
-      return data || [];
-    } catch (err) {
-      console.error('Error fetching buyer orders:', err);
-      toast.error('Erro ao carregar pedidos do comprador');
-      return [];
+      toast.success('Status do pedido atualizado');
+
+      // Update local state without refetching everything
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
+
+      return data;
+    } catch (err: any) {
+      console.error('Error updating order status:', err);
+      toast.error('Erro ao atualizar status');
+      throw err;
     }
   }, []);
 
-  // Get orders by seller
-  const getOrdersBySeller = useCallback(async (sellerId: string) => {
+  /**
+   * Cancel order
+   */
+  const deleteOrder = useCallback(async (orderId: string) => { // Kept name deleteOrder for compatibility, but acts as cancel/soft delete usually? 
+    // Wait, the original useCRUD had 'remove' which is hard delete. 
+    // But for Orders, we usually don't delete. 
+    // However, AdminOrders.tsx uses deleteOrder.
+    // I will implement it as hard delete via service if exposed, or soft if prefered.
+    // OrderService inherits delete from BaseService.
     try {
-      const { data, error } = await supabase
-        .from('orders')
-        .select(`
-          *,
-          buyer:profiles!buyer_id(id, full_name, email, phone),
-          items:order_items(
-            id,
-            quantity,
-            unit_price,
-            total_price,
-            product:products(id, name, images, price)
-          )
-        `)
-        .eq('seller_id', sellerId)
-        .order('created_at', { ascending: false });
-
+      const { error } = await orderService.delete(orderId);
       if (error) throw error;
 
-      return data || [];
-    } catch (err) {
-      console.error('Error fetching seller orders:', err);
-      toast.error('Erro ao carregar pedidos do vendedor');
-      return [];
+      toast.success('Pedido removido');
+      fetchOrders();
+    } catch (err: any) {
+      console.error('Error deleting order:', err);
+      toast.error('Erro ao remover pedido');
+      throw err;
+    }
+  }, [fetchOrders]);
+
+  /**
+   * Get single order details
+   */
+  const getOrder = useCallback(async (orderId: string) => {
+    setLoading(true);
+    try {
+      const { data, error } = await orderService.getOrderWithItems(orderId);
+      if (error) throw error;
+      return data;
+    } catch (err: any) {
+      console.error('Error fetching order:', err);
+      toast.error('Erro ao carregar detalhes do pedido');
+      return null;
+    } finally {
+      setLoading(false);
     }
   }, []);
 
-  // Get order items
+  /**
+   * Get order items (specific method if needed independent of getOrder)
+   */
   const getOrderItems = useCallback(async (orderId: string) => {
+    setLoadingItems(true);
     try {
-      setLoadingItems(true);
-      const { data, error } = await supabase
-        .from('order_items')
-        .select(`
-          *,
-          product:products(id, name, images, price, description)
-        `)
-        .eq('order_id', orderId);
-
+      const { data: order, error } = await orderService.getOrderWithItems(orderId);
       if (error) throw error;
-
-      setOrderItems(data || []);
-      return data || [];
-    } catch (err) {
-      console.error('Error fetching order items:', err);
-      toast.error('Erro ao carregar itens do pedido');
+      setItems(order?.items || []);
+      return order?.items || [];
+    } catch (err: any) {
+      console.error('Error fetching items:', err);
       return [];
     } finally {
       setLoadingItems(false);
     }
   }, []);
 
-  // Get order statistics
-  const getOrderStats = useCallback(async (sellerId?: string) => {
-    try {
-      let query = supabase
-        .from('orders')
-        .select('status, total_amount, created_at');
-
-      if (sellerId) {
-        query = query.eq('seller_id', sellerId);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      const stats = {
-        total: data?.length || 0,
-        pending: data?.filter(o => o.status === 'pending').length || 0,
-        confirmed: data?.filter(o => o.status === 'confirmed').length || 0,
-        delivered: data?.filter(o => o.status === 'delivered').length || 0,
-        cancelled: data?.filter(o => o.status === 'cancelled').length || 0,
-        totalRevenue: data?.reduce((sum, o) => sum + (o.total_amount || 0), 0) || 0
-      };
-
-      return stats;
-    } catch (err) {
-      console.error('Error fetching order stats:', err);
-      return {
-        total: 0,
-        pending: 0,
-        confirmed: 0,
-        delivered: 0,
-        cancelled: 0,
-        totalRevenue: 0
-      };
-    }
+  // Filter helpers
+  const filterByStatus = useCallback((status: OrderStatus | 'all') => {
+    setFilters(prev => ({
+      ...prev,
+      status: status === 'all' ? undefined : status
+    }));
+    setPage(1); // Reset page on filter change
   }, []);
 
-  // Search orders
-  const searchOrders = useCallback((query: string) => {
-    search({
-      id: `%${query}%`
-    });
-  }, [search]);
-
-  // Filter orders by status
-  const filterByStatus = useCallback((status: OrderStatus) => {
-    search({ status });
-  }, [search]);
-
-  // Filter orders by date range
   const filterByDateRange = useCallback((startDate: string, endDate: string) => {
-    search({
-      created_at: `gte.${startDate}`,
-      created_at_end: `lte.${endDate}`
-    });
-  }, [search]);
+    setFilters(prev => ({
+      ...prev,
+      date_from: startDate,
+      date_to: endDate
+    }));
+    setPage(1);
+  }, []);
+
+  const searchOrders = useCallback((query: string) => {
+    setFilters(prev => ({
+      ...prev,
+      search: query
+    }));
+    setPage(1);
+  }, []);
+
+  useEffect(() => {
+    if (fetchOnMount) {
+      fetchOrders();
+    }
+  }, [fetchOnMount, fetchOrders]);
 
   return {
     orders,
     loading,
     error,
-    pagination,
-    orderItems,
+    stats,
+    items,
     loadingItems,
+    pagination: {
+      page,
+      pageSize,
+      totalCount,
+      totalPages: Math.ceil(totalCount / pageSize),
+      setPage,
+      setPageSize
+    },
+    fetchOrders,
+    fetchStats,
     createOrder,
-    updateOrder: update,
-    deleteOrder: remove,
-    getOrder: getById,
     updateOrderStatus,
-    getOrdersByBuyer,
-    getOrdersBySeller,
+    deleteOrder,
+    getOrder,
     getOrderItems,
-    getOrderStats,
-    searchOrders,
     filterByStatus,
     filterByDateRange,
-    refresh,
-    changePage
+    searchOrders,
+    refresh: fetchOrders
   };
 };

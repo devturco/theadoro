@@ -14,6 +14,7 @@ interface ProductReview {
   helpfulCount: number;
 }
 import { supabase } from '@/integrations/supabase/client';
+import { productService } from '@/services/product.service';
 import { toast } from '@/hooks/use-toast';
 
 export const useProduct = (productId: string | undefined) => {
@@ -31,104 +32,20 @@ export const useProduct = (productId: string | undefined) => {
     setError(null);
 
     try {
-      let query = supabase
-        .from('products')
-        .select(`
-          *,
-          slug,
-          categories:categories!fk_products_categories (
-            id,
-            name,
-            slug,
-            description,
-            image_url
-          ),
-          profiles:profiles!fk_products_profiles (
-            id,
-            full_name,
-            avatar_url,
-            location,
-            verified,
-            seller_delivery_enabled
-          )
-        `);
-
-      // Check if productId is a valid UUID
-      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(productId);
-
-
-
-      if (isUUID) {
-        query = query.eq('id', productId);
-      } else {
-        query = query.eq('slug', productId);
-      }
-
-      const { data, error } = await query.single() as { data: any, error: any };
+      const { data, error } = await productService.getByIdOrSlug(productId);
 
       if (error) throw error;
+      if (!data) throw new Error('Produto não encontrado');
 
-      if (!data) {
-        throw new Error('Produto não encontrado');
-      }
-
-      // Fetch sold count
-      const { count: soldCount } = await supabase
-        .from('order_items')
-        .select('*', { count: 'exact', head: true })
-        .eq('product_id', data.id);
-
-      const sellerInfo = Array.isArray(data.profiles) ? data.profiles[0] : data.profiles;
-
-      // Transform data to match Product interface
-      const transformedProduct: Product = {
-        id: data.id,
-        name: data.name,
-        slug: data.slug,
-        description: data.description,
-        price: data.price,
-        original_price: data.original_price,
-        images: data.images || [],
-        rating: data.rating || 0,
-        review_count: data.review_count || 0,
-        in_stock: data.in_stock,
-        stock_quantity: data.stock_quantity || 0,
-        tags: data.tags || [],
-        is_active: data.is_active,
-        is_service: data.is_service,
-        sold_count: soldCount || 0,
-        seller_id: sellerInfo?.id || '',
-        created_at: data.created_at,
-        updated_at: data.updated_at,
-        category: data.categories || {
-          id: '',
-          name: 'Sem categoria',
-          slug: 'sem-categoria',
-        },
-        seller: {
-          id: sellerInfo?.id || '',
-          name: sellerInfo?.full_name || 'Vendedor',
-          avatar: sellerInfo?.avatar_url,
-          location: sellerInfo?.location || '',
-          rating: 0,
-          reviewCount: 0,
-          verified: !!sellerInfo?.verified,
-          specialties: [],
-          responseTime: '',
-          joinedAt: '',
-          description: '',
-        }
-      };
-
-      setProduct(transformedProduct);
+      setProduct(data);
 
       // Fetch related products
-      if (data.categories?.id) {
-        fetchRelatedProducts(data.categories.id, data.id);
+      if (data.category?.id) {
+        fetchRelatedProducts(data.category.id, data.id);
       }
 
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Erro ao carregar produto';
+    } catch (err: any) {
+      const errorMessage = err.message || 'Erro ao carregar produto';
       setError(errorMessage);
       toast({
         title: "Erro",
@@ -142,74 +59,11 @@ export const useProduct = (productId: string | undefined) => {
 
   const fetchRelatedProducts = useCallback(async (categoryId: string, excludeProductId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .select(`
-          *,
-          categories (
-            id,
-            name,
-            slug,
-            description,
-            image_url
-          ),
-          profiles!fk_products_profiles (
-            id,
-            full_name,
-            avatar_url,
-            verified
-          )
-        `)
-        .eq('category_id', categoryId)
-        .neq('id', excludeProductId)
-        .limit(4);
+      const { data, error } = await productService.getRelatedProducts(excludeProductId, 4);
 
       if (error) throw error;
+      setRelatedProducts(data || []);
 
-      const transformedProducts: Product[] = (data || []).map(item => {
-        const sellerInfo = Array.isArray(item.profiles) ? item.profiles[0] : item.profiles;
-
-        return {
-          id: item.id,
-          name: item.name,
-          slug: item.slug,
-          description: item.description,
-          price: item.price,
-          original_price: (item as any).original_price,
-          images: item.images || [],
-          rating: (item as any).rating || 0,
-          review_count: (item as any).review_count || 0,
-          in_stock: (item as any).in_stock,
-          stock_quantity: item.stock_quantity || 0,
-          tags: (item as any).tags || [],
-          is_active: item.is_active ?? true,
-          seller_id: item.seller_id,
-          is_service: item.type === 'service',
-          created_at: item.created_at,
-          updated_at: item.updated_at,
-          category: {
-            id: item.categories?.id || '',
-            name: item.categories?.name || 'Sem categoria',
-            slug: item.categories?.slug || 'sem-categoria',
-            image: item.categories?.image_url,
-          },
-          seller: {
-            id: sellerInfo?.id || '',
-            name: sellerInfo?.full_name || 'Vendedor',
-            avatar: sellerInfo?.avatar_url,
-            location: '',
-            rating: 0,
-            reviewCount: 0,
-            verified: !!sellerInfo?.verified,
-            specialties: [],
-            responseTime: '',
-            joinedAt: '',
-            description: '',
-          }
-        };
-      });
-
-      setRelatedProducts(transformedProducts);
     } catch (err) {
       console.error('Error fetching related products:', err);
     }

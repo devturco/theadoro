@@ -4,8 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrders } from '@/hooks/useOrders';
+import { Order } from '@/types/order';
 import {
     ArrowLeft,
     Package,
@@ -15,17 +16,19 @@ import {
     CreditCard,
     Gift,
     Clock,
-    ExternalLink,
-    ChevronRight
+    MessageCircle,
+    ChevronRight,
+    ExternalLink
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 export default function OrderDetail() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const { user } = useAuth();
-    const [order, setOrder] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
+    const { getOrder, loading } = useOrders();
+    const [order, setOrder] = useState<Order | null>(null);
 
     useEffect(() => {
         if (user && id) {
@@ -34,45 +37,17 @@ export default function OrderDetail() {
     }, [user, id]);
 
     const loadOrderDetails = async () => {
-        try {
-            setLoading(true);
-            const { data, error } = await supabase
-                .from('orders')
-                .select(`
-          *,
-          order_items (
-            *,
-            products (
-                *,
-                profiles (
-                    full_name,
-                    phone
-                )
-            )
-          )
-        `)
-                .eq('id', id)
-                .single();
-
-            if (error) throw error;
-
-            // Parse JSON fields
-            const parsedOrder = {
-                ...data,
-                shipping_address: typeof data.shipping_address === 'string' ? JSON.parse(data.shipping_address) : data.shipping_address,
-                notes: typeof data.notes === 'string' ? JSON.parse(data.notes) : data.notes
-            };
-
-            setOrder(parsedOrder);
-        } catch (error) {
-            console.error('Error loading order:', error);
+        if (!id) return;
+        const data = await getOrder(id);
+        if (data) {
+            setOrder(data);
+        } else {
+            toast.error('Pedido não encontrado');
             navigate('/buyer/orders');
-        } finally {
-            setLoading(false);
         }
     };
 
-    if (loading) {
+    if (loading && !order) {
         return (
             <div className="flex items-center justify-center min-h-[400px]">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -81,6 +56,18 @@ export default function OrderDetail() {
     }
 
     if (!order) return null;
+
+    // Helper to safely access parsed notes and address
+    // OrderService/Supabase might return these as strings or objects depending on client config
+    const notes = order.notes ? (typeof order.notes === 'string' ? JSON.parse(order.notes) : order.notes) : {};
+    const shippingAddress = order.shipping_address ? (typeof order.shipping_address === 'string' ? JSON.parse(order.shipping_address) : order.shipping_address) : null;
+
+    // Derived values
+    const giftWrapPrice = notes.gift_wrap_price || notes.giftWrapPrice || 0;
+    const shippingCost = order.shipping_cost || notes.shipping_cost || notes.shippingCost || 0;
+    const discountAmount = order.discount_amount || notes.discount_amount || notes.discountAmount || 0;
+    const subtotal = order.subtotal || notes.subtotal || notes.subtotal_amount ||
+        (order.total_amount - shippingCost - giftWrapPrice + discountAmount);
 
     const steps = [
         { label: 'Pendente', icon: Clock, status: 'pending' },
@@ -129,7 +116,7 @@ export default function OrderDetail() {
                         {/* Active Progress Bar */}
                         <div
                             className="absolute left-0 top-1/2 h-1 bg-primary -translate-y-1/2 transition-all duration-500 mx-12 hidden md:block"
-                            style={{ width: `${(currentStepIndex / (steps.length - 1)) * 100}%` }}
+                            style={{ width: `${(Math.max(0, currentStepIndex) / (steps.length - 1)) * 100}%` }}
                         ></div>
 
                         {steps.map((step, index) => {
@@ -166,22 +153,22 @@ export default function OrderDetail() {
                         <CardHeader>
                             <CardTitle className="text-lg flex items-center gap-2">
                                 <Package className="h-5 w-5" />
-                                Produtos ({order.order_items.length})
+                                Produtos ({order.items?.length || 0})
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            {order.order_items.map((item: any) => (
+                            {order.items?.map((item: any) => (
                                 <div key={item.id} className="flex gap-4 p-4 border rounded-lg hover:bg-gray-50 transition-colors">
                                     <div className="w-20 h-20 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
                                         <img
-                                            src={item.products?.images?.[0] || 'https://via.placeholder.com/150'}
-                                            alt={item.products?.name}
+                                            src={item.product?.images?.[0] || 'https://via.placeholder.com/150'}
+                                            alt={item.product?.name}
                                             className="w-full h-full object-cover"
                                         />
                                     </div>
                                     <div className="flex-1 flex flex-col justify-between">
                                         <div>
-                                            <h3 className="font-semibold text-gray-900 line-clamp-1">{item.products?.name}</h3>
+                                            <h3 className="font-semibold text-gray-900 line-clamp-1">{item.product?.name}</h3>
                                             <p className="text-sm text-muted-foreground flex items-center gap-2">
                                                 Qtd: {item.quantity} • {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.unit_price)}
                                             </p>
@@ -221,28 +208,32 @@ export default function OrderDetail() {
                                 <div className="flex items-center justify-between mb-4">
                                     <div>
                                         <p className="text-sm font-medium text-blue-900">Método de Envio</p>
-                                        <p className="text-blue-700 font-bold">{order.shipping_method || 'Entrega Padrão'}</p>
+                                        <p className="text-blue-700 font-bold">{notes.shipping_method || 'Entrega Padrão'}</p>
                                     </div>
                                     <div className="text-right">
                                         <p className="text-sm font-medium text-blue-900">Previsão de Entrega</p>
-                                        <p className="text-blue-700 font-bold">18 de Janeiro, 2026</p>
+                                        <p className="text-blue-700 font-bold">
+                                            {order.estimated_delivery ? new Date(order.estimated_delivery).toLocaleDateString('pt-BR') : 'A definir'}
+                                        </p>
                                     </div>
                                 </div>
 
                                 {order.status === 'shipped' || order.status === 'delivered' ? (
                                     <div className="flex items-center gap-2 text-sm">
                                         <span className="font-semibold text-blue-800">Código:</span>
-                                        <code className="bg-white px-2 py-0.5 rounded border text-blue-900">THEA-987-654-BR</code>
-                                        <Button variant="link" size="sm" className="h-auto p-0 text-blue-800 underline">
-                                            Copiar
-                                        </Button>
+                                        <code className="bg-white px-2 py-0.5 rounded border text-blue-900">{order.tracking_number || 'Não disponível'}</code>
+                                        {order.tracking_number && (
+                                            <Button variant="link" size="sm" className="h-auto p-0 text-blue-800 underline">
+                                                Copiar
+                                            </Button>
+                                        )}
                                     </div>
                                 ) : (
                                     <p className="text-sm text-blue-600">O código será gerado assim que o vendedor despachar seu produto.</p>
                                 )}
                             </div>
 
-                            {/* Fake Tracking History */}
+                            {/* Tracking History */}
                             <div className="space-y-4">
                                 <div className="flex gap-4">
                                     <div className="flex flex-col items-center">
@@ -262,18 +253,6 @@ export default function OrderDetail() {
                                         </div>
                                         <div>
                                             <p className="text-sm font-bold">Pagamento Aprovado</p>
-                                            <p className="text-xs text-muted-foreground">14 de Janeiro, 16:30</p>
-                                        </div>
-                                    </div>
-                                )}
-                                {order.status === 'processing' && (
-                                    <div className="flex gap-4">
-                                        <div className="flex flex-col items-center">
-                                            <div className="w-2.5 h-2.5 bg-blue-400 rounded-full animate-pulse"></div>
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-bold">O vendedor está preparando sua encomenda</p>
-                                            <p className="text-xs text-muted-foreground">Em andamento</p>
                                         </div>
                                     </div>
                                 )}
@@ -292,26 +271,26 @@ export default function OrderDetail() {
                         <CardContent className="space-y-3">
                             <div className="flex justify-between text-sm">
                                 <span className="text-muted-foreground">Produtos</span>
-                                <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(order.subtotal_amount || (order.total_amount - (order.shipping_cost || 0) - (order.gift_wrap_price || 0) + (order.discount_amount || 0)))}</span>
+                                <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subtotal)}</span>
                             </div>
-                            {(order.gift_wrap_price > 0) && (
+                            {(giftWrapPrice > 0) && (
                                 <div className="flex justify-between text-sm">
                                     <span className="text-muted-foreground flex items-center gap-1">
                                         Embalagem para presente
                                     </span>
-                                    <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(order.gift_wrap_price)}</span>
+                                    <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(giftWrapPrice)}</span>
                                 </div>
                             )}
                             <div className="flex justify-between text-sm">
                                 <span className="text-muted-foreground">Frete</span>
-                                <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(order.shipping_cost || 0)}</span>
+                                <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(shippingCost)}</span>
                             </div>
-                            {(order.discount_amount > 0) && (
+                            {(discountAmount > 0) && (
                                 <div className="flex justify-between text-sm text-green-600">
                                     <span className="flex items-center gap-1">
                                         Desconto
                                     </span>
-                                    <span>-{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(order.discount_amount)}</span>
+                                    <span>-{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(discountAmount)}</span>
                                 </div>
                             )}
                             <Separator />
@@ -323,19 +302,14 @@ export default function OrderDetail() {
                             <div className="pt-4 space-y-2">
                                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                     <CreditCard className="h-4 w-4" />
-                                    <span>Pago via {order.payment_method?.toUpperCase()}</span>
+                                    <span>Pago via {(order.payment_method || 'Desconhecido').toUpperCase()}</span>
                                 </div>
-                                {order.payment_method === 'pix' && (
-                                    <Badge variant="outline" className="w-full justify-center py-2 border-green-200 bg-green-50 text-green-700">
-                                        Sincronizado via PIX
-                                    </Badge>
-                                )}
                             </div>
                         </CardContent>
                     </Card>
 
                     {/* Gift Options */}
-                    {order.notes?.giftOptions?.is_gift && (
+                    {notes?.giftOptions?.is_gift && (
                         <Card className="border-purple-200 bg-purple-50/30">
                             <CardHeader className="pb-2">
                                 <CardTitle className="text-lg flex items-center gap-2 text-purple-900">
@@ -345,38 +319,38 @@ export default function OrderDetail() {
                             </CardHeader>
                             <CardContent className="text-sm space-y-4">
                                 <div className="flex gap-4">
-                                    {order.notes?.giftOptions?.wrap_style_image && (
+                                    {notes.giftOptions.wrap_style_image && (
                                         <div className="w-20 h-20 rounded-lg overflow-hidden border bg-gray-50 flex-shrink-0">
                                             <img
-                                                src={order.notes.giftOptions.wrap_style_image}
-                                                alt={order.notes.giftOptions.wrap_style_name}
+                                                src={notes.giftOptions.wrap_style_image}
+                                                alt={notes.giftOptions.wrap_style_name}
                                                 className="w-full h-full object-cover"
                                             />
                                         </div>
                                     )}
                                     <div className="flex-1">
                                         <p className="font-semibold text-purple-800">Embalagem:</p>
-                                        <p className="text-purple-700">{order.notes?.giftOptions?.wrap_style_name || 'Embalagem Selecionada'}</p>
+                                        <p className="text-purple-700">{notes.giftOptions.wrap_style_name || 'Embalagem Selecionada'}</p>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
-                                    {order.notes?.giftOptions?.recipient_name && (
+                                    {notes.giftOptions.recipient_name && (
                                         <div>
                                             <p className="font-semibold text-purple-800 text-xs uppercase tracking-wider">Para:</p>
-                                            <p className="text-purple-700 font-medium">{order.notes?.giftOptions.recipient_name}</p>
+                                            <p className="text-purple-700 font-medium">{notes.giftOptions.recipient_name}</p>
                                         </div>
                                     )}
-                                    {order.notes?.giftOptions?.sender_name && (
+                                    {notes.giftOptions.sender_name && (
                                         <div>
                                             <p className="font-semibold text-purple-800 text-xs uppercase tracking-wider">De:</p>
-                                            <p className="text-purple-700 font-medium">{order.notes?.giftOptions.sender_name}</p>
+                                            <p className="text-purple-700 font-medium">{notes.giftOptions.sender_name}</p>
                                         </div>
                                     )}
                                 </div>
-                                {order.notes?.giftOptions?.message && (
+                                {notes.giftOptions.message && (
                                     <div className="bg-white p-4 rounded-xl border border-purple-100 italic text-purple-900 shadow-sm relative">
                                         <span className="absolute -top-2 left-4 px-2 bg-white text-[10px] font-bold text-purple-300 uppercase leading-none">Mensagem</span>
-                                        "{order.notes?.giftOptions.message}"
+                                        "{notes.giftOptions.message}"
                                     </div>
                                 )}
                             </CardContent>
@@ -392,14 +366,14 @@ export default function OrderDetail() {
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            {order.shipping_address ? (
+                            {shippingAddress ? (
                                 <div className="text-sm space-y-1">
-                                    <p className="font-bold">{order.notes?.customer?.firstName} {order.notes?.customer?.lastName}</p>
-                                    <p>{order.shipping_address.street}, {order.shipping_address.number}</p>
-                                    {order.shipping_address.complement && <p>{order.shipping_address.complement}</p>}
-                                    <p>{order.shipping_address.neighborhood}</p>
-                                    <p>{order.shipping_address.city} - {order.shipping_address.state}</p>
-                                    <p>{order.shipping_address.zipCode}</p>
+                                    <p className="font-bold">{notes?.customer?.firstName} {notes?.customer?.lastName}</p>
+                                    <p>{shippingAddress.street || shippingAddress.address}, {shippingAddress.number}</p>
+                                    {shippingAddress.complement && <p>{shippingAddress.complement}</p>}
+                                    <p>{shippingAddress.neighborhood}</p>
+                                    <p>{shippingAddress.city} - {shippingAddress.state}</p>
+                                    <p>{shippingAddress.zipCode || shippingAddress.zip_code}</p>
                                 </div>
                             ) : (
                                 <p className="text-sm text-muted-foreground italic">Endereço não disponível</p>
@@ -408,21 +382,19 @@ export default function OrderDetail() {
                     </Card>
 
                     <div className="space-y-3">
-                        {order.order_items?.[0]?.products?.profiles?.phone && (
+                        {order.seller?.phone && (
                             <Button
                                 variant="outline"
                                 className="w-full gap-2"
                                 size="lg"
                                 onClick={() => {
-                                    const phone = order.order_items[0].products.profiles.phone;
+                                    const phone = order.seller!.phone;
                                     const message = encodeURIComponent(`Olá, preciso de ajuda com o pedido #${order.id.slice(0, 8)}`);
                                     window.open(`https://wa.me/${phone}?text=${message}`, '_blank');
                                 }}
                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                                    <path d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.898 7.898 0 0 0 13.6 2.326zM7.994 14.521a6.573 6.573 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.557 6.557 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592zm3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.346.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.34-.114-.007-.247-.007-.38-.007a.729.729 0 0 0-.529.247c-.182.198-.691.677-.691 1.654 0 .977.71 1.916.81 2.049.098.133 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.152.904.129 1.246.08.38-.058 1.171-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.38-.232z" />
-                                </svg>
-                                Falar com Vendedor (Frete/Dúvidas)
+                                <MessageCircle className="h-4 w-4" />
+                                Falar com Vendedor
                             </Button>
                         )}
                         <Button variant="ghost" className="w-full text-muted-foreground" size="sm" onClick={() => navigate('/buyer/support')}>
