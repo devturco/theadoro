@@ -61,8 +61,10 @@ export interface Product {
   };
   seller: {
     id: string;
-    name: string;
+    name?: string;
+    full_name?: string;
     avatar?: string;
+    avatar_url?: string;
     location?: string;
     rating?: number;
     reviewCount?: number;

@@ -453,9 +453,9 @@ export const ProductDetail: React.FC = () => {
                 <div className="p-4 flex items-center gap-3 cursor-pointer hover:bg-gray-50 transition-colors rounded-t-[1.5rem]"
                   onClick={() => navigate(`/sellers/${product.seller!.id}`)}>
                   <Avatar className="h-10 w-10 border border-gray-100">
-                    <AvatarImage src={product.seller.avatar} />
+                    <AvatarImage src={product.seller.avatar || product.seller.avatar_url} />
                     <AvatarFallback className="bg-wine text-white text-xs">
-                      {product.seller.name.charAt(0).toUpperCase()}
+                      {(product.seller.name || product.seller.full_name || 'V').charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
 
@@ -463,7 +463,7 @@ export const ProductDetail: React.FC = () => {
                     <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Vendido por</p>
                     <div className="flex items-center gap-1">
                       <h3 className="text-sm font-bold text-gray-900 truncate">
-                        {product.seller.name}
+                        {product.seller.name || product.seller.full_name}
                       </h3>
                       {product.seller.verified && (
                         <CheckCircle className="h-3.5 w-3.5 text-blue-500 fill-white" />

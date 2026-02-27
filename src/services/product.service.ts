@@ -9,7 +9,8 @@ export interface Product extends BaseEntity {
   category_id: string;
   seller_id: string;
   images: string[];
-  status: 'active' | 'inactive' | 'out_of_stock';
+  status?: 'active' | 'inactive' | 'out_of_stock'; // UI status type
+  is_active: boolean;
   stock_quantity: number;
   sku?: string;
   weight?: number;
@@ -28,14 +29,16 @@ export interface Product extends BaseEntity {
   views_count?: number;
   sales_count?: number;
   // Relations
-  category?: {
-    id: string;
-    name: string;
-  };
   seller?: {
     id: string;
     full_name: string;
+    name?: string;
     avatar_url?: string;
+    avatar?: string;
+  };
+  category?: {
+    id: string;
+    name: string;
   };
 }
 
@@ -52,7 +55,7 @@ export interface ProductStats {
 export interface ProductFilters {
   category_id?: string;
   seller_id?: string;
-  status?: Product['status'];
+  is_active?: boolean;
   featured?: boolean;
   min_price?: number;
   max_price?: number;
@@ -90,8 +93,12 @@ class ProductService extends BaseService<Product> {
         query = query.eq('seller_id', filters.seller_id);
       }
 
-      if (filters.status) {
-        query = query.eq('status', filters.status);
+      if (filters.is_active !== undefined) {
+        query = query.eq('is_active', filters.is_active);
+      } else if (filters.status === 'active') {
+        query = query.eq('is_active', true);
+      } else if (filters.status === 'inactive') {
+        query = query.eq('is_active', false);
       }
 
       if (filters.featured !== undefined) {
@@ -150,12 +157,16 @@ class ProductService extends BaseService<Product> {
       if (totalError) throw totalError;
 
       // Get active products
-      const { count: activeProducts, error: activeError } = await this.count({ status: 'active' });
+      const { count: activeProducts, error: activeError } = await this.count({ is_active: true });
       if (activeError) throw activeError;
 
-      // Get out of stock products
-      const { count: outOfStock, error: outOfStockError } = await this.count({ status: 'out_of_stock' });
+      // Get out of stock products (using stock_quantity <= 0)
+      const { data: outOfStockData, error: outOfStockError } = await supabase
+        .from(this.tableName)
+        .select('id', { count: 'exact', head: true })
+        .lte('stock_quantity', 0);
       if (outOfStockError) throw outOfStockError;
+      const outOfStock = outOfStockData?.length || 0;
 
       // Get low stock products (stock_quantity <= 10)
       const { data: lowStockData, error: lowStockError } = await supabase
@@ -174,7 +185,7 @@ class ProductService extends BaseService<Product> {
       const { data: priceStats, error: priceError } = await supabase
         .from(this.tableName)
         .select('price')
-        .eq('status', 'active');
+        .eq('is_active', true);
 
       if (priceError) throw priceError;
 
@@ -239,7 +250,7 @@ class ProductService extends BaseService<Product> {
           seller:profiles(id, full_name, avatar_url)
         `)
         .eq('featured', true)
-        .eq('status', 'active')
+        .eq('is_active', true)
         .gt('stock_quantity', 0)
         .order('rating_average', { ascending: false })
         .limit(limit);
@@ -269,7 +280,7 @@ class ProductService extends BaseService<Product> {
           seller:profiles(id, full_name, avatar_url)
         `)
         .eq('category_id', categoryId)
-        .eq('status', 'active')
+        .eq('is_active', true)
         .order('created_at', { ascending: false });
 
       return {
@@ -349,9 +360,9 @@ class ProductService extends BaseService<Product> {
         return { data: null, error: fetchError };
       }
 
-      const newStatus = currentProduct.status === 'active' ? 'inactive' : 'active';
+      const newIsActive = !(currentProduct.is_active);
 
-      return this.update(productId, { status: newStatus });
+      return this.update(productId, { is_active: newIsActive });
     } catch (error) {
       console.error('Error toggling product status:', error);
       return {
@@ -387,11 +398,11 @@ class ProductService extends BaseService<Product> {
    */
   async updateStock(productId: string, quantity: number): Promise<{ data: Product | null; error: PostgrestError | null }> {
     try {
-      const status = quantity <= 0 ? 'out_of_stock' : 'active';
+      const is_active = quantity > 0;
 
       return this.update(productId, {
         stock_quantity: quantity,
-        status
+        is_active
       });
     } catch (error) {
       console.error('Error updating stock:', error);
@@ -432,7 +443,7 @@ class ProductService extends BaseService<Product> {
         `)
         .lte('stock_quantity', threshold)
         .gt('stock_quantity', 0)
-        .eq('status', 'active')
+        .eq('is_active', true)
         .order('stock_quantity', { ascending: true });
 
       return {
@@ -460,7 +471,7 @@ class ProductService extends BaseService<Product> {
           category:categories(id, name),
           seller:profiles(id, full_name, avatar_url)
         `)
-        .eq('status', 'active')
+        .eq('is_active', true)
         .order('sales_count', { ascending: false })
         .limit(limit);
 
@@ -482,7 +493,7 @@ class ProductService extends BaseService<Product> {
    */
   async bulkUpdateProducts(
     productIds: string[],
-    updateData: Partial<Pick<Product, 'status' | 'featured' | 'category_id'>>
+    updateData: Partial<Pick<Product, 'is_active' | 'featured' | 'category_id' | 'status'>>
   ): Promise<{ data: Product[] | null; error: PostgrestError | null }> {
     try {
       const { data, error } = await supabase
@@ -527,7 +538,7 @@ class ProductService extends BaseService<Product> {
         `)
         .eq('category_id', currentProduct.category_id)
         .neq('id', productId)
-        .eq('status', 'active')
+        .eq('is_active', true)
         .gt('stock_quantity', 0)
         .order('rating_average', { ascending: false })
         .limit(limit);

@@ -108,7 +108,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           <div className="flex items-center gap-1">
             <span className="text-[10px] text-gray-400">por </span>
             <Link to={`/sellers/${product.seller.id}`} className="text-[10px] font-medium text-gray-500 hover:text-wine hover:underline truncate">
-              {product.seller.name}
+              {product.seller.name || product.seller.full_name}
             </Link>
             {product.seller.verified && (
               <CheckCircle className="h-3 w-3 text-blue-500 fill-white" />

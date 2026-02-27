@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Minus, Plus, Trash2, Heart, ExternalLink } from 'lucide-react';
-import { CartItem as CartItemType } from '@/types/product';
+import { CartItem as CartItemType } from '@/contexts/CartContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useCart } from '@/hooks/useCart';
@@ -107,23 +107,18 @@ export const CartItem: React.FC<CartItemProps> = ({
 
               {item.product.seller && (
                 <p className="text-xs text-gray-500 mt-1">
-                  Vendido por {item.product.seller.name}
+                  Vendido por {item.product.seller.name || item.product.seller.full_name}
                 </p>
               )}
 
               {/* Variant Info */}
-              {item.variant && (
+              {item.selectedOptions && Object.keys(item.selectedOptions).length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-1">
-                  {item.variant.color && (
-                    <Badge variant="outline" className="text-xs">
-                      {item.variant.color}
+                  {Object.entries(item.selectedOptions).map(([key, value]) => (
+                    <Badge key={key} variant="outline" className="text-xs">
+                      {value}
                     </Badge>
-                  )}
-                  {item.variant.size && (
-                    <Badge variant="outline" className="text-xs">
-                      {item.variant.size}
-                    </Badge>
-                  )}
+                  ))}
                 </div>
               )}
 
@@ -175,7 +170,7 @@ export const CartItem: React.FC<CartItemProps> = ({
               {hasDiscount && (
                 <>
                   <span className="text-xs text-gray-500 line-through">
-                    {formatPrice(item.product.originalPrice!)}
+                    {formatPrice(item.product.original_price!)}
                   </span>
                   <Badge variant="destructive" className="text-xs">
                     -{discountPercentage}%
@@ -238,34 +233,7 @@ export const CartItem: React.FC<CartItemProps> = ({
             </div>
           )}
 
-          {/* Shipping Info */}
-          {item.product.shippingInfo && (
-            <div className="mt-2 pt-2 border-t border-gray-100">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-500">Frete:</span>
-                <span className={cn(
-                  'font-medium',
-                  item.product.shippingInfo.freeShipping
-                    ? 'text-green-600'
-                    : 'text-gray-700'
-                )}>
-                  {item.product.shippingInfo.freeShipping
-                    ? 'Grátis'
-                    : formatPrice(item.product.shippingInfo.price)
-                  }
-                </span>
-              </div>
 
-              {item.product.shippingInfo.estimatedDays && (
-                <div className="flex items-center justify-between text-xs mt-1">
-                  <span className="text-gray-500">Entrega:</span>
-                  <span className="text-gray-700">
-                    {item.product.shippingInfo.estimatedDays} dias úteis
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </div>
     </div>
