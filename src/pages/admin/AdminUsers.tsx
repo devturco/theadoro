@@ -235,6 +235,30 @@ const AdminUsers = () => {
     }
   ];
 
+  const [promoteEmail, setPromoteEmail] = useState('');
+  const [isPromoting, setIsPromoting] = useState(false);
+
+  const handlePromoteByEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!promoteEmail) return;
+
+    try {
+      setIsPromoting(true);
+      const { error } = await userService.updateRoleByEmail(promoteEmail, 'admin');
+      
+      if (error) throw error;
+
+      toast.success(`Usuário ${promoteEmail} agora é um Administrador Master!`);
+      setPromoteEmail('');
+      fetchUsers();
+    } catch (error: any) {
+      console.error('Erro ao promover usuário:', error);
+      toast.error(error.message || 'Erro ao promover usuário. Verifique se o e-mail está correto e cadastrado.');
+    } finally {
+      setIsPromoting(false);
+    }
+  };
+
   if (!isAdmin) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -348,6 +372,41 @@ const AdminUsers = () => {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* NOVO: Espaço para promover sócias por e-mail */}
+      <Card className="border-purple-100 bg-purple-50/30">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center gap-2 text-purple-800">
+            <ShieldCheck className="h-5 w-5" />
+            Promoção de Administradores Master
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col md:flex-row gap-4 items-end">
+            <div className="flex-1 space-y-2">
+              <Label htmlFor="promote-email" className="text-purple-700">E-mail da Sócia/Colaboradora</Label>
+              <Input
+                id="promote-email"
+                type="email"
+                placeholder="exemplo@theadoro.com.br"
+                value={promoteEmail}
+                onChange={(e) => setPromoteEmail(e.target.value)}
+                className="bg-white border-purple-200 focus-visible:ring-purple-400"
+              />
+            </div>
+            <Button 
+              onClick={handlePromoteByEmail} 
+              disabled={isPromoting || !promoteEmail}
+              className="bg-purple-600 hover:bg-purple-700 text-white min-w-[180px]"
+            >
+              {isPromoting ? 'Processando...' : 'Tornar Admin Master'}
+            </Button>
+          </div>
+          <p className="text-[11px] text-purple-600 mt-2 italic">
+            * O usuário deve estar previamente cadastrado no sistema para ser promovido.
+          </p>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

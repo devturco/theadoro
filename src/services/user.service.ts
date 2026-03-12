@@ -17,6 +17,27 @@ class UserService extends BaseService<UserProfile> {
   }
 
   /**
+   * Map database profile to frontend UserProfile
+   */
+  private mapProfile(profile: any): UserProfile {
+    if (!profile) return profile;
+    
+    // Virtual mapping for 'status' based on 'verified' or 'is_approved'
+    // Logic: If verified is true, it's 'active'. Otherwise 'inactive'.
+    // If it's a seller and not approved yet, it could be 'pending'.
+    let status: UserProfile['status'] = profile.verified ? 'active' : 'inactive';
+    
+    if (profile.role === 'seller' && profile.is_approved === false) {
+      status = 'pending';
+    }
+
+    return {
+      ...profile,
+      status
+    };
+  }
+
+  /**
    * Get user statistics for admin dashboard
    */
   async getUserStats(): Promise<{ data: UserStats | null; error: PostgrestError | null }> {
@@ -26,16 +47,15 @@ class UserService extends BaseService<UserProfile> {
       if (totalError) throw totalError;
 
       // Get active users
-      const { count: activeUsers, error: activeError } = await this.count({ status: 'active' });
+      // Map 'status: active' to 'verified: true' for compatibility
+      const { count: activeUsers, error: activeError } = await this.count({ verified: true });
       if (activeError) throw activeError;
 
       // Get pending sellers
-      // Note: 'role' might be in 'user_roles' table, but we use the denormalized/profile column for quick stats if available.
-      // If not, we should query user_roles.
-      // Assuming 'role' column on profiles exists for now based on previous code.
+      // Note: Using 'is_approved' or 'role' combined with other flags if status is missing
       const { count: pendingSellers, error: pendingError } = await this.count({
         role: 'seller',
-        status: 'pending'
+        is_approved: false
       });
       if (pendingError) throw pendingError;
 
@@ -98,7 +118,7 @@ class UserService extends BaseService<UserProfile> {
         .order('created_at', { ascending: false });
 
       return {
-        data: data as unknown as UserProfile[] || [],
+        data: (data || []).map(p => this.mapProfile(p)),
         error
       };
     } catch (error) {
@@ -119,11 +139,11 @@ class UserService extends BaseService<UserProfile> {
         .from('profiles')
         .select('*, user_roles(role)')
         .eq('role', 'seller')
-        .eq('status', 'pending')
+        .eq('is_approved', false)
         .order('created_at', { ascending: false });
 
       return {
-        data: data as unknown as UserProfile[] || [],
+        data: (data || []).map(p => this.mapProfile(p)),
         error
       };
     } catch (error) {
@@ -202,18 +222,19 @@ class UserService extends BaseService<UserProfile> {
    */
   async toggleUserStatus(userId: string): Promise<{ data: UserProfile | null; error: PostgrestError | null }> {
     try {
-      // First get current status
+      // First get current status (verified column)
       const { data: currentUser, error: fetchError } = await this.getById(userId);
       if (fetchError || !currentUser) {
         return { data: null, error: fetchError };
       }
 
-      const newStatus = currentUser.status === 'active' ? 'inactive' : 'active';
+      // Toggle 'verified' column
+      const newStatus = !(currentUser as any).verified;
 
       const { data, error } = await supabase
         .from('profiles')
         .update({
-          status: newStatus,
+          verified: newStatus,
           updated_at: new Date().toISOString()
         })
         .eq('id', userId)
@@ -221,7 +242,7 @@ class UserService extends BaseService<UserProfile> {
         .single();
 
       return {
-        data: data as UserProfile,
+        data: this.mapProfile(data),
         error
       };
     } catch (error) {
@@ -240,7 +261,16 @@ class UserService extends BaseService<UserProfile> {
     userId: string,
     profileData: Partial<UserProfile>
   ): Promise<{ data: UserProfile | null; error: PostgrestError | null }> {
-    return this.update(userId, profileData);
+    // 🛡️ SECURITY/COMPATIBILITY: The 'status' column doesn't exist in the actual DB table.
+    // We remove it here to avoid PostgrestError (PGRST204)
+    const { status, roles, ...validData } = profileData as any;
+    
+    // If status is provided, we could map it to 'verified' if that's the intent
+    if (status !== undefined) {
+      (validData as any).verified = status === 'active';
+    }
+
+    return this.update(userId, validData);
   }
 
   /**
@@ -283,14 +313,18 @@ class UserService extends BaseService<UserProfile> {
 
       // Apply filters
       if (role) {
-        // If 'role' is a column on profiles, this works.
-        // If not, we might need to filter manually or use a different query strategy.
-        // Assuming 'role' column exists for now.
         query = query.eq('role', role);
       }
 
       if (status) {
-        query = query.eq('status', status);
+        // Map frontend status filter to DB columns
+        if (status === 'active') {
+          query = query.eq('verified', true);
+        } else if (status === 'inactive') {
+          query = query.eq('verified', false);
+        } else if (status === 'pending') {
+          query = query.eq('is_approved', false).eq('role', 'seller');
+        }
       }
 
       query = query.order('created_at', { ascending: false });
@@ -298,7 +332,7 @@ class UserService extends BaseService<UserProfile> {
       const { data, error } = await query;
 
       return {
-        data: data as unknown as UserProfile[] || [],
+        data: (data || []).map(p => this.mapProfile(p)),
         error
       };
     } catch (error) {
@@ -335,6 +369,29 @@ class UserService extends BaseService<UserProfile> {
     } catch (error) {
       console.error('Error getting user activity:', error);
       return { data: null, error: error as PostgrestError };
+    }
+  }
+
+  /**
+   * Promote or demote user by email
+   */
+  async updateRoleByEmail(email: string, role: UserRole): Promise<{ data: UserProfile | null; error: any }> {
+    try {
+      // 1. Find user by email
+      const { data: user, error: findError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (findError) throw findError;
+      if (!user) throw new Error('Usuário com este e-mail não encontrado.');
+
+      // 2. Call assignRole
+      return await this.assignRole(user.id, role);
+    } catch (error: any) {
+      console.error('[UserService] Error updating role by email:', error.message);
+      return { data: null, error };
     }
   }
 

@@ -204,34 +204,44 @@ export const UserDashboardLayout = ({ children }: BuyerLayoutProps) => {
               {isSellerRoute ? (
                 <div className="flex items-center gap-1 text-[10px] bg-wine/10 text-wine px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
                   <ShieldCheck className="h-3 w-3" />
-                  Painel Seller
+                  Painel Administrativo
                 </div>
               ) : (
                 <>
-                  {isSellerMode && (
+                  {isSellerMode && !isAdmin && (
                     <div className="flex items-center gap-1 text-[10px] bg-green-50 text-green-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider mb-1">
                       <ShieldCheck className="h-3 w-3" />
                       Conta Verificada
                     </div>
                   )}
-                  <div className="flex items-center gap-1 text-[10px] bg-gray-50 text-gray-500 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                    <User className="h-3 w-3" />
-                    Cliente
-                  </div>
+                  {!isAdmin && (
+                    <div className="flex items-center gap-1 text-[10px] bg-gray-50 text-gray-500 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                      <User className="h-3 w-3" />
+                      Cliente
+                    </div>
+                  )}
+                  {isAdmin && (
+                    <div className="flex items-center gap-1 text-[10px] bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                      <ShieldCheck className="h-3 w-3" />
+                      Admin Master
+                    </div>
+                  )}
                 </>
               )}
             </div>
 
             {/* Navigation Links */}
             <div className="space-y-4">
-              {/* Seller Tools Section (Only for /seller routes) */}
-              {isSellerRoute && (
+              {/* Seller/Admin Tools Section */}
+              {(isSellerRoute || isAdmin) && (
                 <nav className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                   <div className="p-4 border-b border-gray-50 flex items-center justify-between">
-                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Gestão de Loja</span>
+                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                      {isAdmin ? 'Gestão Master' : 'Gestão de Loja'}
+                    </span>
                   </div>
                   <div className="p-2 space-y-1">
-                    {sellerMenuItems.map((item) => {
+                    {(isAdmin && !isSellerRoute ? [] : sellerMenuItems).map((item) => {
                       const isActive = location.pathname === item.url;
                       return (
                         <Link
@@ -252,12 +262,25 @@ export const UserDashboardLayout = ({ children }: BuyerLayoutProps) => {
                         </Link>
                       );
                     })}
+                    
+                    {isAdmin && (
+                      <Link
+                        to="/admin/dashboard"
+                        className="flex items-center justify-between p-3 rounded-lg text-purple-600 hover:bg-purple-50 transition-all group border border-dashed border-purple-100 mt-2"
+                      >
+                        <div className="flex items-center gap-3">
+                          <ShieldCheck className="h-5 w-5 text-purple-400 group-hover:text-purple-600" />
+                          <span className="font-bold">Painel Master</span>
+                        </div>
+                        <ChevronRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </Link>
+                    )}
                   </div>
                 </nav>
               )}
 
-              {/* Buying Tools Section (Only for /buyer routes) */}
-              {!isSellerRoute && (
+              {/* Buying Tools Section (Only for /buyer routes AND NOT for Admin) */}
+              {!isSellerRoute && !isAdmin && (
                 <nav className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                   <div className="p-4 border-b border-gray-50 flex items-center justify-between">
                     <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Minha Conta</span>
@@ -290,7 +313,7 @@ export const UserDashboardLayout = ({ children }: BuyerLayoutProps) => {
 
               {/* General Actions */}
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-2 space-y-1">
-                {isSellerRoute ? (
+                {(isSellerRoute || isAdmin) ? (
                   <Link
                     to="/"
                     className="flex items-center gap-3 p-3 rounded-lg text-gray-600 hover:bg-gray-50 transition-all font-medium"

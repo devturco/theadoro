@@ -214,11 +214,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.removeItem('checkoutStep');
       
       // 3. Selective LocalStorage Clear (Keep global settings, but remove user specific data)
+      // Note: We clean everything starting with 'theadoro-cart-' to ensure NO LEAKAGE between users
       Object.keys(localStorage).forEach(key => {
         if (
           key.includes('supabase.auth.token') || 
           key.startsWith('sb-') || 
-          key.startsWith('theadoro-cart-user-')
+          key.startsWith('theadoro-cart-')
         ) {
           localStorage.removeItem(key);
         }
