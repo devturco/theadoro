@@ -1,0 +1,1 @@
+{"required":["id","name","time_range"],"properties":{"id":{"description":"Note:\nThis is a Primary Key.<pk/>","format":"text","type":"string"},"name":{"format":"text","type":"string"},"time_range":{"format":"text","type":"string"},"is_active":{"default":true,"format":"boolean","type":"boolean"}},"type":"object","x-readme-ref-name":"delivery_slots"}

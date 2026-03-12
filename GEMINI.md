@@ -1,33 +1,25 @@
-# Diretrizes do Projeto: THEADORO GIFT
+# THEADORO GIFT - Monorepo Master
 
-Este arquivo contém mandatos fundamentais para qualquer agente de IA que trabalhe neste repositório. Estas instruções têm precedência sobre os comportamentos padrão.
+Este é o índice principal do projeto THEADORO GIFT. Siga as instruções abaixo para navegar e manter o ecossistema.
 
-## 🔴 Mandato Principal: Test-First (TDD)
+## 🧭 Context Routing (Roteamento de Memória)
+Sempre carregue o `GEMINI.md` específico antes de realizar tarefas em subpastas:
 
-**Sempre escreva e execute testes unitários ANTES de implementar ou modificar qualquer funcionalidade.**
+→ **Frontend:** `apps/web/GEMINI.md` (UI, Rotas, Componentes)
+→ **API & Tipos:** `packages/api-client/GEMINI.md` (Kubb, Hooks, Schemas)
+→ **Configuração:** `packages/config/GEMINI.md` (TS, Tailwind, ESLint)
+→ **Backend:** `supabase/GEMINI.md` (Migrations, RLS, Edge Functions)
 
-### Fluxo de Trabalho Obrigatório:
-1.  **Red (Falha)**: Crie um arquivo de teste que cubra o bug reportado ou a nova funcionalidade desejada. Execute o teste e confirme que ele **falha**.
-2.  **Green (Sucesso)**: Implemente a mudança mínima necessária para fazer o teste passar.
-3.  **Refactor (Refatoração)**: Limpe o código, mantendo o teste passando.
-4.  **Validate**: Execute o conjunto de testes completo para garantir que não houve regressões.
+## 🔴 Mandatos Globais (Não Negociáveis)
+1. **Test-First (TDD):** Escreva testes antes de implementar a lógica.
+2. **Type Safety:** NUNCA use `any`. Use os tipos gerados em `@theadoro/api-client`.
+3. **Segurança (RLS):** Toda tabela nova no Supabase deve ter políticas de RLS.
+4. **Migrations:** Alterações de banco apenas via arquivos em `supabase/migrations/`.
 
-### Padrões de Teste:
-- Use **Vitest** ou **Jest** (verificar configuração no package.json).
-- Foque em lógica de negócio nos `services` e comportamentos de UI nos `components`.
-- Nunca aceite uma tarefa como concluída sem a evidência de que os testes novos e existentes estão passando.
+## 🛠️ Comandos do Monorepo
+- `npm run dev`: Inicia todos os apps em desenvolvimento.
+- `npm run build`: Build de produção de todo o workspace.
+- `npx turbo run generate --filter=@theadoro/api-client`: Atualiza os hooks de API via Kubb.
 
-## 🛠️ Skills Recomendadas
-Sempre ative as seguintes skills ao iniciar uma tarefa de implementação:
-- `test-driven-development`
-- `unit-testing-test-generate`
-- `verification-before-completion`
-
-### 🗄️ Alterações de Banco de Dados (SQL)
-- **Entrega via Arquivo (CRÍTICO)**: NUNCA peça para copiar SQL diretamente do chat/CLI (devido aos números de linha). Sempre crie ou atualize um arquivo em `supabase/migrations/` e instrua o usuário a abrir esse arquivo para copiar o código.
-- **Migrations Obrigatórias**: Toda alteração no esquema do banco deve ser salva em um novo arquivo `.sql`.
-- **Lembrete de Execução**: O agente deve SEMPRE informar o caminho do arquivo e lembrar o usuário de executá-lo no Editor SQL do Supabase.
-- **Segurança (RLS)**: Nunca crie uma tabela sem políticas de RLS adequadas.
-
----
-*Este documento é a "Constituição" do desenvolvimento deste projeto.*
+## 🧠 Memória de Decisões
+ADRs (Architecture Decision Records) estão em `.memory/decisions.md`.

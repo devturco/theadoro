@@ -1,0 +1,1 @@
+{"properties":{"_order_id":{"format":"uuid","type":"string"},"_user_id":{"format":"uuid","type":"string"}},"required":["_order_id","_user_id"],"type":"object"}
