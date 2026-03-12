@@ -101,33 +101,64 @@ export default function ShippingStep() {
             </div>
 
             {/* Delivery Options */}
-            <div className="space-y-4 pt-4 border-t border-gray-100">
-                <h3 className="font-medium text-gray-800">Opções de Entrega Adicionais</h3>
-                <div className="flex flex-col gap-3">
-                    <div className="flex items-center space-x-2">
-                        <Switch
-                            id="express-delivery"
-                            checked={productData.shipping_options?.express_delivery || false}
-                            onCheckedChange={(checked) => updateProductData({
-                                shipping_options: { ...productData.shipping_options, express_delivery: checked }
-                            })}
-                        />
-                        <Label htmlFor="express-delivery">Entrega Expressa (Uber/Moto)</Label>
+            <div className="space-y-6 pt-6 border-t border-gray-100">
+                <div className="space-y-1">
+                    <h3 className="font-bold text-gray-900 uppercase text-xs tracking-wider">Modos de Entrega</h3>
+                    <p className="text-sm text-gray-500">Escolha como seus clientes poderão receber este produto.</p>
+                </div>
+
+                <div className="grid gap-4">
+                    <div className={cn(
+                        "p-4 rounded-xl border-2 transition-all cursor-pointer flex items-start gap-4",
+                        productData.shipping_options?.platform_delivery !== false ? "border-wine bg-wine/5 shadow-sm" : "border-gray-100 bg-white hover:border-gray-200"
+                    )}
+                    onClick={() => updateProductData({
+                        shipping_options: { ...productData.shipping_options, platform_delivery: true }
+                    })}>
+                        <div className={cn("p-2 rounded-lg", productData.shipping_options?.platform_delivery !== false ? "bg-wine text-white" : "bg-gray-100 text-gray-400")}>
+                            <Truck className="h-5 w-5" />
+                        </div>
+                        <div className="flex-1">
+                            <div className="flex items-center justify-between">
+                                <Label className="font-bold text-gray-900 cursor-pointer">Entrega pela THEADORO</Label>
+                                <Switch 
+                                    checked={productData.shipping_options?.platform_delivery !== false}
+                                    onCheckedChange={(checked) => updateProductData({
+                                        shipping_options: { ...productData.shipping_options, platform_delivery: checked }
+                                    })}
+                                />
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">Usaremos nossos parceiros (Uber Direct/Correios) para coletar e entregar. Recomendado para maior segurança e rastreio.</p>
+                        </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                        <Switch
-                            id="own-delivery"
-                            checked={productData.shipping_options?.own_delivery || false}
-                            onCheckedChange={(checked) => updateProductData({
-                                shipping_options: { ...productData.shipping_options, own_delivery: checked }
-                            })}
-                        />
-                        <Label htmlFor="own-delivery">Entrega Própria (A combinar)</Label>
+
+                    <div className={cn(
+                        "p-4 rounded-xl border-2 transition-all cursor-pointer flex items-start gap-4",
+                        productData.shipping_options?.own_delivery ? "border-wine bg-wine/5 shadow-sm" : "border-gray-100 bg-white hover:border-gray-200"
+                    )}
+                    onClick={() => updateProductData({
+                        shipping_options: { ...productData.shipping_options, own_delivery: !productData.shipping_options?.own_delivery }
+                    })}>
+                        <div className={cn("p-2 rounded-lg", productData.shipping_options?.own_delivery ? "bg-wine text-white" : "bg-gray-100 text-gray-400")}>
+                            <MapPin className="h-5 w-5" />
+                        </div>
+                        <div className="flex-1">
+                            <div className="flex items-center justify-between">
+                                <Label className="font-bold text-gray-900 cursor-pointer">Entrega Própria / Retirada</Label>
+                                <Switch 
+                                    checked={productData.shipping_options?.own_delivery || false}
+                                    onCheckedChange={(checked) => updateProductData({
+                                        shipping_options: { ...productData.shipping_options, own_delivery: checked }
+                                    })}
+                                />
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">Você é responsável por enviar o produto ou combinar a entrega com o cliente. Ideal para produtos ultra-delicados.</p>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div className="p-6 bg-blue-50 rounded-xl border border-blue-100 flex gap-4">
+            <div className="p-6 bg-blue-50 rounded-2xl border border-blue-100 flex gap-4 mt-4">
                 <Truck className="h-6 w-6 text-blue-500 shrink-0" />
                 <div className="space-y-1">
                     <h4 className="font-medium text-blue-900">Entrega via Correios e Transportadoras</h4>

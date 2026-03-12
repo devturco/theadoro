@@ -146,11 +146,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           {product.price > 79 && ( // Simulation: Free shipping over R$ 79
             <div className="mt-2 text-center">
               <span className="text-xs font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded inline-block">
-                Entrega Full
+                Entrega Express
               </span>
             </div>
           )}
-
           {/* Rating (Optional vs ML style, keeping simplistic) */}
           {product.rating > 0 && (
             <div className="flex items-center gap-0.5 mt-2">

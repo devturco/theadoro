@@ -19,6 +19,11 @@ BEGIN
         SET role = 'seller'
         WHERE id = NEW.user_id;
 
+        -- 1.5 Ensure the 'seller' role exists in public.user_roles (CRITICAL FOR RLS)
+        INSERT INTO public.user_roles (user_id, role)
+        VALUES (NEW.user_id, 'seller')
+        ON CONFLICT (user_id, role) DO NOTHING;
+
         -- 2. Determine Plan
         IF NEW.chosen_plan_id IS NOT NULL THEN
              v_plan_id := NEW.chosen_plan_id;

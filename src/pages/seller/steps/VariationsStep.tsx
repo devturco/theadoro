@@ -87,89 +87,113 @@ export default function VariationsStep() {
 
     return (
         <div className="space-y-8 animate-in slide-in-from-right-8 duration-500">
-            <div className="flex items-center justify-between">
+            <div className="bg-wine/5 p-6 rounded-2xl border border-wine/10 flex items-center justify-between">
                 <div className="space-y-1">
-                    <h2 className="text-2xl font-semibold text-gray-800">Variações do Produto</h2>
-                    <p className="text-gray-500">Seu produto tem diferentes cores ou tamanhos?</p>
+                    <h2 className="text-xl font-bold text-wine">Variações de Tamanho e Cor</h2>
+                    <p className="text-sm text-gray-600">Ative se o seu produto tiver diferentes opções (ex: P, M, G ou cores variadas).</p>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-3 bg-white p-3 rounded-xl shadow-sm border border-gray-100">
+                    <Label className="font-bold text-gray-700">Habilitar?</Label>
                     <Switch
                         checked={hasVariations}
                         onCheckedChange={setHasVariations}
                     />
-                    <Label>Habilitar Variações</Label>
                 </div>
             </div>
 
             {hasVariations && (
                 <div className="space-y-8">
-                    {/* Generators */}
-                    <div className="grid md:grid-cols-2 gap-8 p-6 bg-white rounded-2xl border border-gray-200 shadow-sm">
+                    <div className="grid md:grid-cols-2 gap-8">
+                        {/* Sizes */}
+                        <div className="space-y-4 p-6 bg-white rounded-2xl border border-gray-100 shadow-sm">
+                            <div className="flex items-center gap-2 mb-2">
+                                <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                                    <span className="font-bold text-xs">T</span>
+                                </div>
+                                <Label className="text-lg font-bold">Tamanhos</Label>
+                            </div>
+                            
+                            <div className="space-y-3">
+                                <p className="text-xs text-gray-500">Sugestões rápidas:</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {['P', 'M', 'G', 'GG', 'Único'].map(s => (
+                                        <Button 
+                                            key={s} 
+                                            variant="outline" 
+                                            size="sm" 
+                                            className="h-7 px-3 text-[10px] font-bold border-blue-100 hover:bg-blue-50 hover:text-blue-700"
+                                            onClick={() => {
+                                                if (!sizes.includes(s)) setSizes([...sizes, s]);
+                                            }}
+                                        >
+                                            + {s}
+                                        </Button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="flex gap-2 pt-2">
+                                <Input
+                                    value={tempSize}
+                                    onChange={(e) => setTempSize(e.target.value)}
+                                    placeholder="Outro (ex: 42, 500ml)"
+                                    className="bg-gray-50 border-gray-200 focus:bg-white transition-colors h-10 text-sm"
+                                    onKeyDown={(e) => e.key === 'Enter' && handleAddSize()}
+                                />
+                                <Button
+                                    onClick={handleAddSize}
+                                    size="icon"
+                                    className="bg-gray-900 hover:bg-black text-white shrink-0 h-10 w-10"
+                                >
+                                    <Plus className="h-4 w-4" />
+                                </Button>
+                            </div>
+                            <div className="flex flex-wrap gap-2 min-h-[32px] pt-2">
+                                {sizes.map((size) => (
+                                    <Badge key={size} variant="secondary" className="px-3 py-1.5 text-sm bg-blue-50 hover:bg-blue-100 border border-blue-100 text-blue-700 flex items-center gap-2 transition-all">
+                                        {size}
+                                        <button onClick={() => setSizes(sizes.filter(s => s !== size))} className="text-blue-400 hover:text-red-500 transition-colors">
+                                            <X className="h-3 w-3" />
+                                        </button>
+                                    </Badge>
+                                ))}
+                            </div>
+                        </div>
+
                         {/* Colors */}
-                        <div className="space-y-4">
-                            <Label className="text-base font-medium">Cores Disponíveis</Label>
+                        <div className="space-y-4 p-6 bg-white rounded-2xl border border-gray-100 shadow-sm">
+                            <div className="flex items-center gap-2 mb-2">
+                                <div className="p-2 bg-pink-50 text-pink-600 rounded-lg">
+                                    <span className="font-bold text-xs">C</span>
+                                </div>
+                                <Label className="text-lg font-bold">Cores</Label>
+                            </div>
+                            <p className="text-xs text-gray-500 mb-2">Adicione cores como: Vermelho, Azul, Estampado, etc.</p>
                             <div className="flex gap-2">
                                 <Input
                                     value={tempColor}
                                     onChange={(e) => setTempColor(e.target.value)}
-                                    placeholder="Digite uma cor e pressione Enter"
+                                    placeholder="Ex: Cor Branca"
                                     className="bg-gray-50 border-gray-200 focus:bg-white transition-colors"
                                     onKeyDown={(e) => e.key === 'Enter' && handleAddColor()}
                                 />
                                 <Button
                                     onClick={handleAddColor}
                                     size="icon"
-                                    className="bg-gray-900 hover:bg-gray-800 text-white shrink-0"
+                                    className="bg-gray-900 hover:bg-black text-white shrink-0"
                                 >
                                     <Plus className="h-4 w-4" />
                                 </Button>
                             </div>
                             <div className="flex flex-wrap gap-2 min-h-[32px]">
                                 {colors.map((color) => (
-                                    <Badge key={color} variant="secondary" className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-700 flex items-center gap-2 transition-all">
+                                    <Badge key={color} variant="secondary" className="px-3 py-1.5 text-sm bg-pink-50 hover:bg-pink-100 border border-pink-100 text-pink-700 flex items-center gap-2 transition-all">
                                         {color}
-                                        <button onClick={() => setColors(colors.filter(c => c !== color))} className="text-gray-400 hover:text-red-500 transition-colors">
+                                        <button onClick={() => setColors(colors.filter(c => c !== color))} className="text-pink-400 hover:text-red-500 transition-colors">
                                             <X className="h-3 w-3" />
                                         </button>
                                     </Badge>
                                 ))}
-                                {colors.length === 0 && (
-                                    <span className="text-sm text-gray-400 italic">Nenhuma cor adicionada</span>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Sizes */}
-                        <div className="space-y-4">
-                            <Label className="text-base font-medium">Tamanhos Disponíveis</Label>
-                            <div className="flex gap-2">
-                                <Input
-                                    value={tempSize}
-                                    onChange={(e) => setTempSize(e.target.value)}
-                                    placeholder="Digite um tamanho e pressione Enter"
-                                    className="bg-gray-50 border-gray-200 focus:bg-white transition-colors"
-                                    onKeyDown={(e) => e.key === 'Enter' && handleAddSize()}
-                                />
-                                <Button
-                                    onClick={handleAddSize}
-                                    size="icon"
-                                    className="bg-gray-900 hover:bg-gray-800 text-white shrink-0"
-                                >
-                                    <Plus className="h-4 w-4" />
-                                </Button>
-                            </div>
-                            <div className="flex flex-wrap gap-2 min-h-[32px]">
-                                {sizes.map((size) => (
-                                    <Badge key={size} variant="secondary" className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-700 flex items-center gap-2 transition-all">
-                                        {size}
-                                        <button onClick={() => setSizes(sizes.filter(s => s !== size))} className="text-gray-400 hover:text-red-500 transition-colors">
-                                            <X className="h-3 w-3" />
-                                        </button>
-                                    </Badge>
-                                ))}
-                                {sizes.length === 0 && (
-                                    <span className="text-sm text-gray-400 italic">Nenhum tamanho adicionado</span>
-                                )}
                             </div>
                         </div>
                     </div>

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useMemo } from 'react';
 import { Product } from '@/types/product';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -24,6 +24,12 @@ export interface Cart {
   shipping: number;
   discount: number;
   total: number;
+  selectedShipping?: {
+    id: string;
+    name: string;
+    price: number;
+    deliveryTime: number;
+  };
 }
 
 interface CartContextType {
@@ -31,6 +37,7 @@ interface CartContextType {
   addToCart: (product: Product, quantity?: number, options?: Record<string, string>) => void;
   removeFromCart: (itemId: string) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
+  setShipping: (shipping: Cart['selectedShipping']) => void;
   clearCart: () => void;
   isInCart: (productId: string) => boolean;
   cartCount: number;
@@ -42,53 +49,61 @@ type CartAction =
   | { type: 'ADD_ITEM'; payload: { product: Product; quantity: number; options?: Record<string, string> } }
   | { type: 'REMOVE_ITEM'; payload: string }
   | { type: 'UPDATE_QUANTITY'; payload: { itemId: string; quantity: number } }
+  | { type: 'SET_SHIPPING'; payload: Cart['selectedShipping'] }
   | { type: 'CLEAR_CART' }
-  | { type: 'LOAD_CART'; payload: CartItem[] };
+  | { type: 'LOAD_CART'; payload: { items: CartItem[], shipping?: Cart['selectedShipping'] } };
 
 // Reducer
-const cartReducer = (state: CartItem[], action: CartAction): CartItem[] => {
+const cartReducer = (state: { items: CartItem[], selectedShipping?: Cart['selectedShipping'] }, action: CartAction): { items: CartItem[], selectedShipping?: Cart['selectedShipping'] } => {
   switch (action.type) {
     case 'ADD_ITEM': {
       const { product, quantity, options } = action.payload;
-      const existingItemIndex = state.findIndex(
+      const existingItemIndex = state.items.findIndex(
         item => item.product.id === product.id &&
           JSON.stringify(item.selectedOptions) === JSON.stringify(options)
       );
 
       if (existingItemIndex > -1) {
-        // Update existing item quantity
-        return state.map((item, index) =>
-          index === existingItemIndex
-            ? { ...item, quantity: item.quantity + quantity }
-            : item
-        );
+        return {
+          ...state,
+          items: state.items.map((item, index) =>
+            index === existingItemIndex
+              ? { ...item, quantity: item.quantity + quantity }
+              : item
+          )
+        };
       } else {
-        // Add new item
         const newItem: CartItem = {
           id: `${product.id}-${Date.now()}`,
           product,
           quantity,
           selectedOptions: options,
         };
-        return [...state, newItem];
+        return { ...state, items: [...state.items, newItem] };
       }
     }
 
     case 'REMOVE_ITEM':
-      return state.filter(item => item.id !== action.payload);
+      return { ...state, items: state.items.filter(item => item.id !== action.payload) };
 
     case 'UPDATE_QUANTITY':
-      return state.map(item =>
-        item.id === action.payload.itemId
-          ? { ...item, quantity: action.payload.quantity }
-          : item
-      ).filter(item => item.quantity > 0);
+      return {
+        ...state,
+        items: state.items.map(item =>
+          item.id === action.payload.itemId
+            ? { ...item, quantity: action.payload.quantity }
+            : item
+        ).filter(item => item.quantity > 0)
+      };
+
+    case 'SET_SHIPPING':
+      return { ...state, selectedShipping: action.payload };
 
     case 'CLEAR_CART':
-      return [];
+      return { items: [], selectedShipping: undefined };
 
     case 'LOAD_CART':
-      return action.payload;
+      return { items: action.payload.items, selectedShipping: action.payload.shipping };
 
     default:
       return state;
@@ -115,38 +130,54 @@ export const CartContext = createContext<CartContextType | undefined>(undefined)
 // Provider
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
-  const [items, dispatch] = useReducer(cartReducer, []);
+  const [state, dispatch] = useReducer(cartReducer, { items: [] });
 
-  // Load cart from localStorage on mount
+  const cartKey = useMemo(() => {
+    return user ? `theadoro-cart-${user.id}` : 'theadoro-cart-guest';
+  }, [user]);
+
+  // Load cart from localStorage whenever the user (and thus cartKey) changes
   useEffect(() => {
-    const savedCart = localStorage.getItem('theadoro-cart');
+    const savedCart = localStorage.getItem(cartKey);
     if (savedCart) {
       try {
-        const parsedCart = JSON.parse(savedCart);
-        dispatch({ type: 'LOAD_CART', payload: parsedCart });
+        const parsed = JSON.parse(savedCart);
+        dispatch({ type: 'LOAD_CART', payload: { 
+          items: parsed.items || [], 
+          shipping: parsed.selectedShipping 
+        }});
       } catch (error) {
         console.error('Error loading cart from localStorage:', error);
+        dispatch({ type: 'LOAD_CART', payload: { items: [] } });
       }
+    } else {
+      // Clear state if no cart found for this user
+      dispatch({ type: 'LOAD_CART', payload: { items: [] } });
     }
-  }, []);
+  }, [cartKey]);
 
-  // Save cart to localStorage whenever items change
+  // Save cart to localStorage whenever state changes
   useEffect(() => {
-    localStorage.setItem('theadoro-cart', JSON.stringify(items));
-  }, [items]);
+    if (state.items.length > 0 || state.selectedShipping) {
+      localStorage.setItem(cartKey, JSON.stringify(state));
+    } else {
+      localStorage.removeItem(cartKey);
+    }
+  }, [state, cartKey]);
 
   // Calculate cart totals
-  const subtotal = calculateSubtotal(items);
-  const shipping = calculateShipping(subtotal);
+  const subtotal = calculateSubtotal(state.items);
+  const shipping = state.selectedShipping ? state.selectedShipping.price : calculateShipping(subtotal);
   const discount = 0; // TODO: Implement discount logic
   const total = calculateTotal(subtotal, shipping, discount);
 
   const cart: Cart = {
-    items,
+    items: state.items,
     subtotal,
     shipping,
     discount,
     total,
+    selectedShipping: state.selectedShipping
   };
 
   const addToCart = (product: Product, quantity = 1, options?: Record<string, string>) => {
@@ -171,7 +202,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const removeFromCart = (itemId: string) => {
-    const item = items.find(item => item.id === itemId);
+    const item = state.items.find(item => item.id === itemId);
     dispatch({ type: 'REMOVE_ITEM', payload: itemId });
     if (item) {
       toast({
@@ -189,6 +220,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     dispatch({ type: 'UPDATE_QUANTITY', payload: { itemId, quantity } });
   };
 
+  const setShipping = (shipping: Cart['selectedShipping']) => {
+    dispatch({ type: 'SET_SHIPPING', payload: shipping });
+  };
+
   const clearCart = () => {
     dispatch({ type: 'CLEAR_CART' });
     toast({
@@ -198,10 +233,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const isInCart = (productId: string): boolean => {
-    return items.some(item => item.product.id === productId);
+    return state.items.some(item => item.product.id === productId);
   };
 
-  const cartCount = items.reduce((total, item) => total + item.quantity, 0);
+  const cartCount = state.items.reduce((total, item) => total + item.quantity, 0);
   const cartTotal = total;
 
   const value: CartContextType = {
@@ -209,6 +244,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     addToCart,
     removeFromCart,
     updateQuantity,
+    setShipping,
     clearCart,
     isInCart,
     cartCount,

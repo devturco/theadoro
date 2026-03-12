@@ -19,7 +19,9 @@ import {
   XCircle,
   Settings,
   Gift,
-  Ticket
+  Ticket,
+  Store,
+  Megaphone
 } from 'lucide-react';
 
 interface BuyerLayoutProps {
@@ -101,6 +103,16 @@ const sellerMenuItems = [
     icon: Ticket,
   },
   {
+    title: 'Cupons',
+    url: '/seller/coupons',
+    icon: Ticket,
+  },
+  {
+    title: 'Campanhas',
+    url: '/seller/campaigns',
+    icon: Megaphone,
+  },
+  {
     title: 'Configurações',
     url: '/seller/settings',
     icon: Settings,
@@ -146,7 +158,7 @@ export const UserDashboardLayout = ({ children }: BuyerLayoutProps) => {
     if (user?.id || profile?.id) {
       checkSellerStatus();
     }
-  }, [user?.id, profile?.id]);
+  }, [user?.id, profile?.id, roles, refreshProfile]);
 
   const handleSignOut = async () => {
     try {
@@ -164,12 +176,16 @@ export const UserDashboardLayout = ({ children }: BuyerLayoutProps) => {
 
   // High-priority check: use both derived roles and raw dbRoles for the most reactive UI
   const isSellerMode = roles.includes('seller') || applicationStatus === 'approved';
+  const isSellerRoute = location.pathname.startsWith('/seller');
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F8F9FA]">
-      <Header />
+      {!isSellerRoute && <Header />}
 
-      <main className="flex-1 container mx-auto px-4 py-8 pt-32">
+      <main className={cn(
+        "flex-1 container mx-auto px-4 py-8",
+        !isSellerRoute ? "pt-32" : "pt-8"
+      )}>
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Sidebar Menu */}
           <aside className="w-full lg:w-64 space-y-6">
@@ -183,44 +199,36 @@ export const UserDashboardLayout = ({ children }: BuyerLayoutProps) => {
                 )}
               </div>
               <h2 className="font-bold text-gray-900 line-clamp-1">{displayName}</h2>
-              <p className="text-xs text-muted-foreground mb-4">Membro desde {profile?.created_at ? new Date(profile.created_at).getFullYear() : new Date().getFullYear()}</p>
+              <p className="text-xs text-muted-foreground mb-2">Membro desde {profile?.created_at ? new Date(profile.created_at).getFullYear() : new Date().getFullYear()}</p>
 
-              {isSellerMode && (
-                <div className="flex items-center gap-1 text-[10px] bg-green-50 text-green-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+              {isSellerRoute ? (
+                <div className="flex items-center gap-1 text-[10px] bg-wine/10 text-wine px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
                   <ShieldCheck className="h-3 w-3" />
-                  Conta Verificada
+                  Painel Seller
                 </div>
-              )}
-
-              {applicationStatus === 'pending' && profile?.role !== 'seller' && (
-                <div className="flex items-center gap-1 text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                  <Clock className="h-3 w-3" />
-                  Aguardando Aprovação
-                </div>
-              )}
-
-              {applicationStatus === 'rejected' && profile?.role !== 'seller' && (
-                <div className="flex items-center gap-1 text-[10px] bg-red-50 text-red-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                  <XCircle className="h-3 w-3" />
-                  Solicitação Reprovada
-                </div>
-              )}
-
-              {!applicationStatus && profile?.role !== 'seller' && (
-                <div className="flex items-center gap-1 text-[10px] bg-gray-50 text-gray-500 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                  <User className="h-3 w-3" />
-                  Membro
-                </div>
+              ) : (
+                <>
+                  {isSellerMode && (
+                    <div className="flex items-center gap-1 text-[10px] bg-green-50 text-green-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider mb-1">
+                      <ShieldCheck className="h-3 w-3" />
+                      Conta Verificada
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1 text-[10px] bg-gray-50 text-gray-500 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                    <User className="h-3 w-3" />
+                    Cliente
+                  </div>
+                </>
               )}
             </div>
 
             {/* Navigation Links */}
             <div className="space-y-4">
-              {/* Seller Tools Section (Only for Sellers) */}
-              {isSellerMode && (
+              {/* Seller Tools Section (Only for /seller routes) */}
+              {isSellerRoute && (
                 <nav className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                   <div className="p-4 border-b border-gray-50 flex items-center justify-between">
-                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Painel do Vendedor</span>
+                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Gestão de Loja</span>
                   </div>
                   <div className="p-2 space-y-1">
                     {sellerMenuItems.map((item) => {
@@ -248,57 +256,67 @@ export const UserDashboardLayout = ({ children }: BuyerLayoutProps) => {
                 </nav>
               )}
 
-              {/* Buying Tools Section (Always visible) */}
-              <nav className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-4 border-b border-gray-50 flex items-center justify-between">
-                  <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Minha Conta</span>
-                </div>
-                <div className="p-2 space-y-1">
-                  {buyerMenuItems.map((item) => {
-                    const isActive = location.pathname === item.url;
-                    return (
-                      <Link
-                        key={item.title}
-                        to={item.url}
-                        className={cn(
-                          "flex items-center justify-between p-3 rounded-lg transition-all group",
-                          isActive
-                            ? "bg-wine text-white shadow-md shadow-wine/20"
-                            : "text-gray-600 hover:bg-gray-50 hover:text-wine"
-                        )}
-                      >
-                        <div className="flex items-center gap-3">
-                          <item.icon className={cn("h-5 w-5", isActive ? "text-white" : "text-gray-400 group-hover:text-wine")} />
-                          <span className="font-medium">{item.title}</span>
-                        </div>
-                        <ChevronRight className={cn("h-4 w-4 opacity-0 transition-opacity", isActive ? "opacity-100" : "group-hover:opacity-100")} />
-                      </Link>
-                    );
-                  })}
-                </div>
-                <div className="px-3 pb-3 space-y-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      refreshProfile();
-                    }}
-                    className="w-full flex items-center gap-3 p-2 rounded-lg text-xs text-muted-foreground hover:bg-gray-50 transition-all font-medium border border-gray-100 border-dashed"
+              {/* Buying Tools Section (Only for /buyer routes) */}
+              {!isSellerRoute && (
+                <nav className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                  <div className="p-4 border-b border-gray-50 flex items-center justify-between">
+                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Minha Conta</span>
+                  </div>
+                  <div className="p-2 space-y-1">
+                    {buyerMenuItems.map((item) => {
+                      const isActive = location.pathname === item.url;
+                      return (
+                        <Link
+                          key={item.title}
+                          to={item.url}
+                          className={cn(
+                            "flex items-center justify-between p-3 rounded-lg transition-all group",
+                            isActive
+                              ? "bg-wine text-white shadow-md shadow-wine/20"
+                              : "text-gray-600 hover:bg-gray-50 hover:text-wine"
+                          )}
+                        >
+                          <div className="flex items-center gap-3">
+                            <item.icon className={cn("h-5 w-5", isActive ? "text-white" : "text-gray-400 group-hover:text-wine")} />
+                            <span className="font-medium">{item.title}</span>
+                          </div>
+                          <ChevronRight className={cn("h-4 w-4 opacity-0 transition-opacity", isActive ? "opacity-100" : "group-hover:opacity-100")} />
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </nav>
+              )}
+
+              {/* General Actions */}
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-2 space-y-1">
+                {isSellerRoute ? (
+                  <Link
+                    to="/"
+                    className="flex items-center gap-3 p-3 rounded-lg text-gray-600 hover:bg-gray-50 transition-all font-medium"
                   >
-                    <Clock className="h-3 w-3" />
-                    <span>Sincronizar Permissões</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      handleSignOut();
-                    }}
-                    className="w-full flex items-center gap-3 p-3 rounded-lg text-red-500 hover:bg-red-50 transition-all font-medium cursor-pointer"
+                    <Store className="h-5 w-5 text-gray-400" />
+                    <span>Ver Marketplace</span>
+                  </Link>
+                ) : isSellerMode && (
+                  <Link
+                    to="/seller/dashboard"
+                    className="flex items-center gap-3 p-3 rounded-lg text-wine hover:bg-wine/5 transition-all font-medium"
                   >
-                    <LogOut className="h-5 w-5" />
-                    <span>Sair da Conta</span>
-                  </button>
-                </div>
-              </nav>
+                    <ShieldCheck className="h-5 w-5" />
+                    <span>Painel do Vendedor</span>
+                  </Link>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="w-full flex items-center gap-3 p-3 rounded-lg text-red-500 hover:bg-red-50 transition-all font-medium cursor-pointer"
+                >
+                  <LogOut className="h-5 w-5" />
+                  <span>Sair da Conta</span>
+                </button>
+              </div>
             </div>
           </aside>
 

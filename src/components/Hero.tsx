@@ -4,8 +4,10 @@ import heroImage from "@/assets/hero-gifts.jpg";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import useEmblaCarousel from 'embla-carousel-react';
 import Autoplay from 'embla-carousel-autoplay';
+import { useNavigate } from "react-router-dom";
 
 const Hero = () => {
+  const navigate = useNavigate();
   const { getSettingValue } = useSiteSettings('hero');
   const [emblaRef] = useEmblaCarousel({ loop: true, duration: 60 }, [Autoplay({ delay: 5000, stopOnInteraction: false })]);
 
@@ -64,11 +66,11 @@ const Hero = () => {
           </p>
 
           <div className="flex flex-wrap gap-4 pt-4">
-            <Button variant="wine" size="lg" className="text-lg px-8">
+            <Button variant="wine" size="lg" className="text-lg px-8" onClick={() => navigate('/products')}>
               <Gift className="mr-2 h-5 w-5" />
               Explorar Presentes
             </Button>
-            <Button variant="champagne" size="lg" className="text-lg px-8">
+            <Button variant="champagne" size="lg" className="text-lg px-8" onClick={() => navigate('/categories/experiencias')}>
               <Calendar className="mr-2 h-5 w-5" />
               Agendar Serviço
             </Button>

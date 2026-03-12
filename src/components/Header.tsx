@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCart } from "@/hooks/useCart";
 import { useWishlist } from "@/hooks/useWishlist";
 import { useRole } from "@/hooks/useRole";
+import { useCategories } from "@/hooks/useCategories";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,29 +24,18 @@ const Header = () => {
   const navigate = useNavigate();
   const { user, profile, signOut } = useAuth();
   const { isAdmin, isSeller } = useRole();
+  const { categories } = useCategories();
   const [searchQuery, setSearchQuery] = useState("");
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
-  // Try to use cart and wishlist hooks, but handle gracefully if not available
-  let cartItemCount = 0;
-  let wishlistItemCount = 0;
-
-  try {
-    const { cartCount } = useCart();
-    cartItemCount = cartCount;
-  } catch (error) {
-    // Cart context not available
-  }
-
-  try {
-    const { wishlist } = useWishlist() as any;
-    wishlistItemCount = wishlist?.length || 0;
-  } catch (error) {
-    // Wishlist context not available
-  }
+  const { cartCount = 0 } = useCart() || {};
+  const { wishlist = [] } = (useWishlist() as any) || {};
+  
+  const cartItemCount = cartCount;
+  const wishlistItemCount = wishlist.length;
 
   // Close suggestions when clicking outside
   useEffect(() => {
@@ -209,10 +199,19 @@ const Header = () => {
                 Categorias <ChevronDown className="h-4 w-4 text-gray-400" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56 p-2 rounded-xl shadow-xl mt-1">
-                <DropdownMenuItem className="p-2 cursor-pointer rounded-lg hover:bg-wine/5 hover:text-wine" onClick={() => navigate('/categories/flores')}>Flores & Cestas</DropdownMenuItem>
-                <DropdownMenuItem className="p-2 cursor-pointer rounded-lg hover:bg-wine/5 hover:text-wine" onClick={() => navigate('/categories/joias')}>Joias & Acessórios</DropdownMenuItem>
-                <DropdownMenuItem className="p-2 cursor-pointer rounded-lg hover:bg-wine/5 hover:text-wine" onClick={() => navigate('/categories/moda')}>Moda & Estilo</DropdownMenuItem>
-                <DropdownMenuItem className="p-2 cursor-pointer rounded-lg hover:bg-wine/5 hover:text-wine" onClick={() => navigate('/categories/cestas')}>Experiências</DropdownMenuItem>
+                {categories.length > 0 ? (
+                  categories.map((category) => (
+                    <DropdownMenuItem
+                      key={category.id}
+                      className="p-2 cursor-pointer rounded-lg hover:bg-wine/5 hover:text-wine"
+                      onClick={() => navigate(`/categories/${category.slug}`)}
+                    >
+                      {category.name}
+                    </DropdownMenuItem>
+                  ))
+                ) : (
+                  <div className="p-2 text-xs text-gray-400 text-center italic">Carregando categorias...</div>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
             <Link to="/offers" className="hover:text-wine transition-colors">Ofertas</Link>
@@ -236,8 +235,13 @@ const Header = () => {
                   {/* Minha Conta Profile Menu */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <button className="flex items-center gap-1 hover:text-wine transition-all group outline-none">
-                        <span className="hidden sm:inline-block">Minha Conta</span>
+                      <button className="flex items-center gap-2 hover:text-wine transition-all group outline-none">
+                        <div className="flex flex-col items-end mr-1">
+                          <span className="text-[10px] text-gray-400 leading-none">Olá,</span>
+                          <span className="font-bold text-gray-900 truncate max-w-[100px] leading-tight">
+                            {profile?.full_name?.split(' ')[0] || user.email?.split('@')[0]}
+                          </span>
+                        </div>
                         <ChevronDown className="h-4 w-4 text-gray-400 group-hover:text-wine transition-transform duration-200 group-data-[state=open]:rotate-180" />
                       </button>
                     </DropdownMenuTrigger>

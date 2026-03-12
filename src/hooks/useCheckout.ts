@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { LoggiService, ShippingQuote } from '@/services/LoggiService';
-import { PaymentService } from '@/services/PaymentService';
+import { paymentService } from '@/services/payment.service';
 import { EmailService } from '@/services/EmailService';
 
 export interface CheckoutData {
@@ -13,6 +13,7 @@ export interface CheckoutData {
   firstName: string;
   lastName: string;
   phone: string;
+  document?: string; // CPF/CNPJ
 
   // Shipping Address
   street: string;
@@ -140,12 +141,12 @@ export const useCheckout = () => {
 
         quotes.push({
           id: 'uber-direct',
-          name: `Uber Flash (Express) ${expressTariff > 0 ? `+${expressTariff}%` : ''}`,
+          name: `Entrega Express ${expressTariff > 0 ? `+${expressTariff}%` : ''}`,
           price: 18.90 * (1 + (expressTariff / 100)), // Base calculation
           estimated_delivery: 'Entrega em até 90 min',
           company: {
-            name: 'Uber',
-            logo_url: 'https://images.tcdn.com.br/img/editor/up/1277028/uber.png' // Add a valid placeholder logo or keep empty
+            name: 'THEADORO',
+            logo_url: '' 
           }
         } as any);
       }
@@ -248,14 +249,16 @@ export const useCheckout = () => {
         name: `${checkoutData.firstName} ${checkoutData.lastName}`.trim(),
         email: checkoutData.email,
         phone: checkoutData.phone,
-        document: (user?.user_metadata as any)?.cpf || '00000000000' // TODO: Ensure CPF is collected in checkout if not in profile
+        document: checkoutData.document || (user?.user_metadata as any)?.cpf || profile?.document || '00000000000'
       };
 
       let paymentResult;
       if (checkoutData.paymentMethod === 'credit_card' || checkoutData.paymentMethod === 'debit_card') {
         if (!checkoutData.paymentDetails?.cardNumber) throw new Error('Dados do cartão incompletos');
 
-        paymentResult = await PaymentService.processCard(total, {
+        // SECURITY WARNING: In a real production app, use client-side tokenization (Stripe.js, Pagarme.js)
+        // Never send raw card data to your backend.
+        paymentResult = await paymentService.processCard(total, {
           number: checkoutData.paymentDetails.cardNumber,
           name: checkoutData.paymentDetails.cardName || '',
           expiry: checkoutData.paymentDetails.cardExpiry || '',
@@ -263,10 +266,10 @@ export const useCheckout = () => {
           installments: checkoutData.paymentDetails.installments || 1
         }, customerData);
       } else if (checkoutData.paymentMethod === 'pix') {
-        paymentResult = await PaymentService.generatePix(total, customerData);
+        paymentResult = await paymentService.generatePix(total, customerData);
       } else {
         // Boleto
-        paymentResult = await PaymentService.generateBoleto(total, customerData);
+        paymentResult = await paymentService.generateBoleto(total, customerData);
       }
 
       if (paymentResult.status === 'failed') {

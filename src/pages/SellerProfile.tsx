@@ -108,7 +108,7 @@ const Reviews: React.FC<{ sellerId: string }> = ({ sellerId }) => {
 export const SellerProfile: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { seller, loading, error } = useSeller(id!);
-  const { products, loading: productsLoading } = useProducts({ initialFilters: { sellerId: id } });
+  const { products, loading: productsLoading } = useProducts({ initialFilters: { seller: id } });
   const [activeTab, setActiveTab] = useState('products');
 
   const handleShare = () => {

@@ -200,10 +200,21 @@ export default function BuyerCalendar() {
                                         <SelectItem value="birthday">Aniversário</SelectItem>
                                         <SelectItem value="anniversary">Aniversário de Namoro/Casamento</SelectItem>
                                         <SelectItem value="holiday">Feriado</SelectItem>
-                                        <SelectItem value="other">Outro</SelectItem>
+                                        <SelectItem value="other">Outro (Personalizado)</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
+
+                            {formData.type === 'other' && (
+                                <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
+                                    <Label>Qual a ocasião?</Label>
+                                    <Input
+                                        placeholder="Ex: Dia do Médico, Formatura..."
+                                        value={formData.title}
+                                        onChange={e => setFormData({ ...formData, title: e.target.value })}
+                                    />
+                                </div>
+                            )}
                         </div>
                         <DialogFooter>
                             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>

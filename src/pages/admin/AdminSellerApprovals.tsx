@@ -26,6 +26,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { DataTable } from '@/components/ui/data-table';
+import { cn } from '@/lib/utils';
 
 export default function AdminSellerApprovals() {
     const [applications, setApplications] = useState<any[]>([]);
@@ -97,6 +98,30 @@ export default function AdminSellerApprovals() {
             loadApplications();
         } catch (error: any) {
             toast.error(error.message || 'Erro ao aprovar solicitação');
+        }
+    };
+
+    const handleApproveManual = async (app: any) => {
+        if (!confirm(`Deseja aprovar ${app.store_name} e ATIVAR a assinatura manualmente? O lojista não precisará pagar agora.`)) return;
+        
+        try {
+            // 1. Approve Application
+            const { error: appError } = await supabase
+                .from('seller_applications' as any)
+                .update({ status: 'approved' })
+                .eq('id', app.id);
+
+            if (appError) throw appError;
+
+            // 2. The database trigger 'handle_seller_approval_subscription' 
+            // will automatically handle Profile, Roles, and Subscription creation
+            // because we updated the status to 'approved'.
+
+            toast.success('Vendedor aprovado e assinatura ativada manualmente!');
+            setIsDetailsOpen(false);
+            loadApplications();
+        } catch (error: any) {
+            toast.error('Erro na ativação manual: ' + error.message);
         }
     };
 
@@ -351,10 +376,15 @@ export default function AdminSellerApprovals() {
                             <XCircle className="h-4 w-4 mr-2" /> Reprovar
                         </Button>
                         <div className="flex-1" />
-                        <Button variant="outline" onClick={() => setIsDetailsOpen(false)}>Cancelar</Button>
-                        <Button className="bg-green-600 hover:bg-green-700" onClick={() => handleApprove(selectedApp)} disabled={selectedApp?.status !== 'pending'}>
-                            <CheckCircle2 className="h-4 w-4 mr-2" /> Aprovar Vendedor
-                        </Button>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                            <Button variant="outline" onClick={() => setIsDetailsOpen(false)}>Cancelar</Button>
+                            <Button variant="secondary" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => handleApproveManual(selectedApp)} disabled={selectedApp?.status !== 'pending'}>
+                                <CheckCircle2 className="h-4 w-4 mr-2" /> Ativação Manual (S/ Cobrança)
+                            </Button>
+                            <Button className="bg-green-600 hover:bg-green-700" onClick={() => handleApprove(selectedApp)} disabled={selectedApp?.status !== 'pending'}>
+                                <CheckCircle2 className="h-4 w-4 mr-2" /> Aprovar Vendedor
+                            </Button>
+                        </div>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

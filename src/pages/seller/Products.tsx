@@ -4,14 +4,18 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Edit, Trash2, Eye, EyeOff, ShoppingBag, Package } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, EyeOff, ShoppingBag, Package, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { cn } from '@/lib/utils';
 
 const SellerProducts = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const isApproved = profile?.is_approved === true;
 
   useEffect(() => {
     if (user) {
@@ -97,13 +101,25 @@ const SellerProducts = () => {
         </div>
         <Button
           variant="wine"
-          onClick={() => navigate('/seller/products/new')}
-          className="shadow-md hover:shadow-wine transition-all"
+          onClick={() => isApproved ? navigate('/seller/products/new') : toast.error('Sua conta ainda não foi aprovada para publicar produtos.')}
+          className={cn("shadow-md hover:shadow-wine transition-all", !isApproved && "opacity-50 cursor-not-allowed")}
         >
           <Plus className="mr-2 h-4 w-4" />
           Criar Anúncio
         </Button>
       </div>
+
+      {!isApproved && (
+        <Alert className="bg-amber-50 border-amber-200 mb-8 rounded-2xl p-6 shadow-sm">
+          <AlertCircle className="h-5 w-5 text-amber-600" />
+          <div className="ml-3">
+            <h4 className="font-bold text-amber-900 mb-1">Conta em Análise</h4>
+            <AlertDescription className="text-amber-800 text-sm">
+              Sua conta de lojista está aguardando validação. Você poderá cadastrar e publicar produtos assim que nossa equipe concluir a revisão da sua documentação.
+            </AlertDescription>
+          </div>
+        </Alert>
+      )}
 
       {products.length === 0 ? (
         <div className="bg-gradient-to-br from-white to-gray-50/50 rounded-2xl border border-dashed border-gray-200 p-12 text-center shadow-sm">
@@ -117,8 +133,8 @@ const SellerProducts = () => {
           <Button
             variant="wine"
             size="lg"
-            onClick={() => navigate('/seller/products/new')}
-            className="rounded-full px-8 shadow-wine transition-all hover:scale-105 active:scale-95"
+            onClick={() => isApproved ? navigate('/seller/products/new') : toast.error('Conta em análise.')}
+            className={cn("rounded-full px-8 shadow-wine transition-all", !isApproved && "opacity-50 cursor-not-allowed")}
           >
             Criar Primeiro Anúncio
           </Button>

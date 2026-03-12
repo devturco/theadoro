@@ -112,7 +112,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (mounted && loading) {
         setLoading(false);
       }
-    }, 8000); // Increased to 8s to give parallel fetch a better chance
+    }, 3000); // Reduced to 3s for better UX
 
     // Initial Load
     const initAuth = async () => {
@@ -124,9 +124,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (mounted) {
           if (session?.user) {
             setUser(session.user as AuthUser);
-            await fetchProfile(session.user.id);
+            // Fetch profile and roles in background, don't wait for them to unblock UI if we already have session
+            fetchProfile(session.user.id);
           } else {
-            console.log('[AuthContext] no session found');
             setUser(null);
             setProfile(null);
           }
@@ -136,8 +136,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } finally {
         if (mounted) {
           setLoading(false);
-        } else {
-          console.warn('[AuthContext] initAuth finished but component unmounted');
         }
       }
     };
@@ -203,17 +201,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Sign out
   const signOut = useCallback(async () => {
 
-    // Internal helper to clear everything
+    // Internal helper to clear auth state
     const performLocalCleanup = () => {
+      // 1. Reset Context State
       setUser(null);
       setProfile(null);
       setDbRoles([]);
+      
+      // 2. Remove Auth Specific Keys
       localStorage.removeItem('auth_db_roles');
-      localStorage.removeItem('supabase.auth.token');
-      localStorage.clear(); // Nuclear option since user is stuck
+      localStorage.removeItem('checkoutFormData');
+      localStorage.removeItem('checkoutStep');
+      
+      // 3. Selective LocalStorage Clear (Keep global settings, but remove user specific data)
+      Object.keys(localStorage).forEach(key => {
+        if (
+          key.includes('supabase.auth.token') || 
+          key.startsWith('sb-') || 
+          key.startsWith('theadoro-cart-user-')
+        ) {
+          localStorage.removeItem(key);
+        }
+      });
+
       sessionStorage.clear();
-      console.log('[AuthContext] Local state cleared successfully');
-      toast.success('Logout realizado localmente.');
+      console.log('[AuthContext] Isolated user data cleared');
+      toast.success('Sessão encerrada com segurança.');
     };
 
     try {

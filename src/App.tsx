@@ -72,6 +72,8 @@ import SellerInsights from '@/pages/seller/SellerInsights';
 import SellerStoreSettings from '@/pages/seller/SellerStoreSettings';
 import SellerGiftWraps from '@/pages/seller/SellerGiftWraps';
 import SellerSubscription from '@/pages/seller/SellerSubscription';
+import SellerCoupons from '@/pages/seller/SellerCoupons';
+import SellerCampaigns from '@/pages/seller/SellerCampaigns';
 
 // Buyer Pages
 import BuyerDashboard from '@/pages/buyer/BuyerDashboard';
@@ -207,6 +209,8 @@ function App() {
                               <Route path="subscription" element={<SellerSubscription />} />
                               <Route path="settings" element={<SellerStoreSettings />} />
                               <Route path="gift-wraps" element={<SellerGiftWraps />} />
+                              <Route path="coupons" element={<SellerCoupons />} />
+                              <Route path="campaigns" element={<SellerCampaigns />} />
                               <Route path="*" element={<SellerDashboard />} />
                             </Routes>
                           </UserDashboardLayout>

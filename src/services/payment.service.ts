@@ -35,20 +35,23 @@ class PaymentService extends BaseService<any> {
 
     /**
      * Process a credit card payment.
+     * @param amount Amount in decimal (e.g. 150.50)
+     * @param card Card data or token. SECURITY: Use token from Pagarme.js/Stripe.js in production.
+     * @param customer Real customer data from checkout
      */
-    async processCard(amount: number, card: CreditCardData, customer?: CustomerData): Promise<PaymentIntent> {
+    async processCard(amount: number, card: CreditCardData | { token: string }, customer: CustomerData): Promise<PaymentIntent> {
         const { data, error } = await supabase.functions.invoke('process-payment', {
             body: {
                 gateway: 'pagarme',
                 paymentMethod: 'credit_card',
                 amount,
                 cardToken: card,
-                installments: card.installments,
-                customer: customer || {
-                    name: card.name,
-                    email: 'customer@example.com',
-                    document: '00000000000',
-                    phone: '11999999999'
+                installments: (card as CreditCardData).installments || 1,
+                customer: {
+                    name: customer.name,
+                    email: customer.email,
+                    document: customer.document,
+                    phone: customer.phone
                 }
             }
         });
@@ -60,17 +63,17 @@ class PaymentService extends BaseService<any> {
     /**
      * Generate a PIX code.
      */
-    async generatePix(amount: number, customer?: CustomerData): Promise<PaymentIntent> {
+    async generatePix(amount: number, customer: CustomerData): Promise<PaymentIntent> {
         const { data, error } = await supabase.functions.invoke('process-payment', {
             body: {
-                gateway: 'asaas',
+                gateway: 'asaas', 
                 paymentMethod: 'pix',
                 amount,
-                customer: customer || {
-                    name: 'Cliente Teste',
-                    email: 'cliente@teste.com',
-                    document: '00000000000',
-                    phone: '11999999999'
+                customer: {
+                    name: customer.name,
+                    email: customer.email,
+                    document: customer.document,
+                    phone: customer.phone
                 }
             }
         });
@@ -82,17 +85,17 @@ class PaymentService extends BaseService<any> {
     /**
      * Generate Boleto.
      */
-    async generateBoleto(amount: number, customer?: CustomerData): Promise<PaymentIntent> {
+    async generateBoleto(amount: number, customer: CustomerData): Promise<PaymentIntent> {
         const { data, error } = await supabase.functions.invoke('process-payment', {
             body: {
                 gateway: 'asaas',
                 paymentMethod: 'boleto',
                 amount,
-                customer: customer || {
-                    name: 'Cliente Teste',
-                    email: 'cliente@teste.com',
-                    document: '00000000000',
-                    phone: '11999999999'
+                customer: {
+                    name: customer.name,
+                    email: customer.email,
+                    document: customer.document,
+                    phone: customer.phone
                 }
             }
         });

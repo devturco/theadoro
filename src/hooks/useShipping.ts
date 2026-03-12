@@ -8,16 +8,18 @@ export const useShipping = () => {
     const [options, setOptions] = useState<ShippingOption[]>([]);
     const [error, setError] = useState<string | null>(null);
 
-    const calculateShipping = async (cep: string, items: ShippingItem[]) => {
+    const calculateShipping = async (cep: string, items: ShippingItem[], sellerId?: string) => {
         try {
             setLoading(true);
             setError(null);
             setOptions([]);
 
-            const result = await shippingService.calculateShipping(cep, items);
+            const result = await shippingService.calculateShipping(cep, items, sellerId);
             setOptions(result);
 
-            if (result.length === 0) {
+            if (result.length === 1 && result[0].id === 'error-region') {
+                setError(result[0].error || "Região não atendida.");
+            } else if (result.length === 0) {
                 toast.error("Não foi possível calcular o frete para este CEP.");
             }
         } catch (err) {

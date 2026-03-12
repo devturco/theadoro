@@ -306,17 +306,6 @@ export default function BuyerProfile() {
                   />
                 </div>
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="bio">Biografia</Label>
-                <Textarea
-                  id="bio"
-                  value={localProfile.bio || ''}
-                  onChange={(e) => setLocalProfile({ ...localProfile, bio: e.target.value })}
-                  disabled={!isEditing}
-                  rows={3}
-                />
-              </div>
             </CardContent>
           </Card>
         </TabsContent>

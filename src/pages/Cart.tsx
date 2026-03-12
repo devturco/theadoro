@@ -19,6 +19,7 @@ export const Cart: React.FC = () => {
     updateQuantity,
     removeFromCart,
     clearCart,
+    setShipping,
   } = useCart();
 
   const [isClearing, setIsClearing] = useState(false);
@@ -29,7 +30,8 @@ export const Cart: React.FC = () => {
   const { calculateShipping, options: shippingOptions, loading: loadingShipping } = useShipping();
 
   const handleCalculateShipping = () => {
-    if (cep.length < 9) return;
+    const cleanCep = cep.replace(/\D/g, '');
+    if (cleanCep.length < 8) return;
 
     // Create shipping items from cart items
     const shippingItems = cart.items.map(item => ({
@@ -41,7 +43,18 @@ export const Cart: React.FC = () => {
       price: item.product.price
     }));
 
-    calculateShipping(cep, shippingItems);
+    const sellerId = cart.items[0]?.product.seller_id;
+    calculateShipping(cleanCep, shippingItems, sellerId);
+  };
+
+  const handleSelectShipping = (option: any) => {
+    if (option.deliveryTime === -1) return;
+    setShipping({
+      id: option.id,
+      name: option.name,
+      price: option.price,
+      deliveryTime: option.deliveryTime
+    });
   };
 
   const handleClearCart = async () => {
@@ -275,29 +288,57 @@ export const Cart: React.FC = () => {
                       {shippingOptions.length > 0 && (
                         <div className="space-y-2">
                           {shippingOptions.map((option) => (
-                            <div key={option.id} className="flex justify-between items-center text-sm p-2 bg-gray-50 rounded border border-gray-100">
-                              <div>
-                                <div className="flex items-center gap-1.5">
-                                  <span className="font-medium text-gray-700">{option.name}</span>
-                                  {option.deliveryTime === 0 && (
-                                    <Badge className="bg-green-600 hover:bg-green-700 text-[10px] px-1 h-4">
-                                      ⚡ FULL
-                                    </Badge>
+                            <div 
+                              key={option.id} 
+                              onClick={() => handleSelectShipping(option)}
+                              className={cn(
+                                "flex justify-between items-center text-sm p-3 rounded border transition-all cursor-pointer",
+                                option.deliveryTime === -1 ? "bg-red-50 border-red-100 text-red-700 cursor-not-allowed" : 
+                                cart.selectedShipping?.id === option.id ? "bg-wine/5 border-wine ring-1 ring-wine/20 shadow-sm" :
+                                "bg-gray-50 border-gray-100 hover:border-gray-300"
+                              )}
+                            >
+                              <div className="flex-1">
+                                <div className="flex flex-col gap-0.5">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className={cn("font-medium", option.deliveryTime === -1 ? "text-red-800" : "text-gray-700")}>
+                                      {option.name.split('(')[0].trim()}
+                                    </span>
+                                    {option.deliveryTime === 0 && (
+                                      <Badge className="bg-wine hover:bg-wine-dark text-[10px] px-1 h-4 shrink-0">
+                                        ⚡ EXPRESS
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  {option.deliveryTime === -1 ? (
+                                    <span className="text-[10px] text-red-600 mt-0.5">{option.error}</span>
+                                  ) : (
+                                    <>
+                                      {option.name.includes('(') && (
+                                        <span className="text-[10px] text-gray-400 leading-none italic">
+                                          ({option.name.split('(')[1]}
+                                        </span>
+                                      )}
+                                      <span className="text-[10px] text-gray-500 mt-1 block">
+                                        {option.deliveryTime === 0 ? 'Chega em até 90 min!' : `${option.deliveryTime} dias úteis`}
+                                      </span>
+                                    </>
                                   )}
                                 </div>
-                                <span className="text-xs text-gray-500">
-                                  {option.deliveryTime === 0 ? 'Chega hoje!' : `${option.deliveryTime} dias úteis`}
-                                </span>
                               </div>
-                              <span className={cn("font-medium", option.price === 0 ? "text-green-600" : "text-gray-900")}>
-                                {option.price === 0 ? 'Grátis' : formatPrice(option.price)}
-                              </span>
+                              {option.deliveryTime !== -1 && (
+                                <span className={cn("font-medium ml-2", option.price === 0 ? "text-green-600" : "text-gray-900")}>
+                                  {option.price === 0 ? 'Grátis' : formatPrice(option.price)}
+                                </span>
+                              )}
                             </div>
                           ))}
-                          <div className="flex items-center text-[10px] text-blue-600 mt-1 pl-1">
-                            <MapPin className="h-3 w-3 mr-1" />
-                            Rastreamento em tempo real disponível
-                          </div>
+                          {shippingOptions.some(o => o.deliveryTime !== -1) && (
+                            <div className="flex items-center text-[10px] text-blue-600 mt-1 pl-1">
+                              <MapPin className="h-3 w-3 mr-1" />
+                              Entrega via Uber Direct disponível
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -356,7 +397,6 @@ export const Cart: React.FC = () => {
                     <div className="flex justify-center gap-2">
                       <Badge variant="outline" className="text-xs">Cartão</Badge>
                       <Badge variant="outline" className="text-xs">PIX</Badge>
-                      <Badge variant="outline" className="text-xs">Boleto</Badge>
                     </div>
                   </div>
                 </div>
