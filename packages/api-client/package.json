@@ -6,6 +6,7 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "generate": "kubb generate",
+    "prebuild": "node ../../scripts/ensure-rollup-native.cjs",
     "build": "tsup src/index.ts --format cjs,esm --dts",
     "dev": "tsup src/index.ts --format cjs,esm --watch --dts",
     "lint": "eslint ."
