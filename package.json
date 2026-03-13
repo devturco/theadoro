@@ -4,7 +4,7 @@
   "packageManager": "npm@10.2.4",
   "scripts": {
     "prebuild": "node scripts/ensure-rollup-native.cjs",
-    "build": "turbo build",
+    "build": "turbo build && node scripts/sync-dist.cjs",
     "dev": "turbo dev",
     "lint": "turbo lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\""
