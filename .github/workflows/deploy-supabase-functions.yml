@@ -30,5 +30,8 @@ jobs:
             exit 1
           fi
 
-      - name: Deploy edge functions
-        run: supabase functions deploy --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Deploy ai-gift-assistant
+        run: supabase functions deploy ai-gift-assistant --project-ref "$SUPABASE_PROJECT_ID"
+
+      - name: Deploy process-payment without JWT verification
+        run: supabase functions deploy process-payment --project-ref "$SUPABASE_PROJECT_ID" --no-verify-jwt
