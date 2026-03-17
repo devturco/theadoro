@@ -38,6 +38,8 @@ serve(async (req) => {
             .select('*')
             .in('key', [
                 'payment_pagarme_secret_key',
+                'payment_pagarme_test_mode',
+                'payment_pagarme_test_secret_key',
                 'payment_asaas_api_key',
                 'payment_asaas_wallet_id'
             ])
@@ -49,7 +51,15 @@ serve(async (req) => {
         let result: any;
 
         if (gateway === 'pagarme') {
-            const secretKey = getSetting('payment_pagarme_secret_key')
+            const parseBooleanSetting = (value: unknown) => value === true || value === 'true'
+            const isTestMode = parseBooleanSetting(getSetting('payment_pagarme_test_mode'))
+            const liveSecretKey = getSetting('payment_pagarme_secret_key')
+            const testSecretKey = getSetting('payment_pagarme_test_secret_key')
+            const secretKey = isTestMode ? (testSecretKey || liveSecretKey) : liveSecretKey
+
+            if (!secretKey) {
+                throw new Error('Pagar.me não configurado. Informe a Secret Key no admin.')
+            }
             // const recipientId = getSetting('payment_pagarme_recipient_id') 
 
             // Pagar.me API Logic
@@ -114,7 +124,9 @@ serve(async (req) => {
                 id: data.id,
                 status: charge.status === 'paid' ? 'succeeded' : 'pending',
                 pix_code: charge.last_transaction?.qr_code,
+                pix_url: charge.last_transaction?.qr_code_url,
                 pix_expiration: charge.last_transaction?.expires_at,
+                is_test_mode: isTestMode,
                 gateway_response: data
             }
 

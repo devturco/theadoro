@@ -60,8 +60,12 @@ const AdminSettings = () => {
     // Pagar.me State
     const [pagarmeEnabled, setPagarmeEnabled] = useState(false);
     const [pagarmeEnabledId, setPagarmeEnabledId] = useState<string | null>(null);
+    const [pagarmeTestMode, setPagarmeTestMode] = useState(false);
+    const [pagarmeTestModeId, setPagarmeTestModeId] = useState<string | null>(null);
     const [pagarmeSecretKey, setPagarmeSecretKey] = useState('');
     const [pagarmeSecretKeyId, setPagarmeSecretKeyId] = useState<string | null>(null);
+    const [pagarmeTestSecretKey, setPagarmeTestSecretKey] = useState('');
+    const [pagarmeTestSecretKeyId, setPagarmeTestSecretKeyId] = useState<string | null>(null);
 
     // Asaas State
     const [asaasEnabled, setAsaasEnabled] = useState(false);
@@ -180,6 +184,16 @@ const AdminSettings = () => {
             if (pgKey) {
                 setPagarmeSecretKey(String(pgKey.value));
                 setPagarmeSecretKeyId(pgKey.id);
+            }
+            const pgTestMode = settings.find(s => s.key === 'payment_pagarme_test_mode');
+            if (pgTestMode) {
+                setPagarmeTestMode(Boolean(pgTestMode.value));
+                setPagarmeTestModeId(pgTestMode.id);
+            }
+            const pgTestKey = settings.find(s => s.key === 'payment_pagarme_test_secret_key');
+            if (pgTestKey) {
+                setPagarmeTestSecretKey(String(pgTestKey.value));
+                setPagarmeTestSecretKeyId(pgTestKey.id);
             }
 
             // Integrations - Asaas
@@ -310,7 +324,9 @@ const AdminSettings = () => {
 
             // Allow the UI to update with the new ID if one was created
             if (key === 'payment_pagarme_enabled') setPagarmeEnabledId(newId);
+            if (key === 'payment_pagarme_test_mode') setPagarmeTestModeId(newId);
             if (key === 'payment_pagarme_secret_key') setPagarmeSecretKeyId(newId);
+            if (key === 'payment_pagarme_test_secret_key') setPagarmeTestSecretKeyId(newId);
 
             if (key === 'payment_asaas_enabled') setAsaasEnabledId(newId);
             if (key === 'payment_asaas_api_key') setAsaasApiKeyId(newId);
@@ -649,8 +665,24 @@ const AdminSettings = () => {
                                 </div>
                                 {pagarmeEnabled && (
                                     <div className="grid gap-4 pt-4 border-t animate-in fade-in slide-in-from-top-2">
+                                        <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/20">
+                                            <div className="space-y-1">
+                                                <Label className="text-sm font-medium">Modo teste</Label>
+                                                <p className="text-xs text-muted-foreground">
+                                                    Usa a chave de teste do Pagar.me e marca o pedido como teste.
+                                                </p>
+                                            </div>
+                                            <Switch
+                                                checked={pagarmeTestMode}
+                                                onCheckedChange={(checked) => {
+                                                    setPagarmeTestMode(checked);
+                                                    handleSaveIntegration(pagarmeTestModeId, checked, 'payment_pagarme_test_mode', 'Pagar.me Test Mode');
+                                                }}
+                                                disabled={updating}
+                                            />
+                                        </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor="pagarme-sk">Secret Key (sk_...)</Label>
+                                            <Label htmlFor="pagarme-sk">Secret Key Produção (sk_live_...)</Label>
                                             <div className="flex gap-2">
                                                 <Input
                                                     id="pagarme-sk"
@@ -667,6 +699,28 @@ const AdminSettings = () => {
                                                     Salvar
                                                 </Button>
                                             </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="pagarme-sk-test">Secret Key Teste (sk_test_...)</Label>
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    id="pagarme-sk-test"
+                                                    type="password"
+                                                    value={pagarmeTestSecretKey}
+                                                    onChange={(e) => setPagarmeTestSecretKey(e.target.value)}
+                                                    placeholder="sk_test_..."
+                                                />
+                                                <Button
+                                                    onClick={() => handleSaveIntegration(pagarmeTestSecretKeyId, pagarmeTestSecretKey, 'payment_pagarme_test_secret_key', 'Pagar.me Test Secret Key')}
+                                                    disabled={updating}
+                                                    variant="secondary"
+                                                >
+                                                    Salvar
+                                                </Button>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">
+                                                Se o modo teste estiver ativo, esta chave tem prioridade.
+                                            </p>
                                         </div>
                                     </div>
                                 )}

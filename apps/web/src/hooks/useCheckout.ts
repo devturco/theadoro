@@ -72,6 +72,14 @@ export interface Order {
   updatedAt: string;
   gift_options?: any;
   delivery_schedule?: any;
+  paymentInfo?: {
+    id?: string;
+    pixCode?: string;
+    pixUrl?: string;
+    pixExpiration?: string;
+    boletoUrl?: string;
+    isTestMode?: boolean;
+  };
 }
 
 interface ShippingOverride {
@@ -312,7 +320,10 @@ export const useCheckout = () => {
         paymentInfo: {
           id: paymentResult.id,
           pixCode: paymentResult.pix_code,
-          boletoUrl: paymentResult.boleto_url
+          pixUrl: paymentResult.pix_url,
+          pixExpiration: paymentResult.pix_expiration,
+          boletoUrl: paymentResult.boleto_url,
+          isTestMode: paymentResult.is_test_mode
         }
       });
 
@@ -434,6 +445,14 @@ export const useCheckout = () => {
         checkoutData,
         createdAt: data.created_at,
         updatedAt: data.updated_at,
+        paymentInfo: {
+          id: paymentResult.id,
+          pixCode: paymentResult.pix_code,
+          pixUrl: paymentResult.pix_url,
+          pixExpiration: paymentResult.pix_expiration,
+          boletoUrl: paymentResult.boleto_url,
+          isTestMode: paymentResult.is_test_mode
+        }
       };
 
       toast({
@@ -567,7 +586,8 @@ export const useCheckout = () => {
         createdAt: data.created_at,
         updatedAt: data.updated_at,
         gift_options: notesData.giftOptions,
-        delivery_schedule: notesData.deliverySchedule
+        delivery_schedule: notesData.deliverySchedule,
+        paymentInfo: notesData.paymentInfo
       };
 
       return order;

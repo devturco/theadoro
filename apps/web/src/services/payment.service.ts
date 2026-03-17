@@ -9,8 +9,10 @@ export interface PaymentIntent {
     status: 'pending' | 'succeeded' | 'failed' | 'requires_action';
     client_secret?: string; // For Stripe frontend
     pix_code?: string; // For PIX
+    pix_url?: string;
     pix_expiration?: string;
     boleto_url?: string;
+    is_test_mode?: boolean;
 }
 
 export interface CreditCardData {
