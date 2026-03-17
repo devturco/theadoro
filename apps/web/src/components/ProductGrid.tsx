@@ -1,7 +1,7 @@
 import React from 'react';
 import { Product } from '@/types/product';
 import { ProductCard } from '@/components/ProductCard';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton } from '@theadoro/ui';
 import { cn } from '@/lib/utils';
 
 interface ProductGridProps {

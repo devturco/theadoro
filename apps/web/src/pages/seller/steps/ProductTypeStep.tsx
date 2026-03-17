@@ -1,7 +1,7 @@
 import { useProductWizard } from '@/hooks/useProductWizard';
-import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@theadoro/ui';
+import { RadioGroup, RadioGroupItem } from '@theadoro/ui';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@theadoro/ui';
 import { Package, Truck, Calendar, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCRUD } from '@/hooks/useCRUD';

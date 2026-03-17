@@ -1,18 +1,18 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Calendar } from '@/components/ui/calendar';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@theadoro/ui';
+import { Calendar } from '@theadoro/ui';
+import { Button } from '@theadoro/ui';
+import { Input } from '@theadoro/ui';
+import { Label } from '@theadoro/ui';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@theadoro/ui';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@theadoro/ui';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Calendar as CalendarIcon, Gift, Plus, Trash2, PartyPopper, Heart, Star } from 'lucide-react';
 import { format, isSameDay, addDays, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Badge } from '@/components/ui/badge';
+import { Badge } from '@theadoro/ui';
 import { useNavigate } from 'react-router-dom';
 
 interface ImportantDate {

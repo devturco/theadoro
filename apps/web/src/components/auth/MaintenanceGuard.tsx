@@ -2,7 +2,7 @@ import { ReactNode } from 'react';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { useRole } from '@/hooks/useRole';
 import Maintenance from '@/pages/Maintenance';
-import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { LoadingSpinner } from '@theadoro/ui';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface MaintenanceGuardProps {

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { CheckCircle, ShoppingBag, Home } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button } from '@theadoro/ui';
 
 const OrderSuccess: React.FC = () => {
     const { id } = useParams<{ id: string }>();

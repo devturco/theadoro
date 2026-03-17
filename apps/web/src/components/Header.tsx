@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Search, ShoppingBag, User, Heart, LogOut, Settings, LayoutDashboard, Loader2, ChevronDown } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from '@theadoro/ui';
+import { Input } from '@theadoro/ui';
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,7 +16,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from '@theadoro/ui';
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { cn } from "@/lib/utils";
 

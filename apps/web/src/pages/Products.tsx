@@ -5,11 +5,11 @@ import { ProductFilters } from '@/types/product';
 import { useProducts } from '@/hooks/useProducts';
 import { ProductGrid } from '@/components/ProductGrid';
 import { FilterSidebar } from '@/components/FilterSidebar';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Button } from '@theadoro/ui';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@theadoro/ui';
+import { Badge } from '@theadoro/ui';
+import { Separator } from '@theadoro/ui';
+import { Sheet, SheetContent, SheetTrigger } from '@theadoro/ui';
 import { cn } from '@/lib/utils';
 
 const SORT_OPTIONS = [

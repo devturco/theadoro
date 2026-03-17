@@ -5,11 +5,11 @@ import { useCart } from '@/hooks/useCart';
 import { useWishlist } from '@/hooks/useWishlist';
 import { useShipping } from '@/hooks/useShipping';
 import { CartItem } from '@/components/CartItem';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@theadoro/ui';
+import { Input } from '@theadoro/ui';
+import { Separator } from '@theadoro/ui';
+import { Badge } from '@theadoro/ui';
+import { Alert, AlertDescription } from '@theadoro/ui';
 import { cn } from '@/lib/utils';
 
 export const Cart: React.FC = () => {

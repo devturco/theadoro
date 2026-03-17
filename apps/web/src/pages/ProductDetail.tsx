@@ -31,11 +31,11 @@ import { useCart } from '@/hooks/useCart';
 import { useWishlist } from '@/hooks/useWishlist';
 import { useShipping } from '@/hooks/useShipping';
 import { useAnalytics } from '@/hooks/useAnalytics';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@theadoro/ui';
+import { Input } from '@theadoro/ui';
+import { Badge } from '@theadoro/ui';
+import { Separator } from '@theadoro/ui';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@theadoro/ui';
 import {
   Dialog,
   DialogContent,
@@ -43,11 +43,11 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+} from '@theadoro/ui';
+import { Avatar, AvatarFallback, AvatarImage } from '@theadoro/ui';
 import { ProductGrid } from '@/components/ProductGrid';
 import { cn } from '@/lib/utils';
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from '@theadoro/ui';
 
 export const ProductDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '@theadoro/ui';
+import { Button } from '@theadoro/ui';
+import { Badge } from '@theadoro/ui';
+import { Label } from '@theadoro/ui';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
@@ -24,8 +24,8 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-} from '@/components/ui/dialog';
-import { DataTable } from '@/components/ui/data-table';
+} from '@theadoro/ui';
+import { DataTable } from '@theadoro/ui';
 import { cn } from '@/lib/utils';
 
 export default function AdminSellerApprovals() {

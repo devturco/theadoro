@@ -1,7 +1,7 @@
 import { useProductWizard } from '@/hooks/useProductWizard';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
+import { Input } from '@theadoro/ui';
+import { Label } from '@theadoro/ui';
+import { Switch } from '@theadoro/ui';
 import { Truck, Weight, Box } from 'lucide-react';
 
 export default function ShippingStep() {

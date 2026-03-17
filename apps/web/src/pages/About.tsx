@@ -1,6 +1,6 @@
 import React from 'react';
 import { Heart, Users, Award, Mail, Phone, ShoppingBag, Star, Clock } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button } from '@theadoro/ui';
 import { Link } from 'react-router-dom';
 
 const About: React.FC = () => {

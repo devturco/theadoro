@@ -1,9 +1,9 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Star, MapPin, Clock, CheckCircle } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@theadoro/ui';
+import { Badge } from '@theadoro/ui';
+import { Button } from '@theadoro/ui';
 import { cn } from '@/lib/utils';
 
 interface Seller {

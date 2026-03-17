@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Button } from '@theadoro/ui';
+import { Badge } from '@theadoro/ui';
 import { Heart, ShoppingBag, Star } from "lucide-react";
 import { ProductCard } from "./ProductCard";
 

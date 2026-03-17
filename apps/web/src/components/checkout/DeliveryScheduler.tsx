@@ -1,13 +1,13 @@
 import React from 'react';
 import { Calendar as CalendarIcon, Clock } from 'lucide-react';
-import { Calendar } from '@/components/ui/calendar';
-import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Calendar } from '@theadoro/ui';
+import { Label } from '@theadoro/ui';
+import { RadioGroup, RadioGroupItem } from '@theadoro/ui';
 import { DeliverySchedule } from '@/types/order';
 import { format, addBusinessDays, isWeekend, isBefore, startOfToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@theadoro/ui';
+import { Button } from '@theadoro/ui';
 import { cn } from '@/lib/utils';
 
 interface DeliverySchedulerProps {

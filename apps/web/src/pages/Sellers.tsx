@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import { Search, Filter, MapPin, Star, CheckCircle, SlidersHorizontal } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@theadoro/ui';
+import { Button } from '@theadoro/ui';
+import { Badge } from '@theadoro/ui';
+import { Card, CardContent } from '@theadoro/ui';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from '@theadoro/ui';
 import {
   Sheet,
   SheetContent,
@@ -18,13 +18,13 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from '@/components/ui/sheet';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
+} from '@theadoro/ui';
+import { Checkbox } from '@theadoro/ui';
+import { Label } from '@theadoro/ui';
+import { Separator } from '@theadoro/ui';
 import { SellerCard } from '@/components/SellerCard';
 import { useSellers, SellerFilters } from '@/hooks/useSellers';
-import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { LoadingSpinner } from '@theadoro/ui';
 
 // Filter Sidebar Component
 const FilterSidebar: React.FC<{

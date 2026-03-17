@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Minus, Plus, Trash2, Heart, ExternalLink } from 'lucide-react';
 import { CartItem as CartItemType } from '@/contexts/CartContext';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Button } from '@theadoro/ui';
+import { Badge } from '@theadoro/ui';
 import { useCart } from '@/hooks/useCart';
 import { useWishlist } from '@/hooks/useWishlist';
 import { cn } from '@/lib/utils';

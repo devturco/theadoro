@@ -64,7 +64,8 @@
     "vaul": "^0.9.9",
     "zod": "^3.25.76",
     "zustand": "^5.0.11",
-    "@theadoro/api-client": "*"
+    "@theadoro/api-client": "*",
+    "@theadoro/ui": "*"
   },
   "devDependencies": {
     "@theadoro/config-typescript": "*",

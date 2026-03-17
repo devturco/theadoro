@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { X, ChevronDown, ChevronUp, Filter } from 'lucide-react';
 import { ProductFilters, Category } from '@/types/product';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Slider } from '@/components/ui/slider';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+import { Button } from '@theadoro/ui';
+import { Checkbox } from '@theadoro/ui';
+import { Slider } from '@theadoro/ui';
+import { Badge } from '@theadoro/ui';
+import { Separator } from '@theadoro/ui';
 import { useCategories } from '@/hooks/useCategories';
 import { cn } from '@/lib/utils';
 

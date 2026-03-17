@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Grid, List } from 'lucide-react';
 import { CategoryGrid } from '@/components/CategoryGrid';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+import { Button } from '@theadoro/ui';
+import { Card, CardContent, CardHeader, CardTitle } from '@theadoro/ui';
+import { Badge } from '@theadoro/ui';
+import { Separator } from '@theadoro/ui';
 
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';

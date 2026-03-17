@@ -1,67 +1,7 @@
 import { BaseService, BaseEntity } from './base.service';
 import { supabase } from '@/integrations/supabase/client';
 import { PostgrestError } from '@supabase/supabase-js';
-
-export interface Product extends BaseEntity {
-  name: string;
-  description: string;
-  price: number;
-  category_id: string;
-  seller_id: string;
-  images: string[];
-  status?: 'active' | 'inactive' | 'out_of_stock'; // UI status type
-  is_active: boolean;
-  stock_quantity: number;
-  sku?: string;
-  weight?: number;
-  dimensions?: {
-    length: number;
-    width: number;
-    height: number;
-  };
-  tags?: string[];
-  featured: boolean;
-  discount_percentage?: number;
-  discount_start_date?: string;
-  discount_end_date?: string;
-  rating?: number;
-  rating_count?: number;
-  views_count?: number;
-  sales_count?: number;
-  // Relations
-  seller?: {
-    id: string;
-    full_name: string;
-    name?: string;
-    avatar_url?: string;
-    avatar?: string;
-  };
-  category?: {
-    id: string;
-    name: string;
-  };
-}
-
-export interface ProductStats {
-  total_products: number;
-  active_products: number;
-  out_of_stock: number;
-  low_stock: number;
-  featured_products: number;
-  average_price: number;
-  total_value: number;
-}
-
-export interface ProductFilters {
-  category_id?: string;
-  seller_id?: string;
-  is_active?: boolean;
-  featured?: boolean;
-  min_price?: number;
-  max_price?: number;
-  in_stock?: boolean;
-  search?: string;
-}
+import { Product, ProductStats, ProductFilters } from '@/types/product';
 
 class ProductService extends BaseService<Product> {
   constructor() {

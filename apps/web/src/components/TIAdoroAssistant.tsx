@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Button } from '@theadoro/ui';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@theadoro/ui';
+import { Input } from '@theadoro/ui';
+import { ScrollArea } from '@theadoro/ui';
 import { MessageSquare, X, Send, Sparkles, ShoppingBag } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@theadoro/ui';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 

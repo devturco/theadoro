@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Product } from '@/types/product';
 import { ProductGrid } from '@/components/ProductGrid';
 import { Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button } from '@theadoro/ui';
 import { Link } from 'react-router-dom';
 
 const Offers = () => {

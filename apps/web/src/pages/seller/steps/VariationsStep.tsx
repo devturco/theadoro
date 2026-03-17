@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useProductWizard } from '@/hooks/useProductWizard';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
+import { Button } from '@theadoro/ui';
+import { Input } from '@theadoro/ui';
+import { Label } from '@theadoro/ui';
+import { Badge } from '@theadoro/ui';
 import { Plus, X, Trash2 } from 'lucide-react';
-import { Card } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
+import { Card } from '@theadoro/ui';
+import { Switch } from '@theadoro/ui';
 
 export default function VariationsStep() {
     const { variations, addVariation, removeVariation, updateVariation, productData } = useProductWizard();

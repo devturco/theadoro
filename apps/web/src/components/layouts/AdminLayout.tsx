@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
+import { Button } from '@theadoro/ui';
 import {
   Sidebar,
   SidebarContent,

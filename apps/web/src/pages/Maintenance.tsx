@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import { Button } from '@theadoro/ui';
 import { Link } from "react-router-dom";
 import { LogIn } from "lucide-react";
 

@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { X, Filter } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Slider } from '@/components/ui/slider';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Button } from '@theadoro/ui';
+import { Card, CardContent, CardHeader, CardTitle } from '@theadoro/ui';
+import { Checkbox } from '@theadoro/ui';
+import { Slider } from '@theadoro/ui';
+import { Badge } from '@theadoro/ui';
+import { Separator } from '@theadoro/ui';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@theadoro/ui';
 
 interface FilterOption {
   id: string;

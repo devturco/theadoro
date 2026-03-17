@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import { Button } from '@theadoro/ui';
 import { Gift, Calendar } from "lucide-react";
 import heroImage from "@/assets/hero-gifts.jpg";
 import { useSiteSettings } from "@/hooks/useSiteSettings";

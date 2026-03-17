@@ -1,3 +1,6 @@
+import { Orders, OrderItems, Profiles, Products, Appointments } from '@theadoro/api-client';
+import type { Product } from './product';
+
 export type OrderStatus = 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
 export type PaymentMethod = 'credit_card' | 'debit_card' | 'pix' | 'bank_transfer';
@@ -24,39 +27,8 @@ export interface BillingAddress {
   country: string;
 }
 
-export interface Order {
-  id: string;
-  order_number: string;
-  buyer_id: string;
-  seller_id: string | null;
-  status: OrderStatus;
-  payment_status: PaymentStatus;
-  payment_method: PaymentMethod | string | null;
-
-  // Amounts
-  subtotal?: number;
-  shipping_cost?: number;
-  tax_amount?: number;
-  discount_amount?: number;
-  total_amount: number;
-
-  // Details
-  shipping_address: string | ShippingAddress | null; // Can be JSON string in DB
-  billing_address?: string | BillingAddress | null;
-  notes: string | any | null; // JSON or text
-
-  // Shipping info
-  tracking_number?: string;
-  estimated_delivery?: string;
-  delivered_at?: string;
-
-  // Metadata
-  created_at: string;
-  updated_at: string;
-  cancelled_at?: string;
-  cancellation_reason?: string;
-
-  // Relations
+export interface Order extends Orders {
+  // UI and Relation Extensions
   buyer?: {
     id: string;
     full_name: string | null;
@@ -71,22 +43,14 @@ export interface Order {
     phone: string | null;
     avatar_url?: string;
   };
-  items?: OrderItem[]; // Standardized name
-
-  // Legacy/Specific fields to keep compatibility or future use
+  items?: OrderItem[];
+  
+  // Computed/UI fields
   gift_options?: GiftOptions;
   delivery_schedule?: DeliverySchedule;
 }
 
-export interface OrderItem {
-  id: string;
-  order_id: string;
-  product_id: string;
-  seller_id?: string;
-  quantity: number;
-  unit_price: number;
-  total_price: number;
-  gift_message?: string | null;
+export interface OrderItem extends OrderItems {
   product?: {
     id: string;
     name: string;
@@ -94,7 +58,7 @@ export interface OrderItem {
     seller_id?: string;
     price?: number;
     description?: string;
-    profiles?: { // For service phone number
+    profiles?: {
       full_name: string;
       phone: string;
     }
@@ -148,18 +112,7 @@ export interface DeliverySchedule {
   scheduled_slot: string;
 }
 
-export interface Appointment {
-  id: string;
-  buyer_id: string;
-  product_id: string;
-  seller_id: string;
-  appointment_date: string;
-  appointment_time: string;
-  service_address: string | null;
-  status: AppointmentStatus;
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
+export interface Appointment extends Appointments {
   buyer?: {
     id: string;
     full_name: string | null;
@@ -193,5 +146,3 @@ export interface Wishlist {
   created_at: string;
   product?: Product;
 }
-
-import type { Product } from './product';

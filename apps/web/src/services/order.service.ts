@@ -32,7 +32,7 @@ class OrderService extends BaseService<Order> {
           )
         `, { count: 'exact' });
 
-      // Apply filters
+      // ... (filters rest identical)
       if (filters.buyer_id) {
         query = query.eq('buyer_id', filters.buyer_id);
       }

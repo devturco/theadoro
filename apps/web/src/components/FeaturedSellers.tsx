@@ -1,8 +1,8 @@
-import { Button } from "@/components/ui/button";
+import { Button } from '@theadoro/ui';
 import { Link } from "react-router-dom";
 import { Star, MapPin, Award } from "lucide-react";
 import { useSellers } from "@/hooks/useSellers";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from '@theadoro/ui';
 
 const FeaturedSellers = () => {
   const { sellers, loading } = useSellers({

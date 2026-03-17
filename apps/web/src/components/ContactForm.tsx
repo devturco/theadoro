@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@theadoro/ui';
+import { Input } from '@theadoro/ui';
+import { Textarea } from '@theadoro/ui';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@theadoro/ui';
+import { Card, CardContent, CardHeader, CardTitle } from '@theadoro/ui';
 import { Mail, Send } from 'lucide-react';
 import { toast } from 'sonner';
 

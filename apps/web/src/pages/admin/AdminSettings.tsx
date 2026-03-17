@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@theadoro/ui';
+import { Button } from '@theadoro/ui';
+import { Label } from '@theadoro/ui';
+import { Switch } from '@theadoro/ui';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@theadoro/ui';
+import { Input } from '@theadoro/ui';
 import { useSiteSettings, SiteSetting } from '@/hooks/useSiteSettings';
 import { Loader2, Settings, Truck, CreditCard, Store, Sparkles, Brain } from 'lucide-react';
 import { toast } from 'sonner';

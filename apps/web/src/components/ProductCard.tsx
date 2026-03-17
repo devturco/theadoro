@@ -4,8 +4,8 @@ import { Heart, Star, ShoppingBag, MapPin, CheckCircle } from 'lucide-react';
 import { Product } from '@/types/product';
 import { useWishlist } from '@/hooks/useWishlist';
 import { useCart } from '@/hooks/useCart';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Button } from '@theadoro/ui';
+import { Badge } from '@theadoro/ui';
 import { cn } from '@/lib/utils';
 
 interface ProductCardProps {

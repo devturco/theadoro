@@ -6,16 +6,16 @@ import {
     CarouselItem,
     CarouselNext,
     CarouselPrevious
-} from '@/components/ui/carousel';
-import { Card, CardContent } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+} from '@theadoro/ui';
+import { Card, CardContent } from '@theadoro/ui';
+import { Label } from '@theadoro/ui';
+import { Input } from '@theadoro/ui';
+import { Textarea } from '@theadoro/ui';
+import { Checkbox } from '@theadoro/ui';
+import { RadioGroup, RadioGroupItem } from '@theadoro/ui';
 import { GiftOptions as GiftOptionsType, GiftWrap } from '@/types/order';
 import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
+import { Badge } from '@theadoro/ui';
 
 interface GiftOptionsProps {
     value: GiftOptionsType;

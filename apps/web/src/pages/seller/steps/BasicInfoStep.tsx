@@ -1,9 +1,9 @@
 import { useProductWizard } from '@/hooks/useProductWizard';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@theadoro/ui';
+import { Label } from '@theadoro/ui';
+import { Textarea } from '@theadoro/ui';
 import { FileUpload } from '@/components/ui/file-upload';
-import { Button } from '@/components/ui/button';
+import { Button } from '@theadoro/ui';
 import { X } from 'lucide-react';
 
 export default function BasicInfoStep() {

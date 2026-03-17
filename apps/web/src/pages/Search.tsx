@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Search as SearchIcon, Clock, TrendingUp } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@theadoro/ui';
+import { Input } from '@theadoro/ui';
+import { Badge } from '@theadoro/ui';
+import { Card, CardContent } from '@theadoro/ui';
 import { SearchResults } from '@/components/SearchResults';
 import { SearchFilters } from '@/components/SearchFilters';
 import { useProducts } from '@/hooks/useProducts';

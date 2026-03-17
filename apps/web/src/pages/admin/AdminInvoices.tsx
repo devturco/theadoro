@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { DataTable } from '@/components/ui/data-table';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@theadoro/ui';
+import { DataTable } from '@theadoro/ui';
+import { Badge } from '@theadoro/ui';
 import { useCRUD } from '@/hooks/useCRUD';
 import {
     FileText,
@@ -14,14 +14,14 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Button } from '@/components/ui/button';
+import { Button } from '@theadoro/ui';
 import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from '@/components/ui/select';
+} from '@theadoro/ui';
 import { toast } from 'sonner';
 
 const AdminInvoices = () => {

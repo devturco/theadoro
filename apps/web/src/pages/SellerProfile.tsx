@@ -17,14 +17,14 @@ import {
   Heart,
   ExternalLink
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@theadoro/ui';
+import { Badge } from '@theadoro/ui';
+import { Card, CardContent, CardHeader, CardTitle } from '@theadoro/ui';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@theadoro/ui';
+import { Separator } from '@theadoro/ui';
+import { Avatar, AvatarFallback, AvatarImage } from '@theadoro/ui';
 import { ProductCard } from '@/components/ProductCard';
-import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { LoadingSpinner } from '@theadoro/ui';
 import { useSeller } from '@/hooks/useSellers';
 import { useProducts } from '@/hooks/useProducts';
 import { toast } from 'sonner';

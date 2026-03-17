@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { DataTable } from '@/components/ui/data-table';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@theadoro/ui';
+import { DataTable } from '@theadoro/ui';
+import { Button } from '@theadoro/ui';
+import { Badge } from '@theadoro/ui';
+import { Input } from '@theadoro/ui';
+import { Label } from '@theadoro/ui';
+import { Textarea } from '@theadoro/ui';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@theadoro/ui';
 import { supabase } from '@/integrations/supabase/client';
 import {
     Dialog,
@@ -15,8 +15,8 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-} from '@/components/ui/dialog';
-import { Switch } from '@/components/ui/switch';
+} from '@theadoro/ui';
+import { Switch } from '@theadoro/ui';
 import { useCRUD } from '@/hooks/useCRUD';
 import {
     Plus,

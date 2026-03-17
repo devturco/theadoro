@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@theadoro/ui';
+import { Card, CardContent, CardHeader, CardTitle } from '@theadoro/ui';
 import { Plus, Edit, Trash2, Eye, EyeOff, ShoppingBag, Package, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription } from '@theadoro/ui';
 import { cn } from '@/lib/utils';
 
 const SellerProducts = () => {

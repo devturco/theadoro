@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Grid, List, SortAsc } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@theadoro/ui';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@theadoro/ui';
 import { ProductCard } from './ProductCard';
 
 interface Product {

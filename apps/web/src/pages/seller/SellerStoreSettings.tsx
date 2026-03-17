@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@theadoro/ui';
+import { Button } from '@theadoro/ui';
+import { Input } from '@theadoro/ui';
+import { Label } from '@theadoro/ui';
+import { Textarea } from '@theadoro/ui';
 import { FileUpload } from '@/components/ui/file-upload';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -19,7 +19,7 @@ import {
     Truck,
     CreditCard
 } from 'lucide-react';
-import { Switch } from '@/components/ui/switch';
+import { Switch } from '@theadoro/ui';
 
 export default function SellerStoreSettings() {
     const { user, profile, refreshProfile } = useAuth();

@@ -1,8 +1,8 @@
 import React from 'react';
 import { Heart, ShoppingCart, Trash2, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@theadoro/ui';
+import { Card, CardContent } from '@theadoro/ui';
 import { useWishlist } from '@/hooks/useWishlist';
 import { useCart } from '@/hooks/useCart';
 import { useAuth } from '@/contexts/AuthContext';

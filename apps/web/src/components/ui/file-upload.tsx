@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
+import { Button } from '@theadoro/ui';
+import { Progress } from '@theadoro/ui';
+import { Badge } from '@theadoro/ui';
 import { 
   Upload, 
   X, 

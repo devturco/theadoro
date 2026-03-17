@@ -2,10 +2,10 @@ import { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserRole } from '@/types/auth';
-import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { LoadingSpinner } from '@theadoro/ui';
+import { Alert, AlertDescription } from '@theadoro/ui';
 import { AlertTriangle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button } from '@theadoro/ui';
 
 interface RoleGuardProps {
   children: ReactNode;
