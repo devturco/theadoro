@@ -1,136 +1,142 @@
 import { Link } from "react-router-dom";
-import { Facebook, Instagram, Twitter, Mail, Phone, MapPin } from "lucide-react";
-import { Button } from '@theadoro/ui';
-import { Input } from '@theadoro/ui';
+import { Facebook, Instagram, Twitter, Mail, Phone, MapPin, Heart } from "lucide-react";
 
 const Footer = () => {
   return (
-    <footer className="bg-graphite text-white">
-      <div className="container mx-auto px-4 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
-          {/* Brand */}
-          <div className="space-y-4">
+    <footer className="bg-secondary text-white">
+      {/* Top wave accent */}
+      <div className="h-1 w-full" style={{ background: 'linear-gradient(90deg, hsl(var(--wine-dark)), hsl(var(--wine)), hsl(var(--champagne-dark)), hsl(var(--wine)))' }} />
+
+      <div className="container mx-auto px-4 py-10 sm:py-14">
+        {/* Main Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
+
+          {/* Brand — full width on mobile */}
+          <div className="col-span-1 sm:col-span-2 lg:col-span-1 space-y-4">
             <img
               src="/logo-colors.png"
               alt="THEADORO"
-              className="h-16 w-auto"
+              className="h-12 w-auto"
             />
-            <p className="text-white/80 text-sm leading-relaxed">
-              O marketplace premium que conecta você a vendedores excepcionais,
-              presentes únicos e experiências inesquecíveis.
+            <p className="text-white/70 text-sm leading-relaxed max-w-xs">
+              O marketplace premium de presentes, conectando você a vendedores excepcionais e experiências inesquecíveis.
             </p>
-            <div className="flex gap-3">
-              <Button size="icon" variant="ghost" className="hover:bg-white/10">
-                <Instagram className="h-5 w-5" />
-              </Button>
-              <Button size="icon" variant="ghost" className="hover:bg-white/10">
-                <Facebook className="h-5 w-5" />
-              </Button>
-              <Button size="icon" variant="ghost" className="hover:bg-white/10">
-                <Twitter className="h-5 w-5" />
-              </Button>
+            <div className="flex gap-2">
+              {[Instagram, Facebook, Twitter].map((Icon, i) => (
+                <button
+                  key={i}
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+                >
+                  <Icon className="h-4 w-4 text-white" />
+                </button>
+              ))}
             </div>
           </div>
 
           {/* Quick Links */}
           <div>
-            <h4 className="font-semibold text-champagne mb-4">Links Rápidos</h4>
-            <ul className="space-y-3 text-sm">
-              <li>
-                <Link to="/about" className="text-white/80 hover:text-champagne transition-colors">
-                  Sobre Nós
-                </Link>
-              </li>
-              <li>
-                <Link to="/contact" className="text-white/80 hover:text-champagne transition-colors">
-                  Contato
-                </Link>
-              </li>
-              <li>
-                <Link to="/sellers" className="text-white/80 hover:text-champagne transition-colors">
-                  Vendedores
-                </Link>
-              </li>
-              <li>
-                <Link to="/products" className="text-white/80 hover:text-champagne transition-colors">
-                  Produtos
-                </Link>
-              </li>
+            <h4 className="font-bold text-white text-sm uppercase tracking-widest mb-4">
+              Explore
+            </h4>
+            <ul className="space-y-2.5">
+              {[
+                { label: 'Produtos', to: '/products' },
+                { label: 'Categorias', to: '/categories' },
+                { label: 'Vendedores', to: '/sellers' },
+                { label: 'Ofertas', to: '/offers' },
+                { label: 'Sobre nós', to: '/about' },
+              ].map((item) => (
+                <li key={item.to}>
+                  <Link
+                    to={item.to}
+                    className="text-white/60 hover:text-white text-sm transition-colors"
+                  >
+                    {item.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 
           {/* Categories */}
           <div>
-            <h4 className="font-semibold text-champagne mb-4">Categorias</h4>
-            <ul className="space-y-3 text-sm">
-              <li>
-                <Link to="/categories" className="text-white/80 hover:text-champagne transition-colors">
-                  Todas as Categorias
-                </Link>
-              </li>
-              <li>
-                <Link to="/categories/presentes" className="text-white/80 hover:text-champagne transition-colors">
-                  Presentes
-                </Link>
-              </li>
-              <li>
-                <Link to="/categories/flores" className="text-white/80 hover:text-champagne transition-colors">
-                  Flores & Cestas
-                </Link>
-              </li>
-              <li>
-                <Link to="/categories/moda" className="text-white/80 hover:text-champagne transition-colors">
-                  Moda
-                </Link>
-              </li>
+            <h4 className="font-bold text-white text-sm uppercase tracking-widest mb-4">
+              Categorias
+            </h4>
+            <ul className="space-y-2.5">
+              {[
+                { label: 'Presentes', to: '/categories/presentes' },
+                { label: 'Flores & Cestas', to: '/categories/flores' },
+                { label: 'Moda', to: '/categories/moda' },
+                { label: 'Beleza', to: '/categories/beleza' },
+                { label: 'Decoração', to: '/categories/decoracao' },
+              ].map((item) => (
+                <li key={item.to}>
+                  <Link
+                    to={item.to}
+                    className="text-white/60 hover:text-white text-sm transition-colors"
+                  >
+                    {item.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 
-          {/* Contact */}
-          <div>
-            <h4 className="font-semibold text-champagne mb-4">Contato</h4>
-            <ul className="space-y-3 text-sm">
-              <li className="flex items-center gap-2 text-white/80">
-                <Mail className="h-4 w-4 text-champagne" />
+          {/* Contact + Newsletter */}
+          <div className="col-span-1 sm:col-span-2 lg:col-span-1">
+            <h4 className="font-bold text-white text-sm uppercase tracking-widest mb-4">
+              Contato
+            </h4>
+            <ul className="space-y-2.5 mb-6">
+              <li className="flex items-center gap-2 text-white/60 text-sm">
+                <Mail className="h-3.5 w-3.5 text-champagne shrink-0" />
                 contato@theadoro.com.br
               </li>
-              <li className="flex items-center gap-2 text-white/80">
-                <Phone className="h-4 w-4 text-champagne" />
+              <li className="flex items-center gap-2 text-white/60 text-sm">
+                <Phone className="h-3.5 w-3.5 text-champagne shrink-0" />
                 (65) 9999-9999
               </li>
-              <li className="flex items-start gap-2 text-white/80">
-                <MapPin className="h-4 w-4 text-champagne mt-0.5" />
+              <li className="flex items-center gap-2 text-white/60 text-sm">
+                <MapPin className="h-3.5 w-3.5 text-champagne shrink-0" />
                 Cuiabá, MT
               </li>
             </ul>
 
             {/* Newsletter */}
-            <div className="mt-6">
-              <p className="text-sm text-white/80 mb-3">Receba novidades e ofertas</p>
+            <div>
+              <p className="text-xs font-bold text-white/80 uppercase tracking-widest mb-2">
+                Receba novidades
+              </p>
               <div className="flex gap-2">
-                <Input
+                <input
                   type="email"
                   placeholder="Seu e-mail"
-                  className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                  className="flex-1 min-w-0 h-9 rounded-lg bg-white/10 border border-white/20 px-3 text-sm text-white placeholder:text-white/40 outline-none focus:border-white/50 transition-colors"
                 />
-                <Button variant="wine" size="sm">
-                  Enviar
-                </Button>
+                <button className="h-9 px-3 rounded-lg bg-wine text-white text-xs font-bold hover:bg-wine-dark transition-colors shrink-0">
+                  OK
+                </button>
               </div>
             </div>
           </div>
         </div>
 
         {/* Bottom Bar */}
-        <div className="mt-12 pt-8 border-t border-white/10">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-white/60">
-            <p>© 2024 THEADORO. Todos os direitos reservados.</p>
-            <div className="flex gap-6">
-              <Link to="/privacy" className="hover:text-champagne transition-colors">
-                Política de Privacidade
+        <div className="mt-10 pt-6 border-t border-white/10">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-white/40">
+            <p className="flex items-center gap-1">
+              © {new Date().getFullYear()} THEADORO. Feito com <Heart className="h-3 w-3 text-champagne fill-current" /> em Cuiabá, MT.
+            </p>
+            <div className="flex gap-4">
+              <Link to="/privacy" className="hover:text-white/70 transition-colors">
+                Privacidade
               </Link>
-              <Link to="/terms" className="hover:text-champagne transition-colors">
+              <Link to="/terms" className="hover:text-white/70 transition-colors">
                 Termos de Uso
+              </Link>
+              <Link to="/contact" className="hover:text-white/70 transition-colors">
+                Contato
               </Link>
             </div>
           </div>

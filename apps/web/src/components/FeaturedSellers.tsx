@@ -12,18 +12,20 @@ const FeaturedSellers = () => {
 
   const featuredSellers = sellers.slice(0, 3);
   return (
-    <section className="py-20 bg-background">
+    <section className="py-10 sm:py-16 bg-background">
       <div className="container mx-auto px-4">
-        <div className="text-center mb-12 animate-fade-in">
-          <h2 className="text-4xl font-serif font-bold text-foreground mb-4">
-            Compre de Quem Encanta
-          </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Conheça vendedores verificados que oferecem produtos e serviços excepcionais
-          </p>
+        <div className="flex items-center justify-between mb-6 sm:mb-10">
+          <div>
+            <h2 className="text-xl sm:text-3xl font-serif font-bold text-foreground">
+              Compre de Quem Encanta
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1 hidden sm:block">
+              Vendedores verificados com produtos excepcionais
+            </p>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           {loading ? (
             Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="space-y-4">
@@ -120,10 +122,10 @@ const FeaturedSellers = () => {
           )}
         </div>
 
-        <div className="text-center mt-12">
-          <Button variant="outline" size="lg">
+        <div className="text-center mt-8">
+          <a href="/sellers" className="inline-flex items-center gap-2 px-6 py-2.5 border border-border rounded-full text-sm font-medium text-gray-700 hover:border-wine hover:text-wine transition-colors">
             Conhecer Mais Vendedores
-          </Button>
+          </a>
         </div>
       </div>
     </section>

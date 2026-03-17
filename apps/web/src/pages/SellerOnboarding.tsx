@@ -273,7 +273,7 @@ export default function SellerOnboarding() {
     };
 
     return (
-        <div className="min-h-screen bg-[#F8F9FA] pb-20">
+        <div className="min-h-screen bg-background pb-20">
             <div className="container max-w-4xl mx-auto px-4 pt-12">
                 {currentStep !== 'success' && (
                     <div className="mb-8">

@@ -218,11 +218,14 @@ const AdminDashboard = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Dashboard Administrativo</h1>
-        <p className="text-muted-foreground">
-          Bem-vindo, {user?.user_metadata?.full_name || user?.email}
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Admin Dashboard</h1>
+          <p className="text-sm text-gray-500">Welcome back, {profiles?.find((p: any) => p.id === user?.id)?.full_name || 'Admin'}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {/* Add any global admin actions here */}
+        </div>
       </div>
 
       {/* Métricas principais */}
@@ -282,12 +285,14 @@ const AdminDashboard = () => {
             <CardTitle>Pedidos Recentes</CardTitle>
           </CardHeader>
           <CardContent>
-            <DataTable
-              data={metrics.recentOrders}
-              columns={orderColumns}
-              loading={loading}
-              pagination={{ page: 1, pageSize: 5, total: metrics.recentOrders.length, totalPages: 1 }}
-            />
+            <div className="overflow-x-auto">
+              <DataTable
+                data={metrics.recentOrders}
+                columns={orderColumns}
+                loading={loading}
+                pagination={{ page: 1, pageSize: 5, total: metrics.recentOrders.length, totalPages: 1 }}
+              />
+            </div>
           </CardContent>
         </Card>
 
@@ -296,12 +301,14 @@ const AdminDashboard = () => {
             <CardTitle>Solicitações de Vendedor</CardTitle>
           </CardHeader>
           <CardContent>
-            <DataTable
-              data={metrics.pendingSellerRequests}
-              columns={sellerRequestColumns}
-              loading={loading}
-              pagination={{ page: 1, pageSize: 5, total: metrics.pendingSellerRequests.length, totalPages: 1 }}
-            />
+            <div className="overflow-x-auto">
+              <DataTable
+                data={metrics.pendingSellerRequests}
+                columns={sellerRequestColumns}
+                loading={loading}
+                pagination={{ page: 1, pageSize: 5, total: metrics.pendingSellerRequests.length, totalPages: 1 }}
+              />
+            </div>
           </CardContent>
         </Card>
       </div>

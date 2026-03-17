@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Gift, Plus, Calendar, Share2, Trash2, ExternalLink, Copy } from 'lucide-react';
+import { Gift, Plus, Calendar, Share2, Trash2, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '@theadoro/ui';
@@ -38,9 +38,7 @@ export default function GiftLists() {
     });
 
     useEffect(() => {
-        if (user) {
-            fetchLists();
-        }
+        if (user) fetchLists();
     }, [user]);
 
     const fetchLists = async () => {
@@ -55,7 +53,6 @@ export default function GiftLists() {
             setLists((data as any) || []);
         } catch (error) {
             console.error('Error fetching lists:', error);
-            // Mock data 
             setLists([
                 {
                     id: '1',
@@ -74,10 +71,8 @@ export default function GiftLists() {
 
     const handleCreateList = async () => {
         if (!user) return;
-
         try {
             const slug = formData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Math.random().toString(36).substring(7);
-
             const payload = {
                 user_id: user.id,
                 title: formData.title,
@@ -86,21 +81,14 @@ export default function GiftLists() {
                 is_public: formData.is_public,
                 slug
             };
-
-            const { error } = await supabase
-                .from('gift_lists' as any)
-                .insert(payload);
-
+            const { error } = await supabase.from('gift_lists' as any).insert(payload);
             if (error) throw error;
-
             toast.success('Lista criada com sucesso!');
             setIsDialogOpen(false);
             fetchLists();
             setFormData({ title: '', description: '', event_date: '', is_public: true });
         } catch (error: any) {
-            console.error('Error creating list:', error);
-            toast.error('Erro ao criar lista (tabela pode não existir).');
-            // Optimistic update
+            toast.error('Erro ao criar lista.');
             setLists(prev => [{
                 id: Date.now().toString(),
                 title: formData.title,
@@ -117,11 +105,7 @@ export default function GiftLists() {
     const handleDelete = async (id: string) => {
         if (!confirm('Tem certeza que deseja excluir esta lista?')) return;
         try {
-            const { error } = await supabase
-                .from('gift_lists' as any)
-                .delete()
-                .eq('id', id);
-
+            const { error } = await supabase.from('gift_lists' as any).delete().eq('id', id);
             if (error) throw error;
             toast.success('Lista removida!');
             fetchLists();
@@ -131,53 +115,57 @@ export default function GiftLists() {
     };
 
     const copyLink = (slug: string) => {
-        const url = `${window.location.origin}/lists/${slug}`;
-        navigator.clipboard.writeText(url);
+        navigator.clipboard.writeText(`${window.location.origin}/lists/${slug}`);
         toast.success('Link copiado!');
     };
 
     return (
-        <div className="container py-8 space-y-8 animate-in fade-in duration-500">
-            <div className="flex items-center justify-between">
+        <div className="space-y-5 sm:space-y-6 animate-in fade-in duration-500">
+            {/* Header Row */}
+            <div className="flex items-start justify-between gap-3">
                 <div>
-                    <h1 className="text-3xl font-bold font-sans text-gradient-wine flex items-center gap-2">
-                        <Gift className="h-8 w-8" />
-                        Minhas Listas de Presentes
+                    <h1 className="text-xl sm:text-2xl font-bold font-serif text-gray-900 flex items-center gap-2">
+                        <Gift className="h-5 w-5 sm:h-6 sm:w-6 text-wine shrink-0" />
+                        Minhas Listas
                     </h1>
-                    <p className="text-muted-foreground mt-2">
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-1 leading-snug">
                         Crie listas para casamentos, aniversários ou chá de bebê e compartilhe com amigos.
                     </p>
                 </div>
 
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                     <DialogTrigger asChild>
-                        <Button className="bg-wine hover:bg-wine-dark">
-                            <Plus className="mr-2 h-4 w-4" /> Nova Lista
+                        <Button
+                            className="bg-wine hover:bg-wine-dark text-white h-9 px-3 sm:px-4 text-xs sm:text-sm shrink-0"
+                        >
+                            <Plus className="h-4 w-4 sm:mr-1.5" />
+                            <span className="hidden sm:inline">Nova Lista</span>
                         </Button>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md rounded-2xl">
                         <DialogHeader>
                             <DialogTitle>Criar Nova Lista</DialogTitle>
                             <DialogDescription>Preencha os detalhes da sua lista de presentes.</DialogDescription>
                         </DialogHeader>
-                        <div className="space-y-4 py-4">
-                            <div className="space-y-2">
-                                <Label>Título da Lista</Label>
+                        <div className="space-y-4 py-2">
+                            <div className="space-y-1.5">
+                                <Label>Título da Lista *</Label>
                                 <Input
                                     placeholder="Ex: Casamento Ana & João"
                                     value={formData.title}
                                     onChange={e => setFormData({ ...formData, title: e.target.value })}
                                 />
                             </div>
-                            <div className="space-y-2">
+                            <div className="space-y-1.5">
                                 <Label>Descrição (Opcional)</Label>
                                 <Textarea
                                     placeholder="Uma mensagem para seus convidados..."
                                     value={formData.description}
                                     onChange={e => setFormData({ ...formData, description: e.target.value })}
+                                    rows={3}
                                 />
                             </div>
-                            <div className="space-y-2">
+                            <div className="space-y-1.5">
                                 <Label>Data do Evento (Opcional)</Label>
                                 <Input
                                     type="date"
@@ -185,75 +173,139 @@ export default function GiftLists() {
                                     onChange={e => setFormData({ ...formData, event_date: e.target.value })}
                                 />
                             </div>
-                            <div className="flex items-center space-x-2 pt-2">
+                            <div className="flex items-center space-x-2 pt-1">
                                 <Switch
                                     id="public"
                                     checked={formData.is_public}
                                     onCheckedChange={checked => setFormData({ ...formData, is_public: checked })}
                                 />
-                                <Label htmlFor="public">Lista Pública (visível para quem tem o link)</Label>
+                                <Label htmlFor="public" className="text-sm cursor-pointer">
+                                    Lista pública (visível com o link)
+                                </Label>
                             </div>
                         </div>
-                        <DialogFooter>
+                        <DialogFooter className="gap-2">
                             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
-                            <Button onClick={handleCreateList} className="bg-wine hover:bg-wine-dark" disabled={!formData.title}>Criar Lista</Button>
+                            <Button
+                                onClick={handleCreateList}
+                                className="bg-wine hover:bg-wine-dark text-white"
+                                disabled={!formData.title}
+                            >
+                                Criar Lista
+                            </Button>
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
             </div>
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {lists.length === 0 && !loading ? (
-                    <div className="col-span-full text-center py-12 bg-gray-50 rounded-xl border border-dashed text-muted-foreground">
-                        <Gift className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                        <p>Você ainda não criou nenhuma lista de presentes.</p>
+            {/* Loading state */}
+            {loading && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                    {[1, 2, 3].map(i => (
+                        <div key={i} className="h-40 rounded-xl bg-gray-100 animate-pulse" />
+                    ))}
+                </div>
+            )}
+
+            {/* Empty state */}
+            {!loading && lists.length === 0 && (
+                <div className="text-center py-12 sm:py-16 bg-background rounded-2xl border border-dashed border-border">
+                    <div className="w-14 h-14 bg-wine/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Gift className="h-7 w-7 text-wine" />
                     </div>
-                ) : (
-                    lists.map(list => (
-                        <Card key={list.id} className="group hover:border-wine/50 transition-all">
-                            <CardHeader>
-                                <div className="flex justify-between items-start">
-                                    <div className="space-y-1">
-                                        <CardTitle className="line-clamp-1" title={list.title}>{list.title}</CardTitle>
+                    <h3 className="font-semibold text-gray-700 mb-1">Nenhuma lista criada</h3>
+                    <p className="text-sm text-gray-500 mb-5 max-w-xs mx-auto">
+                        Crie sua primeira lista de presentes para casamento, aniversário ou chá de bebê.
+                    </p>
+                    <Button
+                        onClick={() => setIsDialogOpen(true)}
+                        className="bg-wine hover:bg-wine-dark text-white"
+                    >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Criar minha primeira lista
+                    </Button>
+                </div>
+            )}
+
+            {/* Lists Grid */}
+            {!loading && lists.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                    {lists.map(list => (
+                        <Card
+                            key={list.id}
+                            className="group hover:border-wine/40 hover:shadow-md transition-all duration-200 cursor-pointer"
+                            onClick={() => navigate(`/buyer/lists/${list.id}`)}
+                        >
+                            <CardHeader className="pb-2 p-4">
+                                <div className="flex justify-between items-start gap-2">
+                                    <div className="min-w-0 flex-1">
+                                        <CardTitle className="text-base line-clamp-1 group-hover:text-wine transition-colors">
+                                            {list.title}
+                                        </CardTitle>
                                         {list.event_date && (
-                                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                                <Calendar className="h-3 w-3" />
+                                            <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                                                <Calendar className="h-3 w-3 shrink-0" />
                                                 {format(new Date(list.event_date), 'dd/MM/yyyy')}
                                             </div>
                                         )}
                                     </div>
-                                    <Badge variant={list.is_public ? 'outline' : 'secondary'}>
+                                    <Badge
+                                        variant={list.is_public ? 'outline' : 'secondary'}
+                                        className="text-[10px] shrink-0"
+                                    >
                                         {list.is_public ? 'Pública' : 'Privada'}
                                     </Badge>
                                 </div>
-                                <CardDescription className="line-clamp-2 min-h-[40px]">
+                                <CardDescription className="line-clamp-2 text-xs mt-1.5 min-h-[32px]">
                                     {list.description || 'Sem descrição.'}
                                 </CardDescription>
                             </CardHeader>
-                            <CardContent>
-                                <div className="text-sm font-medium flex items-center gap-2">
-                                    <Gift className="h-4 w-4 text-wine" />
-                                    {list.item_count || 0} itens na lista
+
+                            <CardContent className="pt-0 pb-3 px-4">
+                                <div className="text-sm font-medium flex items-center gap-1.5 text-gray-600">
+                                    <Gift className="h-3.5 w-3.5 text-wine" />
+                                    {list.item_count || 0} {(list.item_count || 0) === 1 ? 'item' : 'itens'} na lista
                                 </div>
                             </CardContent>
-                            <CardFooter className="border-t pt-4 flex justify-between gap-2">
-                                <Button size="sm" variant="ghost" onClick={() => copyLink(list.slug)}>
-                                    <Share2 className="h-4 w-4 mr-2" />
+
+                            <CardFooter
+                                className="border-t pt-3 pb-3 px-4 flex justify-between gap-2"
+                                onClick={e => e.stopPropagation()}
+                            >
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="gap-1.5 text-xs h-8 px-2 text-gray-600"
+                                    onClick={() => copyLink(list.slug)}
+                                >
+                                    <Share2 className="h-3.5 w-3.5" />
                                     Compartilhar
                                 </Button>
                                 <div className="flex gap-1">
-                                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => navigate(`/buyer/lists/${list.id}`)}>
-                                        <ExternalLink className="h-4 w-4" />
+                                    <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-8 w-8 hover:bg-gray-100"
+                                        title="Abrir lista"
+                                        onClick={() => navigate(`/buyer/lists/${list.id}`)}
+                                    >
+                                        <ExternalLink className="h-3.5 w-3.5" />
                                     </Button>
-                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-red-400 hover:text-red-500 hover:bg-red-50" onClick={() => handleDelete(list.id)}>
-                                        <Trash2 className="h-4 w-4" />
+                                    <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-8 w-8 text-red-400 hover:text-red-500 hover:bg-red-50"
+                                        title="Excluir lista"
+                                        onClick={() => handleDelete(list.id)}
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5" />
                                     </Button>
                                 </div>
                             </CardFooter>
                         </Card>
-                    ))
-                )}
-            </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }

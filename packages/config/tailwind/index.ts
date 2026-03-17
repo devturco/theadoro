@@ -48,10 +48,19 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        graphite: "hsl(var(--graphite))",
+        ivory: {
+          DEFAULT: "hsl(var(--ivory))",
+          dark: "hsl(var(--ivory-dark))",
+        },
         wine: {
           DEFAULT: "hsl(var(--wine))",
           light: "hsl(var(--wine-light))",
           dark: "hsl(var(--wine-dark))",
+          50: "hsl(var(--wine-50))",
+          400: "hsl(var(--wine-400))",
+          500: "hsl(var(--wine-500))",
+          600: "hsl(var(--wine-600))",
         },
         champagne: {
           DEFAULT: "hsl(var(--champagne))",

@@ -1,1 +1,4 @@
-project_id = "xdedlwozqqyhjovdobym"
+project_id = "pfpbaepzvgovqheeqxlg"
+
+[functions.process-payment]
+verify_jwt = false

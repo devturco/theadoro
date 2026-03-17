@@ -3,7 +3,7 @@ import { CartItem } from '@/contexts/CartContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
-import { LoggiService, ShippingQuote } from '@/services/LoggiService';
+import { shippingService, ShippingOption } from '@/services/shippingService';
 import { paymentService } from '@/services/payment.service';
 import { EmailService } from '@/services/EmailService';
 
@@ -74,37 +74,41 @@ export interface Order {
   delivery_schedule?: any;
 }
 
+interface ShippingOverride {
+  price: number;
+  label?: string;
+}
+
 export const useCheckout = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [shippingQuotes, setShippingQuotes] = useState<ShippingQuote[]>([]);
-  const [selectedShipping, setSelectedShipping] = useState<ShippingQuote | null>(null);
-  const { user } = useAuth();
+  const [shippingQuotes, setShippingQuotes] = useState<ShippingOption[]>([]);
+  const [selectedShipping, setSelectedShipping] = useState<ShippingOption | null>(null);
+  const { user, profile } = useAuth();
 
   const getShippingQuotes = useCallback(async (items: CartItem[], zipCode: string) => {
     try {
       setLoading(true);
-      // Map items to ShippingRequest format
       const shippingItems = items.map(item => ({
-        id: item.product.id,
-        quantity: item.quantity
+        weight: item.product.shipping_info?.weight || 1,
+        width: item.product.shipping_info?.width || 20,
+        height: item.product.shipping_info?.height || 20,
+        length: item.product.shipping_info?.depth || 20,
+        quantity: item.quantity,
+        price: item.product.price
       }));
 
-      const quotes = await LoggiService.calculateShipping({ zipCode, items: shippingItems });
-
-      // Fetch Site Settings for Uber
-      const { data: settings } = await (supabase.from as any)('site_settings')
-        .select('*')
-        .in('key', ['shipping_uber_enabled', 'shipping_express_tariff']);
-
-      const uberEnabled = settings?.find(s => s.key === 'shipping_uber_enabled')?.value === true || settings?.find(s => s.key === 'shipping_uber_enabled')?.value === 'true';
-      const expressTariff = Number(settings?.find(s => s.key === 'shipping_express_tariff')?.value || 0);
+      const firstItem = items[0];
+      const quotes = await shippingService.calculateShipping(
+        zipCode,
+        shippingItems,
+        firstItem?.product.seller_id
+      );
 
       // Check Product specific shipping options (from the first item as main reference)
-      const productShippingOptions = items[0]?.product.shipping_options;
+      const productShippingOptions = firstItem?.product.shipping_options;
 
       // Add Seller Delivery option if enabled for this product OR seller profile
-      const firstItem = items[0];
       if (firstItem && firstItem.product.seller_id) {
         const { data: sellerData } = await supabase
           .from('profiles')
@@ -121,34 +125,10 @@ export const useCheckout = () => {
             name: 'Entrega Própria (A combinar)',
             price: 0,
             estimated_delivery: 'Combinar com vendedor',
-            company: {
-              name: 'Vendedor',
-              logo_url: ''
-            }
-          } as any);
+            deliveryTime: 0,
+            company: 'custom'
+          });
         }
-      }
-
-      // Add Uber Direct if enabled in Product OR Site Settings
-      // We check product first.
-      const productUberEnabled = productShippingOptions?.express_delivery;
-
-      if (productUberEnabled || uberEnabled) {
-        // Only add if not already added by some other logic, but quotes logic is simple here.
-        // Ensure we don't duplicate if site settings enabled it AND product enabled it.
-        // Actually, let's treat product setting as an override or specific enabler.
-        // If product explicitly enables 'express_delivery', show it.
-
-        quotes.push({
-          id: 'uber-direct',
-          name: `Entrega Express ${expressTariff > 0 ? `+${expressTariff}%` : ''}`,
-          price: 18.90 * (1 + (expressTariff / 100)), // Base calculation
-          estimated_delivery: 'Entrega em até 90 min',
-          company: {
-            name: 'THEADORO',
-            logo_url: '' 
-          }
-        } as any);
       }
 
       setShippingQuotes(quotes);
@@ -156,6 +136,8 @@ export const useCheckout = () => {
       // Default select the cheapest option
       if (quotes.length > 0) {
         setSelectedShipping(quotes.reduce((prev, curr) => prev.price < curr.price ? prev : curr));
+      } else {
+        setSelectedShipping(null);
       }
       return quotes;
     } catch (err) {
@@ -183,14 +165,14 @@ export const useCheckout = () => {
       errors.push('Email válido é obrigatório');
     }
 
-    if (!data.firstName.trim()) errors.push('Nome é obrigatório');
-    if (!data.lastName.trim()) errors.push('Sobrenome é obrigatório');
-    if (!data.phone.trim()) errors.push('Telefone é obrigatório');
-    if (!data.address.trim()) errors.push('Endereço é obrigatório');
-    if (!data.city.trim()) errors.push('Cidade é obrigatória');
-    if (!data.state.trim()) errors.push('Estado é obrigatório');
-    if (!data.zipCode.trim()) errors.push('CEP é obrigatório');
-    if (!data.country.trim()) errors.push('País é obrigatório');
+    if (!data.firstName?.trim()) errors.push('Nome é obrigatório');
+    if (!data.lastName?.trim()) errors.push('Sobrenome é obrigatório');
+    if (!data.phone?.trim()) errors.push('Telefone é obrigatório');
+    if (!data.address?.trim()) errors.push('Endereço é obrigatório');
+    if (!data.city?.trim()) errors.push('Cidade é obrigatória');
+    if (!data.state?.trim()) errors.push('Estado é obrigatório');
+    if (!data.zipCode?.trim()) errors.push('CEP é obrigatório');
+    if (!data.country?.trim()) errors.push('País é obrigatório');
     if (!data.paymentMethod) errors.push('Método de pagamento é obrigatório');
 
     return errors;
@@ -198,7 +180,8 @@ export const useCheckout = () => {
 
   const processOrder = useCallback(async (
     items: CartItem[],
-    checkoutData: CheckoutData
+    checkoutData: CheckoutData,
+    shippingOverride?: ShippingOverride
   ): Promise<Order | null> => {
     setLoading(true);
     setError(null);
@@ -216,7 +199,7 @@ export const useCheckout = () => {
 
       // 2. Calculate Totals
       const subtotal = items.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-      const shipping = selectedShipping?.price || 0;
+      const shipping = shippingOverride?.price ?? selectedShipping?.price ?? 0;
 
       // Calculate Gift Wrap Price from DB to ensure accuracy
       let giftWrapPrice = 0;
@@ -249,7 +232,7 @@ export const useCheckout = () => {
         name: `${checkoutData.firstName} ${checkoutData.lastName}`.trim(),
         email: checkoutData.email,
         phone: checkoutData.phone,
-        document: checkoutData.document || (user?.user_metadata as any)?.cpf || profile?.document || '00000000000'
+        document: checkoutData.document || (user?.user_metadata as any)?.cpf || (profile as any)?.document || '00000000000'
       };
 
       let paymentResult;
@@ -358,9 +341,13 @@ export const useCheckout = () => {
         notes: notesJson,
       };
 
-      const { data, error: orderError } = await supabase
+      if (shippingOverride?.label) {
+        (orderData as any).shipping_method = shippingOverride.label;
+      }
+
+      const { data, error: orderError } = await (supabase
         .from('orders')
-        .insert(orderData)
+        .insert(orderData as any) as any)
         .select()
         .single();
 
@@ -406,14 +393,14 @@ export const useCheckout = () => {
             service_address: `${checkoutData.street}, ${checkoutData.number}${checkoutData.complement ? ', ' + checkoutData.complement : ''}`,
             status: 'pending',
             notes: `Agendamento automático via pedido #${data.id.slice(0, 8)}. Mensagem: ${checkoutData.giftMessage || 'N/A'}`
-          });
+          } as any);
           if (apptError) console.error('Error creating automatic appointment:', apptError);
         }
       }
 
       // 7. Update Stock (Only for physical products)
       for (const item of items) {
-        if (!item.product.is_service && item.product.stock_quantity !== null) {
+        if (!item.product.is_service && item.product.stock_quantity !== null && item.product.stock_quantity !== undefined) {
           await supabase
             .from('products')
             .update({

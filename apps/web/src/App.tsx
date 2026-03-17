@@ -59,6 +59,7 @@ import AdminContent from '@/pages/admin/AdminContent';
 import AdminSettings from '@/pages/admin/AdminSettings';
 import AdminInsights from '@/pages/admin/AdminInsights';
 import AdminGiftWraps from '@/pages/admin/AdminGiftWraps';
+import AdminCampaigns from '@/pages/admin/AdminCampaigns';
 
 // Seller Pages
 import SellerDashboard from '@/pages/seller/SellerDashboard';
@@ -181,6 +182,7 @@ function App() {
                               <Route path="insights" element={<AdminInsights />} />
                               <Route path="content" element={<AdminContent />} />
                               <Route path="gift-wraps" element={<AdminGiftWraps />} />
+                              <Route path="campaigns" element={<AdminCampaigns />} />
                               <Route path="settings" element={<AdminSettings />} />
                               <Route path="*" element={<AdminDashboard />} />
                             </Routes>

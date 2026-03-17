@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { ArrowRight } from "lucide-react";
 
 interface Category {
   id: string;
@@ -21,7 +22,7 @@ const Categories = () => {
           .from('categories')
           .select('*')
           .eq('is_active', true)
-          .limit(4)
+          .limit(6)
           .order('name');
 
         if (error) throw error;
@@ -30,7 +31,7 @@ const Categories = () => {
           id: cat.id,
           name: cat.name,
           slug: cat.slug || '',
-          image: cat.image_url || 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?q=80&w=2000',
+          image: cat.image_url || 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?q=80&w=800',
           description: cat.description
         })));
       } catch (error) {
@@ -43,44 +44,73 @@ const Categories = () => {
     loadCategories();
   }, []);
 
-  if (isLoading) return <div className="py-20 text-center">Carregando categorias...</div>;
+  if (isLoading) {
+    return (
+      <section className="py-10 sm:py-16 bg-white">
+        <div className="container mx-auto px-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="rounded-2xl bg-gray-100 animate-pulse h-28 sm:h-36" />
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
-    <section className="py-20 bg-background">
+    <section className="py-10 sm:py-16 bg-background">
       <div className="container mx-auto px-4">
-        <div className="text-center mb-12 animate-fade-in">
-          <h2 className="text-4xl font-serif font-bold text-foreground mb-4">
-            Explore Nossas Categorias
-          </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            De presentes clássicos a experiências únicas, encontre exatamente o que procura
-          </p>
+        {/* Section Header */}
+        <div className="flex items-center justify-between mb-6 sm:mb-10">
+          <div>
+            <h2 className="text-xl sm:text-3xl font-serif font-bold text-gray-900">
+              Explore Categorias
+            </h2>
+            <p className="text-sm text-gray-500 mt-1 hidden sm:block">
+              De presentes clássicos a experiências únicas
+            </p>
+          </div>
+          <Link
+            to="/categories"
+            className="flex items-center gap-1 text-sm font-semibold text-wine hover:underline"
+          >
+            Ver todas <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Category Grid — mobile: 2 cols compact, tablet: 3 cols, desktop: 6 cols */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
           {categories.map((category, index) => (
             <Link
               key={category.id}
               to={`/categories/${category.slug}`}
-              className="group relative overflow-hidden rounded-2xl aspect-square shadow-md hover:shadow-wine transition-all duration-500 animate-fade-in"
-              style={{ animationDelay: `${index * 100}ms` }}
+              className="group relative overflow-hidden rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 active:scale-95"
+              style={{ animationDelay: `${index * 60}ms` }}
             >
-              {/* Image */}
-              <div
-                className="absolute inset-0 bg-cover bg-center transform group-hover:scale-110 transition-transform duration-700"
-                style={{ backgroundImage: `url(${category.image})` }}
-              />
+              {/* Fixed-height image container — NOT aspect-square on mobile */}
+              <div className="relative h-28 sm:h-36 lg:h-44 overflow-hidden bg-gray-100">
+                <img
+                  src={category.image}
+                  alt={category.name}
+                  className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
+                  loading="lazy"
+                />
 
-              {/* Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-graphite/90 via-graphite/40 to-transparent" />
+                {/* Strong overlay for legibility — always visible, darker at bottom */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/30 to-transparent" />
 
-              {/* Content */}
-              <div className="absolute inset-0 p-6 flex flex-col justify-end">
-                <h3 className="text-2xl font-serif font-bold text-white mb-2 transform group-hover:translate-y-[-4px] transition-transform duration-300">
-                  {category.name}
-                </h3>
-                <p className="text-white/90 text-sm opacity-0 group-hover:opacity-100 transform translate-y-4 group-hover:translate-y-0 transition-all duration-300">
-                  {category.description}
-                </p>
+                {/* Category name — always visible at bottom */}
+                <div className="absolute bottom-0 left-0 right-0 p-2.5 sm:p-3">
+                  <h3 className="text-white font-bold text-xs sm:text-sm leading-tight drop-shadow-sm">
+                    {category.name}
+                  </h3>
+                  {category.description && (
+                    <p className="text-white/75 text-[9px] sm:text-[10px] mt-0.5 line-clamp-1 hidden sm:block">
+                      {category.description}
+                    </p>
+                  )}
+                </div>
               </div>
             </Link>
           ))}

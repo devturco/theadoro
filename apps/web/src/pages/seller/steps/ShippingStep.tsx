@@ -2,10 +2,13 @@ import { useProductWizard } from '@/hooks/useProductWizard';
 import { Input } from '@theadoro/ui';
 import { Label } from '@theadoro/ui';
 import { Switch } from '@theadoro/ui';
-import { Truck, Weight, Box } from 'lucide-react';
+import { Truck, Weight, Box, MapPin, BadgePercent } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { DEFAULT_FREE_SHIPPING_THRESHOLD } from '@/lib/freeShipping';
 
 export default function ShippingStep() {
     const { productType, productData, updateProductData } = useProductWizard();
+    const shippingOptions = productData.shipping_options || {};
 
     const handleChange = (field: string, value: string) => {
         const currentInfo = productData.shipping_info || {};
@@ -13,6 +16,27 @@ export default function ShippingStep() {
             shipping_info: {
                 ...currentInfo,
                 [field]: Number(value)
+            }
+        });
+    };
+
+    const handleFreeShippingToggle = (checked: boolean) => {
+        updateProductData({
+            shipping_options: {
+                ...shippingOptions,
+                free_shipping_enabled: checked,
+                free_shipping_threshold: checked
+                    ? Number(shippingOptions.free_shipping_threshold || DEFAULT_FREE_SHIPPING_THRESHOLD)
+                    : null,
+            }
+        });
+    };
+
+    const handleFreeShippingThresholdChange = (value: string) => {
+        updateProductData({
+            shipping_options: {
+                ...shippingOptions,
+                free_shipping_threshold: value ? Number(value) : null,
             }
         });
     };
@@ -155,6 +179,53 @@ export default function ShippingStep() {
                             <p className="text-xs text-gray-500 mt-1">Você é responsável por enviar o produto ou combinar a entrega com o cliente. Ideal para produtos ultra-delicados.</p>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <div className="space-y-4 pt-6 border-t border-gray-100">
+                <div className="space-y-1">
+                    <h3 className="font-bold text-gray-900 uppercase text-xs tracking-wider">Frete gratis por valor</h3>
+                    <p className="text-sm text-gray-500">Ative um aviso automatico no carrinho quando o cliente atingir um valor minimo configurado.</p>
+                </div>
+
+                <div className={cn(
+                    "p-4 rounded-xl border-2 transition-all",
+                    shippingOptions.free_shipping_enabled ? "border-wine bg-wine/5 shadow-sm" : "border-gray-100 bg-white"
+                )}>
+                    <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-3">
+                            <div className={cn("p-2 rounded-lg", shippingOptions.free_shipping_enabled ? "bg-wine text-white" : "bg-gray-100 text-gray-400")}>
+                                <BadgePercent className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <Label className="font-bold text-gray-900 cursor-pointer">Mostrar frete gratis no carrinho</Label>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    Exemplo: liberar o aviso quando o carrinho passar de R$ 200,00.
+                                </p>
+                            </div>
+                        </div>
+                        <Switch
+                            checked={Boolean(shippingOptions.free_shipping_enabled)}
+                            onCheckedChange={handleFreeShippingToggle}
+                        />
+                    </div>
+
+                    {shippingOptions.free_shipping_enabled && (
+                        <div className="mt-4 pt-4 border-t border-wine/10">
+                            <Label className="text-xs">Valor minimo do carrinho (R$)</Label>
+                            <div className="relative mt-2 max-w-xs">
+                                <Input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    placeholder={DEFAULT_FREE_SHIPPING_THRESHOLD.toString()}
+                                    value={shippingOptions.free_shipping_threshold || ''}
+                                    onChange={(e) => handleFreeShippingThresholdChange(e.target.value)}
+                                />
+                                <span className="absolute right-3 top-2.5 text-gray-400 text-sm">BRL</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 

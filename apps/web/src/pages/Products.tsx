@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Grid, List, Filter, SlidersHorizontal } from 'lucide-react';
+import { Grid, List, Filter, SlidersHorizontal, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ProductFilters } from '@/types/product';
 import { useProducts } from '@/hooks/useProducts';
 import { ProductGrid } from '@/components/ProductGrid';
@@ -11,6 +11,7 @@ import { Badge } from '@theadoro/ui';
 import { Separator } from '@theadoro/ui';
 import { Sheet, SheetContent, SheetTrigger } from '@theadoro/ui';
 import { cn } from '@/lib/utils';
+
 
 const SORT_OPTIONS = [
   { value: 'relevance', label: 'Mais relevantes' },
@@ -26,7 +27,7 @@ export const Products: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showMobileFilters, setShowMobileFilters] = useState(false);
-  
+
   // Initialize filters from URL params
   const [filters, setFilters] = useState<ProductFilters>(() => {
     const params = Object.fromEntries(searchParams.entries());
@@ -62,7 +63,7 @@ export const Products: React.FC = () => {
   // Update URL when filters change
   useEffect(() => {
     const params = new URLSearchParams();
-    
+
     if (filters.category) params.set('category', filters.category);
     if (filters.minPrice !== undefined) params.set('minPrice', filters.minPrice.toString());
     if (filters.maxPrice !== undefined) params.set('maxPrice', filters.maxPrice.toString());
@@ -111,10 +112,10 @@ export const Products: React.FC = () => {
   const formatResultsText = () => {
     if (loading) return 'Carregando...';
     if (error) return 'Erro ao carregar produtos';
-    
+
     const start = (currentPage - 1) * 24 + 1;
     const end = Math.min(currentPage * 24, totalCount);
-    
+
     return `Mostrando ${start}-${end} de ${totalCount} produtos`;
   };
 
@@ -135,7 +136,7 @@ export const Products: React.FC = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex gap-6">
+        <div className="flex flex-col lg:flex-row gap-6">
           {/* Desktop Sidebar */}
           <div className="hidden lg:block w-80 flex-shrink-0">
             <div className="sticky top-6">
@@ -149,24 +150,25 @@ export const Products: React.FC = () => {
 
           {/* Main Content */}
           <div className="flex-1 min-w-0">
-            {/* Toolbar */}
-            <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  {/* Mobile Filter Button */}
+            {/* Toolbar — Mobile-First Redesign */}
+            <div className="bg-white border border-gray-100 rounded-2xl p-2 sm:p-4 mb-6 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+
+                {/* Filters & Sort (Compact on Mobile) */}
+                <div className="flex items-center gap-2 w-full sm:w-auto">
                   <Sheet open={showMobileFilters} onOpenChange={setShowMobileFilters}>
                     <SheetTrigger asChild>
-                      <Button variant="outline" className="lg:hidden">
-                        <Filter className="h-4 w-4 mr-2" />
-                        Filtros
+                      <Button variant="outline" className="flex-1 lg:hidden h-10 py-0 px-3 rounded-xl border-gray-200">
+                        <Filter className="h-4 w-4 mr-2 text-wine" />
+                        <span className="text-xs font-bold uppercase tracking-tight">Filtros</span>
                         {getActiveFiltersCount() > 0 && (
-                          <Badge variant="secondary" className="ml-2">
+                          <Badge className="ml-1.5 bg-wine text-white h-5 px-1.5 min-w-[18px] justify-center border-none text-[10px]">
                             {getActiveFiltersCount()}
                           </Badge>
                         )}
                       </Button>
                     </SheetTrigger>
-                    <SheetContent side="left" className="w-80 p-0">
+                    <SheetContent side="left" className="w-[85vw] p-0 rounded-r-3xl overflow-hidden">
                       <FilterSidebar
                         filters={filters}
                         onFiltersChange={handleFiltersChange}
@@ -176,141 +178,157 @@ export const Products: React.FC = () => {
                     </SheetContent>
                   </Sheet>
 
-                  {/* Results Count */}
-                  <span className="text-sm text-gray-600">
-                    {formatResultsText()}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-4">
-                  {/* Sort */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600 hidden sm:block">
-                      Ordenar por:
-                    </span>
+                  <div className="lg:hidden flex-1">
                     <Select value={sortBy} onValueChange={handleSortChange}>
-                      <SelectTrigger className="w-40">
-                        <SelectValue />
+                      <SelectTrigger className="w-full h-10 rounded-xl border-gray-200 text-xs font-bold uppercase tracking-tight">
+                        <div className="flex items-center text-gray-700">
+                          <SlidersHorizontal className="h-3.5 w-3.5 mr-2 text-gray-400" />
+                          <SelectValue placeholder="Ordenar" />
+                        </div>
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="rounded-xl shadow-xl">
                         {SORT_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
+                          <SelectItem key={option.value} value={option.value} className="text-xs">
                             {option.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
 
-                  <Separator orientation="vertical" className="h-6" />
+                {/* Counter & View Mode (Desktop mostly) */}
+                <div className="flex items-center justify-between gap-4 w-full sm:w-auto">
+                  <span className="text-[10px] sm:text-sm font-bold text-gray-400 uppercase tracking-widest px-1 sm:px-0">
+                    {formatResultsText()}
+                  </span>
 
-                  {/* View Mode */}
-                  <div className="flex items-center border border-gray-300 rounded-md">
-                    <Button
-                      variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                      size="sm"
-                      onClick={() => setViewMode('grid')}
-                      className="rounded-none rounded-l-md"
-                    >
-                      <Grid className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant={viewMode === 'list' ? 'default' : 'ghost'}
-                      size="sm"
-                      onClick={() => setViewMode('list')}
-                      className="rounded-none rounded-r-md"
-                    >
-                      <List className="h-4 w-4" />
-                    </Button>
+                  <div className="flex items-center gap-4">
+                    {/* Desktop Sort */}
+                    <div className="hidden lg:flex items-center gap-2">
+                      <span className="text-sm text-gray-500 whitespace-nowrap">Ordenar por:</span>
+                      <Select value={sortBy} onValueChange={handleSortChange}>
+                        <SelectTrigger className="w-44 h-10 rounded-xl border-gray-200">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl shadow-xl">
+                          {SORT_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="hidden sm:flex items-center border border-gray-200 rounded-xl overflow-hidden h-10">
+                      <Button
+                        variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                        size="sm"
+                        onClick={() => setViewMode('grid')}
+                        className={cn("rounded-none px-3 border-none", viewMode === 'grid' ? "bg-wine text-white" : "text-gray-500")}
+                      >
+                        <Grid className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant={viewMode === 'list' ? 'default' : 'ghost'}
+                        size="sm"
+                        onClick={() => setViewMode('list')}
+                        className={cn("rounded-none px-3 border-none", viewMode === 'list' ? "bg-wine text-white" : "text-gray-500")}
+                      >
+                        <List className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Active Filters */}
+              {/* Active Filters Row */}
               {getActiveFiltersCount() > 0 && (
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm text-gray-600">Filtros ativos:</span>
-                    
-                    {filters.category && (
-                      <Badge variant="secondary" className="gap-1">
-                        Categoria
-                        <button
-                          onClick={() => handleFiltersChange({ category: undefined })}
-                          className="ml-1 hover:bg-gray-300 rounded-full p-0.5"
-                        >
-                          ×
-                        </button>
-                      </Badge>
-                    )}
-                    
-                    {(filters.minPrice !== undefined || filters.maxPrice !== undefined) && (
-                      <Badge variant="secondary" className="gap-1">
-                        Preço
-                        <button
-                          onClick={() => handleFiltersChange({ minPrice: undefined, maxPrice: undefined })}
-                          className="ml-1 hover:bg-gray-300 rounded-full p-0.5"
-                        >
-                          ×
-                        </button>
-                      </Badge>
-                    )}
-                    
-                    {filters.rating && (
-                      <Badge variant="secondary" className="gap-1">
-                        {filters.rating}+ estrelas
-                        <button
-                          onClick={() => handleFiltersChange({ rating: undefined })}
-                          className="ml-1 hover:bg-gray-300 rounded-full p-0.5"
-                        >
-                          ×
-                        </button>
-                      </Badge>
-                    )}
-                    
-                    {filters.tags && filters.tags.map((tag) => (
-                      <Badge key={tag} variant="secondary" className="gap-1">
-                        {tag}
-                        <button
-                          onClick={() => {
-                            const newTags = filters.tags!.filter(t => t !== tag);
-                            handleFiltersChange({ tags: newTags.length > 0 ? newTags : undefined });
-                          }}
-                          className="ml-1 hover:bg-gray-300 rounded-full p-0.5"
-                        >
-                          ×
-                        </button>
-                      </Badge>
-                    ))}
-                    
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleClearFilters}
-                      className="text-blue-600 hover:text-blue-700"
-                    >
-                      Limpar todos
-                    </Button>
-                  </div>
+                <div className="mt-3 pt-3 border-t border-gray-50 flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">Filtros:</span>
+                  {filters.category && (
+                    <Badge variant="outline" className="gap-1 border-gray-200 text-gray-600 font-medium py-1">
+                      Categoria
+                      <X className="h-3.5 w-3.5 cursor-pointer hover:text-wine" onClick={() => handleFiltersChange({ category: undefined })} />
+                    </Badge>
+                  )}
+                  {(filters.minPrice !== undefined || filters.maxPrice !== undefined) && (
+                    <Badge variant="outline" className="gap-1 border-gray-200 text-gray-600 font-medium py-1">
+                      Preço
+                      <X className="h-3.5 w-3.5 cursor-pointer hover:text-wine" onClick={() => handleFiltersChange({ minPrice: undefined, maxPrice: undefined })} />
+                    </Badge>
+                  )}
+                  {filters.rating && (
+                    <Badge variant="outline" className="gap-1 border-gray-200 text-gray-600 font-medium py-1">
+                      {filters.rating}+ estrelas
+                      <X className="h-3.5 w-3.5 cursor-pointer hover:text-wine" onClick={() => handleFiltersChange({ rating: undefined })} />
+                    </Badge>
+                  )}
+                  {filters.tags && filters.tags.map((tag) => (
+                    <Badge key={tag} variant="outline" className="gap-1 border-gray-200 text-gray-600 font-medium py-1">
+                      {tag}
+                      <X
+                        className="h-3.5 w-3.5 cursor-pointer hover:text-wine"
+                        onClick={() => {
+                          const newTags = filters.tags!.filter(t => t !== tag);
+                          handleFiltersChange({ tags: newTags.length > 0 ? newTags : undefined });
+                        }}
+                      />
+                    </Badge>
+                  ))}
+                  <Button variant="link" size="sm" onClick={handleClearFilters} className="text-wine text-[10px] h-auto p-0 font-bold uppercase ml-auto">
+                    Limpar Tudo
+                  </Button>
                 </div>
               )}
             </div>
 
             {/* Products Grid */}
-            <ProductGrid
-              products={products}
-              loading={loading}
-              error={error}
-              viewMode={viewMode}
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={handlePageChange}
-              emptyMessage={
-                getActiveFiltersCount() > 0
-                  ? 'Nenhum produto encontrado com os filtros selecionados.'
-                  : 'Nenhum produto encontrado.'
-              }
-            />
+            <div className="min-h-[400px]">
+              <ProductGrid
+                products={products}
+                loading={loading}
+                emptyMessage={
+                  getActiveFiltersCount() > 0
+                    ? 'Nenhum produto encontrado com os filtros selecionados.'
+                    : 'Nenhum produto encontrado.'
+                }
+              />
+            </div>
+
+            {/* Simple Mobile-Friendly Pagination */}
+            {totalPages > 1 && (
+              <div className="mt-12 flex items-center justify-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { if (currentPage > 1) handlePageChange(currentPage - 1); }}
+                  disabled={currentPage === 1}
+                  className="rounded-xl border-gray-200"
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Anterior
+                </Button>
+
+                <div className="flex items-center gap-1 mx-2">
+                  <span className="text-xs font-bold text-gray-900">{currentPage}</span>
+                  <span className="text-xs text-gray-400">/</span>
+                  <span className="text-xs text-gray-400">{totalPages}</span>
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { if (currentPage < totalPages) handlePageChange(currentPage + 1); }}
+                  disabled={currentPage === totalPages}
+                  className="rounded-xl border-gray-200"
+                >
+                  Próximo
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </div>

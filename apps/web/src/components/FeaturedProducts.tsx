@@ -62,24 +62,24 @@ const FeaturedProducts = () => {
   if (isLoading) return <div className="py-20 text-center">Carregando destaques...</div>;
 
   return (
-    <section className="py-20 bg-cream">
+    <section className="py-10 sm:py-16 bg-background">
       <div className="container mx-auto px-4">
         {/* ... keeping header ... */}
-        <div className="flex justify-between items-center mb-12">
+        <div className="flex items-center justify-between mb-6 sm:mb-10">
           <div className="animate-fade-in">
-            <h2 className="text-4xl font-serif font-bold text-foreground mb-4">
+            <h2 className="text-xl sm:text-3xl font-serif font-bold text-foreground">
               Produtos em Destaque
             </h2>
-            <p className="text-lg text-muted-foreground">
+            <p className="text-sm text-muted-foreground mt-1 hidden sm:block">
               Selecionados especialmente para você
             </p>
           </div>
-          <Button variant="outline" className="hidden md:flex" asChild>
-            <Link to="/products">Ver Todos os Produtos</Link>
-          </Button>
+          <a href="/products" className="hidden md:inline-flex items-center gap-1 text-sm font-medium border border-border rounded-full px-4 py-2 hover:border-wine hover:text-wine transition-colors">
+            Ver Todos
+          </a>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
           {products.map((product, index) => (
             <ProductCard
               key={product.id}

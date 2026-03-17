@@ -18,6 +18,8 @@ interface Campaign {
     discount_percentage: number;
     starts_at: string;
     ends_at: string;
+    free_shipping_enabled?: boolean;
+    free_shipping_threshold?: number | null;
     is_joined?: boolean;
 }
 
@@ -115,6 +117,11 @@ export default function SellerCampaigns() {
                                                 {campaign.is_joined && (
                                                     <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none">
                                                         <CheckCircle2 className="h-3 w-3 mr-1" /> Inscrito
+                                                    </Badge>
+                                                )}
+                                                {campaign.free_shipping_enabled && (
+                                                    <Badge variant="outline" className="border-wine/20 text-wine">
+                                                        Frete gratis acima de R$ {Number(campaign.free_shipping_threshold || 0).toFixed(2)}
                                                     </Badge>
                                                 )}
                                             </div>

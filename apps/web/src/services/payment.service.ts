@@ -33,6 +33,84 @@ class PaymentService extends BaseService<any> {
         super('orders'); // Base table just for consistency, but we mostly use edge functions
     }
 
+    private async getFreshAccessToken(): Promise<string | null> {
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (!session) {
+            return null;
+        }
+
+        const expiresAtMs = (session.expires_at || 0) * 1000;
+        const shouldRefresh = expiresAtMs > 0 && expiresAtMs <= Date.now() + 60_000;
+
+        if (!shouldRefresh) {
+            return session.access_token;
+        }
+
+        const { data, error } = await supabase.auth.refreshSession({
+            refresh_token: session.refresh_token,
+        });
+
+        if (error) {
+            throw new Error('Sua sessao expirou. Entre novamente para continuar o pagamento.');
+        }
+
+        return data.session?.access_token || null;
+    }
+
+    private async callProcessPayment(payload: Record<string, unknown>, retryOnUnauthorized = true): Promise<PaymentIntent> {
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+        const accessToken = await this.getFreshAccessToken();
+
+        const response = await fetch(`${supabaseUrl}/functions/v1/process-payment`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                apikey: publishableKey,
+                ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+            },
+            body: JSON.stringify(payload),
+        });
+
+        if (response.status === 401 && retryOnUnauthorized) {
+            const { data, error } = await supabase.auth.refreshSession();
+
+            if (error || !data.session?.access_token) {
+                throw new Error('Sua sessao expirou. Entre novamente para continuar o pagamento.');
+            }
+
+            return this.callProcessPayment(payload, false);
+        }
+
+        const responseText = await response.text();
+        let parsed: any = null;
+
+        if (responseText) {
+            try {
+                parsed = JSON.parse(responseText);
+            } catch {
+                parsed = { message: responseText };
+            }
+        }
+
+        if (!response.ok) {
+            const rawMessage =
+                parsed?.error ||
+                parsed?.message ||
+                `Erro ao processar pagamento (${response.status})`;
+
+            const message =
+                response.status === 401 || rawMessage === 'Invalid JWT'
+                    ? 'Sessao invalida no Supabase. Saia e entre novamente. Se continuar, a function process-payment do ambiente live ainda esta protegida por JWT ou foi publicada no projeto errado.'
+                    : rawMessage;
+
+            throw new Error(message);
+        }
+
+        return parsed as PaymentIntent;
+    }
+
     /**
      * Process a credit card payment.
      * @param amount Amount in decimal (e.g. 150.50)
@@ -40,68 +118,53 @@ class PaymentService extends BaseService<any> {
      * @param customer Real customer data from checkout
      */
     async processCard(amount: number, card: CreditCardData | { token: string }, customer: CustomerData): Promise<PaymentIntent> {
-        const { data, error } = await supabase.functions.invoke('process-payment', {
-            body: {
-                gateway: 'pagarme',
-                paymentMethod: 'credit_card',
-                amount,
-                cardToken: card,
-                installments: (card as CreditCardData).installments || 1,
-                customer: {
-                    name: customer.name,
-                    email: customer.email,
-                    document: customer.document,
-                    phone: customer.phone
-                }
+        return this.callProcessPayment({
+            gateway: 'pagarme',
+            paymentMethod: 'credit_card',
+            amount,
+            cardToken: card,
+            installments: (card as CreditCardData).installments || 1,
+            customer: {
+                name: customer.name,
+                email: customer.email,
+                document: customer.document,
+                phone: customer.phone
             }
         });
-
-        if (error) throw new Error(error.message || 'Erro ao processar pagamento');
-        return data as PaymentIntent;
     }
 
     /**
      * Generate a PIX code.
      */
     async generatePix(amount: number, customer: CustomerData): Promise<PaymentIntent> {
-        const { data, error } = await supabase.functions.invoke('process-payment', {
-            body: {
-                gateway: 'asaas', 
-                paymentMethod: 'pix',
-                amount,
-                customer: {
-                    name: customer.name,
-                    email: customer.email,
-                    document: customer.document,
-                    phone: customer.phone
-                }
+        return this.callProcessPayment({
+            gateway: 'pagarme',
+            paymentMethod: 'pix',
+            amount,
+            customer: {
+                name: customer.name,
+                email: customer.email,
+                document: customer.document,
+                phone: customer.phone
             }
         });
-
-        if (error) throw new Error(error.message || 'Erro ao gerar Pix');
-        return data as PaymentIntent;
     }
 
     /**
      * Generate Boleto.
      */
     async generateBoleto(amount: number, customer: CustomerData): Promise<PaymentIntent> {
-        const { data, error } = await supabase.functions.invoke('process-payment', {
-            body: {
-                gateway: 'asaas',
-                paymentMethod: 'boleto',
-                amount,
-                customer: {
-                    name: customer.name,
-                    email: customer.email,
-                    document: customer.document,
-                    phone: customer.phone
-                }
+        return this.callProcessPayment({
+            gateway: 'pagarme',
+            paymentMethod: 'boleto',
+            amount,
+            customer: {
+                name: customer.name,
+                email: customer.email,
+                document: customer.document,
+                phone: customer.phone
             }
         });
-
-        if (error) throw new Error(error.message || 'Erro ao gerar Boleto');
-        return data as PaymentIntent;
     }
 }
 

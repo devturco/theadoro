@@ -59,12 +59,12 @@ export default function SellerDashboard() {
       const { count: totalProducts } = await supabase
         .from('products')
         .select('*', { count: 'exact', head: true })
-        .eq('seller_id', user?.id);
+        .eq('seller_id', user?.id ?? '');
 
       const { count: activeProducts } = await supabase
         .from('products')
         .select('*', { count: 'exact', head: true })
-        .eq('seller_id', user?.id)
+        .eq('seller_id', user?.id ?? '')
         .eq('is_active', true);
 
       const { data: orderItems, error: itemsError } = await supabase
@@ -80,7 +80,7 @@ export default function SellerDashboard() {
             profiles:buyer_id (full_name)
           )
         `)
-        .eq('seller_id', user?.id);
+        .eq('seller_id', user?.id ?? '');
 
       if (itemsError) throw itemsError;
 
@@ -127,7 +127,7 @@ export default function SellerDashboard() {
           appointment_date,
           profiles:buyer_id (full_name)
         `)
-        .eq('seller_id', user?.id)
+        .eq('seller_id', user?.id ?? '')
         .gte('appointment_date', new Date().toISOString())
         .order('appointment_date', { ascending: true })
         .limit(5);
@@ -137,7 +137,7 @@ export default function SellerDashboard() {
       const { count: pendingAppointments } = await supabase
         .from('appointments')
         .select('*', { count: 'exact', head: true })
-        .eq('seller_id', user?.id)
+        .eq('seller_id', user?.id ?? '')
         .eq('status', 'pending');
 
       setMetrics({
@@ -250,13 +250,14 @@ export default function SellerDashboard() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Dashboard do Vendedor</h1>
-          <p className="text-muted-foreground">
-            Visão geral das suas vendas e anúncios
-          </p>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Seller Dashboard</h1>
+          <p className="text-sm text-gray-500">Gerencie seus produtos e acompanhe suas vendas</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {/* Add any action buttons here, e.g., <Button>Add Product</Button> */}
         </div>
       </div>
 
@@ -307,12 +308,14 @@ export default function SellerDashboard() {
             <CardTitle>Pedidos Recentes</CardTitle>
           </CardHeader>
           <CardContent>
-            <DataTable
-              data={metrics.recentOrders}
-              columns={orderColumns}
-              loading={loading}
-              pagination={undefined}
-            />
+            <div className="overflow-x-auto">
+              <DataTable
+                data={metrics.recentOrders}
+                columns={orderColumns}
+                loading={loading}
+                pagination={undefined}
+              />
+            </div>
           </CardContent>
         </Card>
 
@@ -321,12 +324,14 @@ export default function SellerDashboard() {
             <CardTitle>Próximos Agendamentos</CardTitle>
           </CardHeader>
           <CardContent>
-            <DataTable
-              data={metrics.upcomingAppointments}
-              columns={appointmentColumns}
-              loading={loading}
-              pagination={undefined}
-            />
+            <div className="overflow-x-auto">
+              <DataTable
+                data={metrics.upcomingAppointments}
+                columns={appointmentColumns}
+                loading={loading}
+                pagination={undefined}
+              />
+            </div>
           </CardContent>
         </Card>
       </div>

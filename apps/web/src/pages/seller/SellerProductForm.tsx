@@ -5,6 +5,7 @@ import { Button } from '@theadoro/ui';
 import { Input } from '@theadoro/ui';
 import { Label } from '@theadoro/ui';
 import { Textarea } from '@theadoro/ui';
+import { Switch } from '@theadoro/ui';
 import {
     Select,
     SelectContent,
@@ -17,10 +18,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useProducts } from '@/hooks/useProducts';
 import { useCRUD } from '@/hooks/useCRUD';
 import { toast } from 'sonner';
-import { Package, ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2, BadgePercent } from 'lucide-react';
 import { ProductType } from '@/types/product';
-import { supabase } from '@/integrations/supabase/client';
 import { productService } from '@/services/product.service';
+import { DEFAULT_FREE_SHIPPING_THRESHOLD } from '@/lib/freeShipping';
 
 
 
@@ -40,7 +41,11 @@ export default function SellerProductForm() {
         type: 'physical' as ProductType,
         is_active: true,
         images: [] as string[],
-        slug: ''
+        slug: '',
+        shipping_options: {
+            free_shipping_enabled: false,
+            free_shipping_threshold: null as number | null,
+        }
     });
 
     const { createProduct, updateProduct } = useProducts();
@@ -67,7 +72,14 @@ export default function SellerProductForm() {
                     type: data.type as ProductType || 'physical',
                     is_active: data.is_active !== undefined ? data.is_active : true,
                     images: data.images || [],
-                    slug: (data as any).slug || ''
+                    slug: (data as any).slug || '',
+                    shipping_options: {
+                        ...(data.shipping_options || {}),
+                        free_shipping_enabled: Boolean(data.shipping_options?.free_shipping_enabled),
+                        free_shipping_threshold: data.shipping_options?.free_shipping_threshold
+                            ? Number(data.shipping_options.free_shipping_threshold)
+                            : null,
+                    }
                 });
             }
         } catch (error) {
@@ -85,12 +97,23 @@ export default function SellerProductForm() {
 
         setSaving(true);
         try {
+            const payload = {
+                ...formData,
+                shipping_options: {
+                    ...formData.shipping_options,
+                    free_shipping_enabled: Boolean(formData.shipping_options?.free_shipping_enabled),
+                    free_shipping_threshold: formData.shipping_options?.free_shipping_enabled
+                        ? (Number(formData.shipping_options?.free_shipping_threshold) || DEFAULT_FREE_SHIPPING_THRESHOLD)
+                        : null,
+                }
+            };
+
             if (id) {
-                await updateProduct(id, formData);
+                await updateProduct(id, payload);
                 toast.success('Anúncio atualizado com sucesso!');
             } else {
                 await createProduct({
-                    ...formData,
+                    ...payload,
                     seller_id: user.id
                 });
                 toast.success('Anúncio criado com sucesso!');
@@ -111,6 +134,19 @@ export default function SellerProductForm() {
     const handleImageRemove = (index: number) => {
         const newImages = formData.images.filter((_, i) => i !== index);
         setFormData({ ...formData, images: newImages });
+    };
+
+    const handleFreeShippingToggle = (checked: boolean) => {
+        setFormData({
+            ...formData,
+            shipping_options: {
+                ...formData.shipping_options,
+                free_shipping_enabled: checked,
+                free_shipping_threshold: checked
+                    ? (formData.shipping_options?.free_shipping_threshold || DEFAULT_FREE_SHIPPING_THRESHOLD)
+                    : null,
+            }
+        });
     };
 
     if (loadingProduct) {
@@ -240,6 +276,48 @@ export default function SellerProductForm() {
                                         </Select>
                                     </div>
                                 </div>
+                            </div>
+
+                            <div className="grid gap-4 rounded-2xl border border-gray-100 p-5 bg-gray-50/40">
+                                <div className="flex items-start justify-between gap-4">
+                                    <div className="space-y-1">
+                                        <div className="flex items-center gap-2">
+                                            <BadgePercent className="h-4 w-4 text-wine" />
+                                            <Label className="text-sm font-semibold text-gray-700">Frete gratis no carrinho</Label>
+                                        </div>
+                                        <p className="text-sm text-muted-foreground">
+                                            Mostre o aviso de frete gratis quando este anuncio atingir um valor minimo no carrinho.
+                                        </p>
+                                    </div>
+                                    <Switch
+                                        checked={Boolean(formData.shipping_options?.free_shipping_enabled)}
+                                        onCheckedChange={handleFreeShippingToggle}
+                                    />
+                                </div>
+
+                                {formData.shipping_options?.free_shipping_enabled && (
+                                    <div className="grid gap-2 max-w-xs">
+                                        <Label htmlFor="free_shipping_threshold" className="text-sm font-semibold text-gray-700">
+                                            Valor minimo do carrinho (R$)
+                                        </Label>
+                                        <Input
+                                            id="free_shipping_threshold"
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={formData.shipping_options?.free_shipping_threshold || ''}
+                                            onChange={(e) => setFormData({
+                                                ...formData,
+                                                shipping_options: {
+                                                    ...formData.shipping_options,
+                                                    free_shipping_threshold: e.target.value ? Number(e.target.value) : null,
+                                                }
+                                            })}
+                                            className="h-11 rounded-xl"
+                                            placeholder={DEFAULT_FREE_SHIPPING_THRESHOLD.toString()}
+                                        />
+                                    </div>
+                                )}
                             </div>
 
                             {/* Images */}

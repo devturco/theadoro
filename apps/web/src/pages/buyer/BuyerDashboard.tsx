@@ -25,7 +25,7 @@ interface BuyerMetrics {
   favoriteProducts: any[];
 }
 
-export default function BuyerDashboard() {
+const BuyerDashboard = () => {
   const { user, profile } = useAuth();
   const { hasRole } = useRole();
   const navigate = useNavigate();
@@ -63,14 +63,14 @@ export default function BuyerDashboard() {
       const { count: wishCount, error: wishError } = await supabase
         .from('wishlist')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', user?.id);
+        .eq('user_id', user?.id ?? '');
 
       if (wishError) throw wishError;
 
       const { data: apptData, error: apptError } = await supabase
         .from('appointments')
         .select('*')
-        .eq('buyer_id', user?.id)
+        .eq('buyer_id', user?.id ?? '')
         .gte('appointment_date', new Date().toISOString());
 
       if (apptError) throw apptError;
@@ -105,12 +105,13 @@ export default function BuyerDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Olá, {profile?.full_name || 'Cliente'}!</h1>
-          <p className="text-muted-foreground">
-            Bem-vindo ao seu painel pessoal
-          </p>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold">Olá, {profile?.full_name?.split(' ')[0] || 'Presenteado'}!</h1>
+          <p className="text-sm text-muted-foreground">Acompanhe seus pedidos e listas de presentes</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {/* Add any quick actions if needed */}
         </div>
       </div>
 
@@ -181,16 +182,12 @@ export default function BuyerDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {recentOrders.length > 0 ? (
-              recentOrders.map((order) => (
+            {orders && orders.length > 0 ? (
+              orders.slice(0, 5).map((order) => (
                 <div key={order.id} className="flex items-center justify-between p-4 border rounded-lg">
                   <div className="space-y-1">
                     <p className="font-medium">#{order.id.slice(0, 8)}</p>
-                    <p className="text-sm text-muted-foreground">{order.seller?.full_name || 'Vendedor'}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {order.items?.[0]?.product?.name || 'Produto'}
-                      {(order.items?.length || 0) > 1 && ` +${(order.items?.length || 0) - 1} mais`}
-                    </p>
+                    <p className="text-sm text-muted-foreground">Pedido realizado</p>
                   </div>
                   <div className="text-right space-y-1">
                     <p className="font-medium">R$ {order.total_amount.toFixed(2)}</p>
@@ -224,7 +221,7 @@ export default function BuyerDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {extraMetrics.favoriteProducts.length > 0 ? (
+            {extraMetrics.favoriteProducts && extraMetrics.favoriteProducts.length > 0 ? (
               extraMetrics.favoriteProducts.map((product) => (
                 <div key={product.id} className="flex items-center gap-4 p-4 border rounded-lg">
                   <img
@@ -234,10 +231,9 @@ export default function BuyerDashboard() {
                   />
                   <div className="flex-1 space-y-1">
                     <p className="font-medium">{product.name}</p>
-                    <p className="text-sm text-muted-foreground">{product.seller_name}</p>
-                    <p className="font-medium text-wine">R$ {product.price.toFixed(2)}</p>
+                    <p className="text-sm text-muted-foreground">R$ {product.price.toFixed(2)}</p>
                   </div>
-                  <Button size="sm" variant="outline">
+                  <Button size="sm" variant="outline" onClick={() => navigate(`/product/${product.id}`)}>
                     Ver
                   </Button>
                 </div>
@@ -283,9 +279,9 @@ export default function BuyerDashboard() {
             <Star className="h-4 w-4 text-yellow-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">3</div>
+            <div className="text-2xl font-bold">0</div>
             <p className="text-xs text-muted-foreground">
-              produtos para avaliar
+              em breve
             </p>
           </CardContent>
         </Card>
@@ -293,3 +289,5 @@ export default function BuyerDashboard() {
     </div>
   );
 }
+
+export default BuyerDashboard;

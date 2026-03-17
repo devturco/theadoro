@@ -352,11 +352,17 @@ export const Cart: React.FC = () => {
                   </div>
 
                   {/* Shipping Info */}
-                  {cart.shipping === 0 && (
+                  {cart.isFreeShippingApplied && (
                     <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                      <p className="text-sm text-green-800 font-medium">
+                      <p className="text-sm text-green-800 font-medium">Voce ganhou frete gratis!</p>
+                      {/*
                         🎉 Você ganhou frete grátis!
-                      </p>
+                      */}
+                      {cart.freeShippingRule && (
+                        <p className="text-xs text-green-700 mt-1">
+                          Liberado por {cart.freeShippingRule.sourceType === 'campaign' ? 'campanha' : 'anuncio'} acima de {formatPrice(cart.freeShippingRule.threshold)}.
+                        </p>
+                      )}
                     </div>
                   )}
 

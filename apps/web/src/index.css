@@ -9,62 +9,87 @@
 @layer base {
   :root {
     /* Brand Colors */
-    --wine: 357 85% 25%;           /* #720d13 - Primary wine/burgundy */
-    --wine-light: 357 75% 35%;     /* Lighter wine variant */
-    --wine-dark: 357 90% 20%;      /* Darker wine variant */
-    --graphite: 0 0% 13%;          /* #212121 - Secondary graphite */
-    --champagne: 45 60% 80%;       /* Gold/champagne accent */
-    --champagne-dark: 45 50% 65%;  /* Darker champagne */
-    
+    --wine: 346 95% 25%;
+    /* #7D031F - Rich Burgundy */
+    --wine-light: 346 78% 35%;
+    /* Brand wine hover/highlight */
+    --wine-dark: 346 100% 18%;
+    /* Deeper burgundy */
+    --wine-50: 346 60% 96%;
+    --wine-400: 346 72% 39%;
+    --wine-500: 346 95% 25%;
+    --wine-600: 346 100% 18%;
+    --graphite: 0 0% 0%;
+    /* #000000 - All Black */
+    --ivory: 49 100% 97%;
+    /* #FFFCEF - Ivory Cream */
+    --ivory-dark: 49 45% 91%;
+    /* Warmer ivory support tone */
+    --champagne: 49 100% 97%;
+    /* Compatibility alias for Ivory Cream */
+    --champagne-dark: 49 45% 91%;
+    /* Compatibility alias for darker ivory */
+
     /* Neutrals */
-    --cream: 30 20% 97%;           /* Warm background */
-    --beige: 30 15% 92%;           /* Light beige */
-    --gray-light: 0 0% 88%;        /* Light gray */
-    --gray-medium: 0 0% 60%;       /* Medium gray */
-    
+    --cream: 49 100% 97%;
+    /* Main light support background */
+    --beige: 49 30% 93%;
+    /* Soft warm neutral */
+    --gray-light: 49 12% 89%;
+    /* Light gray */
+    --gray-medium: 0 0% 60%;
+    /* Medium gray */
+
     /* Semantic Tokens */
-    --background: 30 20% 97%;      /* Cream background */
-    --foreground: 0 0% 13%;        /* Graphite text */
-    
-    --card: 0 0% 100%;             /* White cards */
-    --card-foreground: 0 0% 13%;
-    
+    --background: 49 100% 97%;
+    /* Ivory Cream background */
+    --foreground: 0 0% 0%;
+    /* All Black text */
+
+    --card: 0 0% 100%;
+    /* White cards */
+    --card-foreground: 0 0% 0%;
+
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 13%;
-    
-    --primary: 357 85% 25%;        /* Wine primary */
+    --popover-foreground: 0 0% 0%;
+
+    --primary: 346 95% 25%;
+    /* Wine primary */
     --primary-foreground: 0 0% 100%;
-    
-    --secondary: 0 0% 13%;         /* Graphite secondary */
+
+    --secondary: 0 0% 0%;
+    /* All black secondary */
     --secondary-foreground: 0 0% 100%;
-    
-    --accent: 45 60% 80%;          /* Champagne accent */
-    --accent-foreground: 0 0% 13%;
-    
-    --muted: 30 15% 92%;           /* Beige muted */
+
+    --accent: 49 100% 97%;
+    /* Ivory accent */
+    --accent-foreground: 0 0% 0%;
+
+    --muted: 49 30% 93%;
+    /* Warm muted */
     --muted-foreground: 0 0% 40%;
-    
+
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
-    
-    --border: 30 15% 88%;
-    --input: 30 15% 92%;
-    --ring: 357 85% 25%;
-    
+
+    --border: 49 18% 88%;
+    --input: 49 30% 93%;
+    --ring: 346 95% 25%;
+
     --radius: 0.75rem;
-    
+
     /* Gradients */
-    --gradient-wine: linear-gradient(135deg, hsl(357 85% 25%), hsl(357 90% 20%));
-    --gradient-champagne: linear-gradient(135deg, hsl(45 60% 80%), hsl(45 50% 65%));
-    --gradient-hero: linear-gradient(135deg, hsl(357 85% 25%) 0%, hsl(357 75% 35%) 50%, hsl(45 60% 80%) 100%);
+    --gradient-wine: linear-gradient(135deg, hsl(var(--wine)), hsl(var(--wine-dark)));
+    --gradient-champagne: linear-gradient(135deg, hsl(var(--champagne)), hsl(var(--champagne-dark)));
+    --gradient-hero: linear-gradient(135deg, hsl(var(--wine)) 0%, hsl(var(--wine-light)) 52%, hsl(var(--ivory)) 100%);
     --gradient-overlay: linear-gradient(180deg, transparent 0%, hsl(0 0% 0% / 0.6) 100%);
-    
+
     /* Shadows */
     --shadow-sm: 0 2px 8px hsl(0 0% 0% / 0.08);
     --shadow-md: 0 4px 16px hsl(0 0% 0% / 0.12);
     --shadow-lg: 0 8px 32px hsl(0 0% 0% / 0.16);
-    --shadow-wine: 0 8px 32px hsl(357 85% 25% / 0.25);
-    
+    --shadow-wine: 0 8px 32px hsl(var(--wine) / 0.25);
+
     /* Transitions */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-slow: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
@@ -91,31 +116,31 @@
   .dark {
     --background: 0 0% 10%;
     --foreground: 0 0% 95%;
-    
+
     --card: 0 0% 13%;
     --card-foreground: 0 0% 95%;
-    
+
     --popover: 0 0% 13%;
     --popover-foreground: 0 0% 95%;
-    
-    --primary: 357 85% 35%;
+
+    --primary: 346 78% 35%;
     --primary-foreground: 0 0% 100%;
-    
+
     --secondary: 0 0% 20%;
     --secondary-foreground: 0 0% 95%;
-    
-    --accent: 45 60% 70%;
+
+    --accent: 49 45% 91%;
     --accent-foreground: 0 0% 13%;
-    
+
     --muted: 0 0% 20%;
     --muted-foreground: 0 0% 65%;
-    
+
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 100%;
-    
+
     --border: 0 0% 20%;
     --input: 0 0% 20%;
-    --ring: 357 85% 35%;
+    --ring: 346 78% 35%;
   }
 }
 
@@ -128,14 +153,20 @@
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
-  
-  h1, h2, h3, h4, h5, h6 {
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: 'Playfair Display', Georgia, serif;
     font-weight: 600;
   }
 }
 
 @layer components {
+
   /* Hero Gradient Text */
   .text-gradient-wine {
     background: var(--gradient-wine);
@@ -143,32 +174,37 @@
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
-  
+
+  .bg-gradient-wine {
+    background: var(--gradient-wine);
+    color: white;
+  }
+
   /* Elegant Cards */
   .card-elegant {
     @apply bg-card rounded-2xl shadow-md hover:shadow-lg transition-all duration-300;
   }
-  
+
   /* Premium Button */
   .btn-wine {
     @apply bg-primary text-primary-foreground hover:opacity-90 shadow-md hover:shadow-wine;
     transition: var(--transition-smooth);
   }
-  
+
   /* Hover Scale */
   .hover-scale {
     transition: var(--transition-smooth);
   }
-  
+
   .hover-scale:hover {
     transform: scale(1.03);
   }
-  
+
   /* Image Overlay */
   .image-overlay {
     position: relative;
   }
-  
+
   .image-overlay::after {
     content: '';
     position: absolute;
@@ -178,8 +214,44 @@
     transition: var(--transition-smooth);
     border-radius: inherit;
   }
-  
+
   .image-overlay:hover::after {
     opacity: 1;
+  }
+}
+
+/* ─── Mobile Utilities ─── */
+@layer utilities {
+
+  /* Prevent iOS zoom on inputs */
+  input,
+  select,
+  textarea {
+    font-size: max(16px, 1em);
+  }
+
+  /* Touch feedback optimization */
+  .touch-action-manipulation {
+    touch-action: manipulation;
+  }
+
+  /* Custom scrollbar hide */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Safe area padding for notch devices */
+  .safe-pb {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  /* Prevent overscroll bounce on mobile nav */
+  .overscroll-contain {
+    overscroll-behavior: contain;
   }
 }

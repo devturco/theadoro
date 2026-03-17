@@ -77,20 +77,20 @@ export const CartItem: React.FC<CartItemProps> = ({
     : 0;
 
   const itemClasses = cn(
-    'bg-white border border-gray-200 rounded-lg p-4',
-    compact && 'p-3',
+    'bg-white border border-gray-200 rounded-xl p-3 sm:p-4',
+    compact && 'p-2',
     className
   );
 
   return (
     <div className={itemClasses}>
-      <div className={cn('flex gap-4', compact && 'gap-3')}>
+      <div className={cn('flex gap-3 sm:gap-4', compact && 'gap-2')}>
         {/* Product Image */}
-        <div className={cn('flex-shrink-0', compact ? 'w-16 h-16' : 'w-20 h-20')}>
+        <div className={cn('flex-shrink-0', compact ? 'w-14 h-14' : 'w-16 h-16 sm:w-20 sm:h-20')}>
           <img
             src={item.product.images?.[0] || '/placeholder-product.jpg'}
             alt={item.product.name}
-            className="w-full h-full object-cover rounded-md"
+            className="w-full h-full object-cover rounded-lg sm:rounded-md"
           />
         </div>
 
@@ -100,13 +100,13 @@ export const CartItem: React.FC<CartItemProps> = ({
             <div className="flex-1 min-w-0">
               <Link
                 to={`/product/${item.product.slug || item.product.id}`}
-                className="text-sm font-medium text-gray-900 hover:text-blue-600 line-clamp-2"
+                className="text-xs sm:text-sm font-semibold text-gray-900 hover:text-wine line-clamp-2 leading-tight"
               >
                 {item.product.name}
               </Link>
 
-              {item.product.seller && (
-                <p className="text-xs text-gray-500 mt-1">
+              {item.product.seller && !compact && (
+                <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5">
                   Vendido por {item.product.seller.name || item.product.seller.full_name}
                 </p>
               )}
@@ -115,32 +115,19 @@ export const CartItem: React.FC<CartItemProps> = ({
               {item.selectedOptions && Object.keys(item.selectedOptions).length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-1">
                   {Object.entries(item.selectedOptions).map(([key, value]) => (
-                    <Badge key={key} variant="outline" className="text-xs">
+                    <Badge key={key} variant="outline" className="text-[9px] sm:text-xs h-4 sm:h-5">
                       {value}
                     </Badge>
                   ))}
                 </div>
               )}
-
-              {/* Stock Status */}
-              {item.product.stock_quantity <= 5 && item.product.stock_quantity > 0 && (
-                <p className="text-xs text-orange-600 mt-1">
-                  Apenas {item.product.stock_quantity} em estoque
-                </p>
-              )}
-
-              {item.product.stock_quantity === 0 && (
-                <p className="text-xs text-red-600 mt-1">
-                  Fora de estoque
-                </p>
-              )}
             </div>
 
             {/* Quick Actions */}
             {!compact && (
-              <div className="flex items-center gap-1 ml-2">
+              <div className="flex items-center gap-0.5 ml-2">
                 <Link to={`/product/${item.product.slug || item.product.id}`}>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 sm:h-8 sm:w-8">
                     <ExternalLink className="h-3 w-3" />
                   </Button>
                 </Link>
@@ -150,7 +137,7 @@ export const CartItem: React.FC<CartItemProps> = ({
                     variant="ghost"
                     size="sm"
                     onClick={handleMoveToWishlist}
-                    className="h-8 w-8 p-0"
+                    className="h-7 w-7 p-0 sm:h-8 sm:w-8"
                     title="Mover para lista de desejos"
                   >
                     <Heart className="h-3 w-3" />
@@ -161,39 +148,34 @@ export const CartItem: React.FC<CartItemProps> = ({
           </div>
 
           {/* Price and Quantity */}
-          <div className="flex items-center justify-between mt-3">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-gray-900">
+          <div className="flex flex-wrap items-center justify-between mt-2 gap-2">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs sm:text-sm font-bold text-gray-900">
                 {formatPrice(item.product.price || 0)}
               </span>
 
-              {hasDiscount && (
-                <>
-                  <span className="text-xs text-gray-500 line-through">
-                    {formatPrice(item.product.original_price!)}
-                  </span>
-                  <Badge variant="destructive" className="text-xs">
-                    -{discountPercentage}%
-                  </Badge>
-                </>
+              {hasDiscount && !compact && (
+                <span className="text-[10px] text-gray-400 line-through">
+                  {formatPrice(item.product.original_price!)}
+                </span>
               )}
             </div>
 
             {/* Quantity Controls */}
             {showActions && (
-              <div className="flex items-center gap-2">
-                <div className="flex items-center border border-gray-300 rounded-md">
+              <div className="flex items-center gap-1.5 sm:gap-2 ml-auto">
+                <div className="flex items-center border border-gray-200 rounded-lg bg-gray-50/50">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => handleQuantityChange(item.quantity - 1)}
                     disabled={item.quantity <= 1 || isUpdating}
-                    className="h-8 w-8 p-0 rounded-none"
+                    className="h-7 w-7 p-0 rounded-none hover:bg-transparent"
                   >
                     <Minus className="h-3 w-3" />
                   </Button>
 
-                  <span className="px-3 py-1 text-sm font-medium min-w-[2rem] text-center">
+                  <span className="px-1 text-xs font-bold min-w-[1.5rem] text-center">
                     {item.quantity}
                   </span>
 
@@ -201,8 +183,8 @@ export const CartItem: React.FC<CartItemProps> = ({
                     variant="ghost"
                     size="sm"
                     onClick={() => handleQuantityChange(item.quantity + 1)}
-                    disabled={item.quantity >= item.product.stock_quantity || isUpdating}
-                    className="h-8 w-8 p-0 rounded-none"
+                    disabled={item.quantity >= (item.product.stock_quantity || 99) || isUpdating}
+                    className="h-7 w-7 p-0 rounded-none hover:bg-transparent"
                   >
                     <Plus className="h-3 w-3" />
                   </Button>
@@ -212,28 +194,24 @@ export const CartItem: React.FC<CartItemProps> = ({
                   variant="ghost"
                   size="sm"
                   onClick={handleRemove}
-                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                  className="h-7 w-7 p-0 text-red-400 hover:text-red-600 hover:bg-red-50"
                   title="Remover item"
                 >
-                  <Trash2 className="h-3 w-3" />
+                  <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
             )}
           </div>
 
-          {/* Total Price */}
-          {item.quantity > 1 && (
-            <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-100">
-              <span className="text-xs text-gray-500">
-                {item.quantity} × {formatPrice(item.product.price)}
-              </span>
-              <span className="text-sm font-semibold text-gray-900">
+          {/* Total Price - Hidden on very small mobile if compact */}
+          {item.quantity > 1 && !compact && (
+            <div className="hidden sm:flex justify-between items-center mt-2 pt-2 border-t border-gray-50">
+              <span className="text-[10px] text-gray-400 uppercase tracking-tight font-bold">Subtotal</span>
+              <span className="text-xs sm:text-sm font-bold text-gray-900">
                 {formatPrice(totalPrice)}
               </span>
             </div>
           )}
-
-
         </div>
       </div>
     </div>

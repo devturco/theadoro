@@ -1,7 +1,14 @@
-import React, { createContext, useContext, useReducer, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useMemo, useState } from 'react';
 import { Product } from '@/types/product';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import {
+  FreeShippingRule,
+  getAppliedFreeShippingRule,
+  getCampaignFreeShippingRules,
+  getProductFreeShippingRules,
+} from '@/lib/freeShipping';
 
 // Interfaces
 export interface CartItem {
@@ -24,6 +31,8 @@ export interface Cart {
   shipping: number;
   discount: number;
   total: number;
+  isFreeShippingApplied: boolean;
+  freeShippingRule: FreeShippingRule | null;
   selectedShipping?: {
     id: string;
     name: string;
@@ -115,9 +124,8 @@ const calculateSubtotal = (items: CartItem[]): number => {
   return items.reduce((total, item) => total + ((item.product.price || 0) * item.quantity), 0);
 };
 
-const calculateShipping = (subtotal: number): number => {
-  // Free shipping for orders over R$ 100
-  return subtotal >= 100 ? 0 : 15;
+const calculateBaseShipping = (items: CartItem[]): number => {
+  return items.length > 0 ? 15 : 0;
 };
 
 const calculateTotal = (subtotal: number, shipping: number, discount: number): number => {
@@ -131,6 +139,7 @@ export const CartContext = createContext<CartContextType | undefined>(undefined)
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const [state, dispatch] = useReducer(cartReducer, { items: [] });
+  const [campaignRules, setCampaignRules] = useState<FreeShippingRule[]>([]);
 
   const cartKey = useMemo(() => {
     return user ? `theadoro-cart-${user.id}` : 'theadoro-cart-guest';
@@ -165,9 +174,111 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [state, cartKey]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadCampaignRules = async () => {
+      const sellerIds = Array.from(
+        new Set(state.items.map((item) => item.product.seller_id).filter(Boolean))
+      );
+
+      if (sellerIds.length === 0) {
+        if (isMounted) {
+          setCampaignRules([]);
+        }
+        return;
+      }
+
+      try {
+        const { data: participations, error: participationsError } = await (supabase.from as any)(
+          'campaign_participants'
+        )
+          .select('campaign_id, seller_id')
+          .in('seller_id', sellerIds);
+
+        if (participationsError) {
+          throw participationsError;
+        }
+
+        const campaignIds = Array.from(
+          new Set((participations || []).map((item: any) => item.campaign_id).filter(Boolean))
+        );
+
+        if (campaignIds.length === 0) {
+          if (isMounted) {
+            setCampaignRules([]);
+          }
+          return;
+        }
+
+        const { data: campaigns, error: campaignsError } = await (supabase.from as any)('campaigns')
+          .select('id, title, free_shipping_enabled, free_shipping_threshold, starts_at, ends_at, is_active')
+          .in('id', campaignIds)
+          .eq('is_active', true);
+
+        if (campaignsError) {
+          throw campaignsError;
+        }
+
+        const now = Date.now();
+        const activeCampaigns = new Map(
+          (campaigns || [])
+            .filter((campaign: any) => {
+              const startsAt = campaign.starts_at ? new Date(campaign.starts_at).getTime() : now;
+              const endsAt = campaign.ends_at ? new Date(campaign.ends_at).getTime() : now;
+
+              return startsAt <= now && now <= endsAt;
+            })
+            .map((campaign: any) => [campaign.id, campaign])
+        );
+
+        const rules = getCampaignFreeShippingRules(
+          (participations || [])
+            .map((participation: any) => {
+              const campaign = activeCampaigns.get(participation.campaign_id);
+
+              if (!campaign) {
+                return null;
+              }
+
+              return {
+                ...campaign,
+                seller_id: participation.seller_id,
+              };
+            })
+            .filter(Boolean)
+        );
+
+        if (isMounted) {
+          setCampaignRules(rules);
+        }
+      } catch (error) {
+        console.error('Error loading free shipping campaigns:', error);
+        if (isMounted) {
+          setCampaignRules([]);
+        }
+      }
+    };
+
+    loadCampaignRules();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [state.items]);
+
   // Calculate cart totals
   const subtotal = calculateSubtotal(state.items);
-  const shipping = state.selectedShipping ? state.selectedShipping.price : calculateShipping(subtotal);
+  const productRules = useMemo(() => getProductFreeShippingRules(state.items), [state.items]);
+  const freeShippingRule = useMemo(
+    () => getAppliedFreeShippingRule(subtotal, [...productRules, ...campaignRules]),
+    [campaignRules, productRules, subtotal]
+  );
+  const shipping = freeShippingRule
+    ? 0
+    : state.selectedShipping
+      ? state.selectedShipping.price
+      : calculateBaseShipping(state.items);
   const discount = 0; // TODO: Implement discount logic
   const total = calculateTotal(subtotal, shipping, discount);
 
@@ -177,6 +288,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     shipping,
     discount,
     total,
+    isFreeShippingApplied: Boolean(freeShippingRule),
+    freeShippingRule,
     selectedShipping: state.selectedShipping
   };
 
