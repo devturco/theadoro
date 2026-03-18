@@ -418,6 +418,10 @@ const AdminOrders = () => {
             const giftOptions = notes.giftOptions || selectedOrder.gift_options;
             const deliverySchedule = notes.deliverySchedule || selectedOrder.delivery_schedule;
             const paymentInfo = notes.paymentInfo;
+            const hasValidScheduleDate = Boolean(
+              deliverySchedule?.scheduled_date &&
+              !Number.isNaN(new Date(deliverySchedule.scheduled_date).getTime())
+            );
 
             // Derived amounts with fallback to notes
             const giftWrapPrice = notes.gift_wrap_price || notes.giftWrapPrice || 0;
@@ -475,7 +479,7 @@ const AdminOrders = () => {
                             <p className="font-medium flex items-center gap-2 text-blue-600">
                               <Calendar className="h-3 w-3" /> Agendamento
                             </p>
-                            <p>Data: {new Date(deliverySchedule.scheduled_date).toLocaleDateString('pt-BR')}</p>
+                            <p>Data: {hasValidScheduleDate ? new Date(deliverySchedule.scheduled_date).toLocaleDateString('pt-BR') : 'A definir'}</p>
                             <p>Período: {deliverySchedule.scheduled_slot === 'morning' ? 'Manhã' : deliverySchedule.scheduled_slot === 'afternoon' ? 'Tarde' : 'Comercial'}</p>
                           </div>
                         )}
@@ -522,10 +526,31 @@ const AdminOrders = () => {
                         {paymentInfo && (
                           <div className="bg-gray-50 p-2 rounded text-[10px] text-muted-foreground mt-2">
                             <p>Transaction ID: {paymentInfo.id}</p>
+                            {paymentInfo.isTestMode && (
+                              <p className="font-medium text-amber-700">Modo teste do Pagar.me</p>
+                            )}
+                            {paymentInfo.pixExpiration && (
+                              <p>
+                                Expira em:{' '}
+                                {Number.isNaN(new Date(paymentInfo.pixExpiration).getTime())
+                                  ? paymentInfo.pixExpiration
+                                  : new Date(paymentInfo.pixExpiration).toLocaleString('pt-BR')}
+                              </p>
+                            )}
                             {paymentInfo.pixCode && (
                               <div className="mt-1 break-all">
                                 <span className="font-semibold">PIX:</span> {paymentInfo.pixCode.slice(0, 30)}...
                               </div>
+                            )}
+                            {paymentInfo.pixUrl && (
+                              <div className="mt-1 break-all">
+                                <span className="font-semibold">QR URL:</span> {paymentInfo.pixUrl}
+                              </div>
+                            )}
+                            {!paymentInfo.pixCode && !paymentInfo.pixUrl && selectedOrder.payment_method === 'pix' && (
+                              <p className="mt-1 text-amber-700">
+                                O gateway ainda nÃ£o retornou o payload do PIX.
+                              </p>
                             )}
                           </div>
                         )}

@@ -186,6 +186,28 @@ export const useCheckout = () => {
     return errors;
   }, []);
 
+  const buildPaymentIdempotencyKey = useCallback((items: CartItem[], data: CheckoutData, total: number) => {
+    const itemSignature = [...items]
+      .map((item) => `${item.product.id}:${item.quantity}`)
+      .sort()
+      .join('|');
+
+    const raw = [
+      user?.id || data.email.toLowerCase(),
+      data.paymentMethod,
+      data.zipCode.replace(/\D/g, ''),
+      Math.round(total * 100).toString(),
+      itemSignature
+    ].join(':');
+
+    let hash = 7;
+    for (const char of raw) {
+      hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+    }
+
+    return `checkout:${data.paymentMethod}:${Math.round(total * 100)}:${hash.toString(16)}`;
+  }, [user?.id]);
+
   const processOrder = useCallback(async (
     items: CartItem[],
     checkoutData: CheckoutData,
@@ -234,6 +256,8 @@ export const useCheckout = () => {
 
       const total = subtotal + shipping + giftWrapPrice - discount;
       const tax = 0; // Tax is currently not part of the active pricing model but kept for interface consistency
+      const paymentIdempotencyKey = buildPaymentIdempotencyKey(items, checkoutData, total);
+      const paymentDescription = `Pedido TheAdoro - ${items.length} item(ns)`;
 
       // 3. Process Payment
       const customerData = {
@@ -255,12 +279,21 @@ export const useCheckout = () => {
           expiry: checkoutData.paymentDetails.cardExpiry || '',
           cvv: checkoutData.paymentDetails.cardCvv || '',
           installments: checkoutData.paymentDetails.installments || 1
-        }, customerData);
+        }, customerData, {
+          idempotencyKey: paymentIdempotencyKey,
+          description: paymentDescription
+        } as any);
       } else if (checkoutData.paymentMethod === 'pix') {
-        paymentResult = await paymentService.generatePix(total, customerData);
+        paymentResult = await paymentService.generatePix(total, customerData, {
+          idempotencyKey: paymentIdempotencyKey,
+          description: paymentDescription
+        });
       } else {
         // Boleto
-        paymentResult = await paymentService.generateBoleto(total, customerData);
+        paymentResult = await paymentService.generateBoleto(total, customerData, {
+          idempotencyKey: paymentIdempotencyKey,
+          description: paymentDescription
+        });
       }
 
       if (paymentResult.status === 'failed') {
@@ -392,6 +425,59 @@ export const useCheckout = () => {
         throw itemsError;
       }
 
+      const paymentStatus =
+        paymentResult.status === 'succeeded'
+          ? 'approved'
+          : paymentResult.status === 'failed'
+            ? 'failed'
+            : 'pending';
+
+      const paymentMetadata = {
+        method: checkoutData.paymentMethod,
+        pixCode: paymentResult.pix_code || null,
+        pixUrl: paymentResult.pix_url || null,
+        pixExpiration: paymentResult.pix_expiration || null,
+        boletoUrl: paymentResult.boleto_url || null,
+        isTestMode: paymentResult.is_test_mode || false,
+        customerEmail: checkoutData.email,
+      };
+
+      const { data: paymentRow, error: paymentPersistenceError } = await (supabase
+        .from('payments' as any)
+        .insert({
+          order_id: data.id,
+          provider: 'pagarme',
+          provider_transaction_id: paymentResult.id,
+          idempotency_key: paymentIdempotencyKey,
+          amount: total,
+          status: paymentStatus,
+          metadata: paymentMetadata,
+        })
+        .select()
+        .single() as any);
+
+      if (paymentPersistenceError) {
+        console.error('Payment persistence FAILED:', paymentPersistenceError);
+      } else {
+        const { error: paymentEventError } = await supabase
+          .from('payment_events' as any)
+          .insert({
+            payment_id: paymentRow.id,
+            order_id: data.id,
+            provider: 'pagarme',
+            event_type: 'checkout_payment_created',
+            payload: {
+              paymentResult,
+              checkoutPaymentMethod: checkoutData.paymentMethod,
+            },
+            processed_at: new Date().toISOString(),
+          } as any);
+
+        if (paymentEventError) {
+          console.error('Payment event persistence FAILED:', paymentEventError);
+        }
+      }
+
       // 6. Create Appointments for Services
       for (const item of items) {
         if (item.product.is_service) {
@@ -474,7 +560,7 @@ export const useCheckout = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, selectedShipping, calculateTax, validateCheckoutData]);
+  }, [user, selectedShipping, calculateTax, validateCheckoutData, buildPaymentIdempotencyKey]);
 
   const getOrderById = useCallback(async (orderId: string): Promise<Order | null> => {
     try {

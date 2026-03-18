@@ -8,6 +8,8 @@ const corsHeaders = {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
 serve(async (req) => {
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders })
@@ -27,10 +29,119 @@ serve(async (req) => {
             cardToken,
             installments,
             description,
-            orderId
+            orderId,
+            idempotencyKey
         } = await req.json()
 
         const sanitize = (str: string) => str ? str.replace(/\D/g, '') : ''
+        const mergePixDetails = (current: any, next: any) => ({
+            pix_code: current?.pix_code || next?.pix_code || null,
+            pix_url: current?.pix_url || next?.pix_url || null,
+            pix_expiration: current?.pix_expiration || next?.pix_expiration || null,
+        })
+        const extractPixDetails = (source: any) => {
+            const candidates = [
+                source,
+                source?.pix,
+                source?.transaction,
+                source?.last_transaction,
+                source?.gateway_response,
+                source?.gateway_response?.pix,
+                source?.gateway_response?.transaction,
+                source?.gateway_response?.last_transaction,
+                source?.charges?.[0],
+                source?.charges?.[0]?.pix,
+                source?.charges?.[0]?.transaction,
+                source?.charges?.[0]?.last_transaction,
+            ].filter(Boolean)
+
+            return candidates.reduce(
+                (acc, candidate) =>
+                    mergePixDetails(acc, {
+                        pix_code:
+                            candidate?.qr_code ||
+                            candidate?.emv ||
+                            candidate?.copy_paste ||
+                            candidate?.copy_and_paste ||
+                            candidate?.pix_payload ||
+                            candidate?.payload ||
+                            null,
+                        pix_url:
+                            candidate?.qr_code_url ||
+                            candidate?.pix_url ||
+                            candidate?.qrcode_url ||
+                            candidate?.url ||
+                            null,
+                        pix_expiration:
+                            candidate?.expires_at ||
+                            candidate?.expiration_date ||
+                            candidate?.expires_on ||
+                            candidate?.due_at ||
+                            null,
+                    }),
+                { pix_code: null, pix_url: null, pix_expiration: null }
+            )
+        }
+        const fetchPagarmeJson = async (path: string, secretKey: string) => {
+            const response = await fetch(`https://api.pagar.me/core/v5${path}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Basic ' + btoa(secretKey + ':')
+                }
+            })
+
+            if (!response.ok) {
+                return null
+            }
+
+            return response.json()
+        }
+        const fetchPixDetailsWithRetry = async ({
+            secretKey,
+            orderId,
+            chargeId,
+            initialSources,
+        }: {
+            secretKey: string
+            orderId?: string
+            chargeId?: string
+            initialSources?: any[]
+        }) => {
+            let pixDetails = { pix_code: null, pix_url: null, pix_expiration: null }
+
+            for (const source of initialSources || []) {
+                pixDetails = mergePixDetails(pixDetails, extractPixDetails(source))
+            }
+
+            const attemptDelays = [0, 400, 900, 1500]
+
+            for (const delay of attemptDelays) {
+                if (pixDetails.pix_code || pixDetails.pix_url) {
+                    break
+                }
+
+                if (delay > 0) {
+                    await wait(delay)
+                }
+
+                if (orderId) {
+                    const orderData = await fetchPagarmeJson(`/orders/${orderId}`, secretKey)
+                    if (orderData) {
+                        pixDetails = mergePixDetails(pixDetails, extractPixDetails(orderData))
+                    }
+                }
+
+                if (chargeId) {
+                    const chargeData = await fetchPagarmeJson(`/charges/${chargeId}`, secretKey)
+                    if (chargeData) {
+                        pixDetails = mergePixDetails(pixDetails, extractPixDetails(chargeData))
+                    }
+                }
+            }
+
+            return pixDetails
+        }
 
         // 1. Fetch Settings
         const { data: settings, error: settingsError } = await supabaseClient
@@ -67,7 +178,8 @@ serve(async (req) => {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': 'Basic ' + btoa(secretKey + ':')
+                    'Authorization': 'Basic ' + btoa(secretKey + ':'),
+                    ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {})
                 },
                 body: JSON.stringify({
                     items: [{
@@ -120,12 +232,21 @@ serve(async (req) => {
             }
 
             const charge = data.charges[0]
+            const pixDetails = paymentMethod === 'pix'
+                ? await fetchPixDetailsWithRetry({
+                    secretKey,
+                    orderId: data.id,
+                    chargeId: charge?.id,
+                    initialSources: [data, charge],
+                })
+                : extractPixDetails(charge)
+
             result = {
                 id: data.id,
                 status: charge.status === 'paid' ? 'succeeded' : 'pending',
-                pix_code: charge.last_transaction?.qr_code,
-                pix_url: charge.last_transaction?.qr_code_url,
-                pix_expiration: charge.last_transaction?.expires_at,
+                pix_code: pixDetails.pix_code,
+                pix_url: pixDetails.pix_url,
+                pix_expiration: pixDetails.pix_expiration,
                 is_test_mode: isTestMode,
                 gateway_response: data
             }

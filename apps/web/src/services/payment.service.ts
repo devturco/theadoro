@@ -30,6 +30,12 @@ export interface CustomerData {
     document: string; // CPF/CNPJ
 }
 
+export interface PaymentRequestOptions {
+    orderId?: string;
+    idempotencyKey?: string;
+    description?: string;
+}
+
 class PaymentService extends BaseService<any> {
     constructor() {
         super('orders'); // Base table just for consistency, but we mostly use edge functions
@@ -119,13 +125,21 @@ class PaymentService extends BaseService<any> {
      * @param card Card data or token. SECURITY: Use token from Pagarme.js/Stripe.js in production.
      * @param customer Real customer data from checkout
      */
-    async processCard(amount: number, card: CreditCardData | { token: string }, customer: CustomerData): Promise<PaymentIntent> {
+    async processCard(
+        amount: number,
+        card: CreditCardData | { token: string },
+        customer: CustomerData,
+        options?: PaymentRequestOptions
+    ): Promise<PaymentIntent> {
         return this.callProcessPayment({
             gateway: 'pagarme',
             paymentMethod: 'credit_card',
             amount,
             cardToken: card,
             installments: (card as CreditCardData).installments || 1,
+            orderId: options?.orderId,
+            idempotencyKey: options?.idempotencyKey,
+            description: options?.description,
             customer: {
                 name: customer.name,
                 email: customer.email,
@@ -138,11 +152,14 @@ class PaymentService extends BaseService<any> {
     /**
      * Generate a PIX code.
      */
-    async generatePix(amount: number, customer: CustomerData): Promise<PaymentIntent> {
+    async generatePix(amount: number, customer: CustomerData, options?: PaymentRequestOptions): Promise<PaymentIntent> {
         return this.callProcessPayment({
             gateway: 'pagarme',
             paymentMethod: 'pix',
             amount,
+            orderId: options?.orderId,
+            idempotencyKey: options?.idempotencyKey,
+            description: options?.description,
             customer: {
                 name: customer.name,
                 email: customer.email,
@@ -155,11 +172,14 @@ class PaymentService extends BaseService<any> {
     /**
      * Generate Boleto.
      */
-    async generateBoleto(amount: number, customer: CustomerData): Promise<PaymentIntent> {
+    async generateBoleto(amount: number, customer: CustomerData, options?: PaymentRequestOptions): Promise<PaymentIntent> {
         return this.callProcessPayment({
             gateway: 'pagarme',
             paymentMethod: 'boleto',
             amount,
+            orderId: options?.orderId,
+            idempotencyKey: options?.idempotencyKey,
+            description: options?.description,
             customer: {
                 name: customer.name,
                 email: customer.email,
