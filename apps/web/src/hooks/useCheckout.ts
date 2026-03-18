@@ -44,6 +44,7 @@ export interface CheckoutData {
     cardExpiry?: string;
     cardCvv?: string;
     installments?: number;
+    cardToken?: string;
   };
 
   // Additional Options
@@ -433,14 +434,13 @@ export const useCheckout = () => {
       if (checkoutData.paymentMethod === 'credit_card' || checkoutData.paymentMethod === 'debit_card') {
         if (!checkoutData.paymentDetails?.cardNumber) throw new Error('Dados do cartão incompletos');
 
-        // SECURITY WARNING: In a real production app, use client-side tokenization (Stripe.js, Pagarme.js)
-        // Never send raw card data to your backend.
-        const cardToken = await paymentService.tokenizeCard({
-          number: checkoutData.paymentDetails.cardNumber,
-          name: checkoutData.paymentDetails.cardName || '',
-          expiry: checkoutData.paymentDetails.cardExpiry || '',
-          cvv: checkoutData.paymentDetails.cardCvv || '',
-        });
+        // Tokenize on the client right before submitting the payment.
+        // TODO: migrate this direct token API call to the official Pagar.me tokenizecard.js loader.
+        const cardToken = checkoutData.paymentDetails?.cardToken;
+
+        if (!cardToken) {
+          throw new Error('Não foi possível tokenizar o cartão com o fluxo oficial do Pagar.me.');
+        }
 
         paymentResult = await paymentService.processCard(total, {
           token: cardToken,

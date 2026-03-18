@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@theadoro/ui';
 import { Button } from '@theadoro/ui';
@@ -28,6 +28,10 @@ import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { Checkbox } from '@theadoro/ui';
 import { Badge } from '@theadoro/ui';
 import { paymentService } from '@/services/payment.service';
+import {
+    PagarmeTokenizecardForm,
+    type PagarmeTokenizecardFormHandle,
+} from '@/components/payments/PagarmeTokenizecardForm';
 
 const renderMarkdown = (text: string) => {
     if (!text) return '';
@@ -77,6 +81,7 @@ export default function SellerOnboarding() {
     const [paymentMethod, setPaymentMethod] = useState<'credit' | 'pix'>('credit');
     const [cardData, setCardData] = useState({ number: '', name: '', expiry: '', cvv: '', installments: 1 });
     const [pixData, setPixData] = useState<{ qr_code?: string, qr_code_url?: string } | null>(null);
+    const pagarmeTokenizecardRef = useRef<PagarmeTokenizecardFormHandle | null>(null);
 
     // Form State
     const [formData, setFormData] = useState({
@@ -179,12 +184,11 @@ export default function SellerOnboarding() {
             };
 
             if (paymentMethod === 'credit') {
-                const cardToken = await paymentService.tokenizeCard({
-                    number: cardData.number,
-                    name: cardData.name,
-                    expiry: cardData.expiry,
-                    cvv: cardData.cvv,
-                });
+                const cardToken = await pagarmeTokenizecardRef.current?.tokenize();
+
+                if (!cardToken) {
+                    throw new Error('Não foi possível tokenizar o cartão com o fluxo oficial do Pagar.me.');
+                }
 
                 const result = await paymentService.processCard(selectedPlan.price, {
                     token: cardToken,
@@ -284,6 +288,14 @@ export default function SellerOnboarding() {
 
     return (
         <div className="min-h-screen bg-background pb-20">
+            <PagarmeTokenizecardForm
+                ref={pagarmeTokenizecardRef}
+                enabled={paymentMethod === 'credit'}
+                holderName={cardData.name}
+                cardNumber={cardData.number}
+                cardExpiry={cardData.expiry}
+                cardCvv={cardData.cvv}
+            />
             <div className="container max-w-4xl mx-auto px-4 pt-12">
                 {currentStep !== 'success' && (
                     <div className="mb-8">
@@ -373,7 +385,15 @@ export default function SellerOnboarding() {
                                 <div className="flex items-center space-x-2"><RadioGroupItem value="pix" id="p"/><Label htmlFor="pix">Pix</Label></div>
                             </RadioGroup>
                             {paymentMethod === 'credit' ? (
+                                <>
+                                <div className="space-y-2">
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <Input placeholder="MM/AA" value={cardData.expiry} onChange={e => setCardData({...cardData, expiry: e.target.value})} />
+                                        <Input placeholder="CVV" value={cardData.cvv} onChange={e => setCardData({...cardData, cvv: e.target.value})} />
+                                    </div>
+                                </div>
                                 <div className="space-y-2"><Input placeholder="Número" onChange={e => setCardData({...cardData, number: e.target.value})} /><Input placeholder="Nome" onChange={e => setCardData({...cardData, name: e.target.value})} /></div>
+                                </>
                             ) : (
                                 <div className="text-center">{pixData ? <img src={pixData.qr_code_url} className="mx-auto w-40" /> : <p>Clique em Pagar para gerar o Pix</p>}</div>
                             )}

@@ -179,7 +179,7 @@ class PaymentService extends BaseService<any> {
         return parsed as PaymentIntent;
     }
 
-    private async getPagarmeClientConfig(): Promise<PagarmeClientConfig> {
+    async getPagarmeClientConfig(): Promise<PagarmeClientConfig> {
         const { data, error } = await supabase
             .from('site_settings' as any)
             .select('key, value')
@@ -208,6 +208,7 @@ class PaymentService extends BaseService<any> {
         return { testMode, publicKey };
     }
 
+    // Alternative path from the official docs for environments where tokenizecard.js cannot be embedded.
     async tokenizeCard(card: Omit<CreditCardData, 'installments'>): Promise<string> {
         const { publicKey } = await this.getPagarmeClientConfig();
         const [expMonth, expYear] = (card.expiry || '').split('/');
@@ -245,7 +246,7 @@ class PaymentService extends BaseService<any> {
     /**
      * Process a credit card payment.
      * @param amount Amount in decimal (e.g. 150.50)
-     * @param card Card data or token. SECURITY: Use token from Pagarme.js/Stripe.js in production.
+     * @param card Card data or token. Prefer token generated client-side via the official Pagar.me tokenizecard.js flow.
      * @param customer Real customer data from checkout
      */
     async processCard(

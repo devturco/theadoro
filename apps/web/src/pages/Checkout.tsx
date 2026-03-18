@@ -17,6 +17,10 @@ import { useCart } from '@/hooks/useCart';
 import { useCheckout } from '@/hooks/useCheckout';
 import { GiftOptions } from '@/components/checkout/GiftOptions';
 import { GiftOptions as GiftOptionsType, DeliverySchedule as DeliveryScheduleType } from '@/types/order';
+import {
+  PagarmeTokenizecardForm,
+  type PagarmeTokenizecardFormHandle,
+} from '@/components/payments/PagarmeTokenizecardForm';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -109,6 +113,7 @@ export const Checkout: React.FC = () => {
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
   const [searchingCep, setSearchingCep] = useState(false);
+  const pagarmeTokenizecardRef = useRef<PagarmeTokenizecardFormHandle | null>(null);
   const lastAutoFetchedCepRef = useRef<string | null>(null);
   const lastAutoQuotedCepRef = useRef<string | null>(null);
 
@@ -482,12 +487,28 @@ export const Checkout: React.FC = () => {
 
     setIsProcessing(true);
     try {
+      const cardToken =
+        formData.paymentMethod === 'credit' || formData.paymentMethod === 'debit'
+          ? await pagarmeTokenizecardRef.current?.tokenize()
+          : undefined;
+
       const order = await processOrder(cart.items as any, {
         ...formData,
         paymentMethod: formData.paymentMethod === 'credit' ? 'credit_card' : formData.paymentMethod === 'debit' ? 'debit_card' : 'pix',
         address: `${formData.street}, ${formData.number}`,
         country: 'Brasil', // Ensure country is passed
         document: formData.document,
+        paymentDetails:
+          formData.paymentMethod === 'credit' || formData.paymentMethod === 'debit'
+            ? {
+                cardNumber: formData.cardNumber,
+                cardName: formData.cardName,
+                cardExpiry: formData.cardExpiry,
+                cardCvv: formData.cardCvv,
+                installments: formData.installments,
+                cardToken,
+              }
+            : undefined,
       } as any, cart.isFreeShippingApplied ? {
         price: 0,
         label: 'Frete gratis'
@@ -514,6 +535,14 @@ export const Checkout: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50/50 pb-32 pt-2 sm:pt-10">
+      <PagarmeTokenizecardForm
+        ref={pagarmeTokenizecardRef}
+        enabled={formData.paymentMethod === 'credit' || formData.paymentMethod === 'debit'}
+        holderName={formData.cardName}
+        cardNumber={formData.cardNumber}
+        cardExpiry={formData.cardExpiry}
+        cardCvv={formData.cardCvv}
+      />
       <Dialog
         open={profileGateOpen}
         onOpenChange={(open) => {
@@ -880,6 +909,7 @@ export const Checkout: React.FC = () => {
 
                 {formData.paymentMethod === 'credit' && (
                   <div className="space-y-5 py-4 border-t border-gray-50">
+                    <div className="space-y-1.5"><Label className="text-xs font-bold text-gray-500 uppercase px-1">Nome no Cartão</Label><Input placeholder="Como está impresso no cartão" value={formData.cardName} onChange={e => handleInputChange('cardName', e.target.value)} className="rounded-xl bg-gray-50 h-12" /></div>
                     <div className="space-y-1.5"><Label className="text-xs font-bold text-gray-500 uppercase px-1">Número do Cartão</Label><Input placeholder="0000 0000 0000 0000" value={formData.cardNumber} onChange={e => handleInputChange('cardNumber', e.target.value)} className="rounded-xl bg-gray-50 h-12" /></div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5"><Label className="text-xs font-bold text-gray-500 uppercase px-1">Validade</Label><Input placeholder="MM/AA" value={formData.cardExpiry} onChange={e => handleInputChange('cardExpiry', e.target.value)} className="rounded-xl bg-gray-50 h-12" /></div>
