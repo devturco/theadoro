@@ -419,6 +419,10 @@ const AdminOrders = () => {
             const deliverySchedule = notes.deliverySchedule || selectedOrder.delivery_schedule;
             const paymentInfo = notes.paymentInfo;
             const paymentMetadata = (selectedOrder as any).payments?.[0]?.metadata;
+            const gatewayErrorMessage =
+              paymentMetadata?.gatewayErrorMessage ||
+              paymentMetadata?.gatewayResponse?.charges?.[0]?.last_transaction?.gateway_response?.errors?.[0]?.message ||
+              null;
             const hasValidScheduleDate = Boolean(
               deliverySchedule?.scheduled_date &&
               !Number.isNaN(new Date(deliverySchedule.scheduled_date).getTime())
@@ -551,6 +555,11 @@ const AdminOrders = () => {
                             {!paymentInfo.pixCode && !paymentInfo.pixUrl && selectedOrder.payment_method === 'pix' && (
                               <p className="mt-1 text-amber-700">
                                 O gateway ainda nÃ£o retornou o payload do PIX.
+                              </p>
+                            )}
+                            {gatewayErrorMessage && (
+                              <p className="mt-1 text-red-700">
+                                Falha do gateway: {gatewayErrorMessage}
                               </p>
                             )}
                             {paymentMetadata?.gatewayResponse && (

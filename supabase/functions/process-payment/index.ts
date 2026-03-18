@@ -22,6 +22,7 @@ serve(async (req) => {
         )
 
         const {
+            action,
             gateway,
             paymentMethod,
             amount,
@@ -30,15 +31,113 @@ serve(async (req) => {
             installments,
             description,
             orderId,
-            idempotencyKey
+            idempotencyKey,
+            orderCode,
+            items,
+            shipping,
+            billingAddress,
+            providerTransactionId,
         } = await req.json()
 
         const sanitize = (str: string) => str ? str.replace(/\D/g, '') : ''
+        const formatPhone = (phone: string) => {
+            const digits = sanitize(phone)
+            const localDigits = digits.startsWith('55') && digits.length >= 12 ? digits.slice(2) : digits
+            const safeLocalDigits = localDigits.length >= 10 ? localDigits : '1100000000'
+
+            return {
+                country_code: '55',
+                area_code: safeLocalDigits.slice(0, 2),
+                number: safeLocalDigits.slice(2),
+            }
+        }
+        const normalizeAddress = (address: any) => {
+            if (!address) return undefined
+
+            return {
+                line_1: address.line_1,
+                line_2: address.line_2 || undefined,
+                zip_code: sanitize(address.zip_code),
+                city: address.city,
+                state: address.state,
+                country: address.country || 'BR',
+            }
+        }
+        const customerDocument = sanitize(customer?.document || '')
+        const customerDocumentType =
+            customer?.document_type ||
+            (customerDocument.length === 14 ? 'CNPJ' : 'CPF')
+        const customerType =
+            customer?.type ||
+            (customerDocumentType === 'CNPJ' ? 'company' : 'individual')
+        const customerPhone = formatPhone(customer?.phone || '')
+        const normalizedBillingAddress =
+            normalizeAddress(billingAddress) ||
+            normalizeAddress(customer?.address)
+        const normalizedItems =
+            Array.isArray(items) && items.length > 0
+                ? items.map((item: any, index: number) => ({
+                    amount: Number(item.amount),
+                    description: item.description || description || `Item ${index + 1}`,
+                    quantity: Number(item.quantity) || 1,
+                    code: item.code || `order_item_${index + 1}`,
+                    category: item.category || undefined,
+                }))
+                : [{
+                    amount: Math.round(amount * 100),
+                    description: description || 'Pedido TheAdoro',
+                    quantity: 1,
+                    code: orderCode || 'order_item',
+                }]
+        const normalizedShipping =
+            shipping
+                ? {
+                    amount: Number(shipping.amount) || 0,
+                    description: shipping.description || 'Entrega',
+                    recipient_name: shipping.recipient_name || customer?.name,
+                    recipient_phone: sanitize(shipping.recipient_phone || customer?.phone || ''),
+                    address: normalizeAddress(shipping.address),
+                    max_delivery_date: shipping.max_delivery_date || undefined,
+                    estimated_delivery_date: shipping.estimated_delivery_date || undefined,
+                    type: shipping.type || undefined,
+                }
+                : undefined
         const mergePixDetails = (current: any, next: any) => ({
             pix_code: current?.pix_code || next?.pix_code || null,
             pix_url: current?.pix_url || next?.pix_url || null,
             pix_expiration: current?.pix_expiration || next?.pix_expiration || null,
         })
+        const extractGatewayErrorMessage = (source: any): string | null => {
+            const candidates = [
+                source,
+                source?.transaction,
+                source?.last_transaction,
+                source?.charges?.[0],
+                source?.charges?.[0]?.transaction,
+                source?.charges?.[0]?.last_transaction,
+            ].filter(Boolean)
+
+            for (const candidate of candidates) {
+                const directMessage =
+                    candidate?.gateway_response?.message ||
+                    candidate?.gateway_response?.error ||
+                    null
+
+                if (typeof directMessage === 'string' && directMessage.trim()) {
+                    return directMessage
+                }
+
+                const gatewayErrors = candidate?.gateway_response?.errors
+                if (Array.isArray(gatewayErrors)) {
+                    const firstMessage = gatewayErrors.find((error: any) => typeof error?.message === 'string')?.message
+                    if (firstMessage?.trim()) {
+                        return firstMessage
+                    }
+                }
+            }
+
+            return null
+        }
         const extractPixDetails = (source: any) => {
             const candidates = [
                 source,
@@ -173,6 +272,50 @@ serve(async (req) => {
             }
             // const recipientId = getSetting('payment_pagarme_recipient_id') 
 
+            if (action === 'cancel_remote_order') {
+                const remoteOrderId = providerTransactionId || orderId
+
+                if (!remoteOrderId) {
+                    throw new Error('Provider transaction id Ã© obrigatÃ³rio para cancelar no Pagar.me.')
+                }
+
+                const remoteOrder = await fetchPagarmeJson(`/orders/${remoteOrderId}`, secretKey)
+                const remoteChargeId = remoteOrder?.charges?.[0]?.id
+
+                if (remoteChargeId) {
+                    const cancelResponse = await fetch(`https://api.pagar.me/core/v5/charges/${remoteChargeId}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Basic ' + btoa(secretKey + ':')
+                        }
+                    })
+
+                    const cancelData = await cancelResponse.json().catch(() => null)
+
+                    if (!cancelResponse.ok) {
+                        throw new Error(JSON.stringify(cancelData || { message: 'Falha ao cancelar cobrança no Pagar.me.' }))
+                    }
+
+                    return new Response(JSON.stringify({
+                        success: true,
+                        provider_transaction_id: remoteOrderId,
+                        charge_id: remoteChargeId,
+                        gateway_response: cancelData,
+                    }), {
+                        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                    })
+                }
+
+                return new Response(JSON.stringify({
+                    success: true,
+                    provider_transaction_id: remoteOrderId,
+                    gateway_response: remoteOrder,
+                }), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                })
+            }
+
             // Pagar.me API Logic
             const response = await fetch('https://api.pagar.me/core/v5/orders', {
                 method: 'POST',
@@ -182,44 +325,48 @@ serve(async (req) => {
                     ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {})
                 },
                 body: JSON.stringify({
-                    items: [{
-                        amount: Math.round(amount * 100), // Pagar.me uses cents
-                        description: description || 'Pedido TheAdoro',
-                        quantity: 1,
-                        code: 'order_item'
-                    }],
+                    closed: true,
+                    code: orderCode || orderId || idempotencyKey || undefined,
+                    items: normalizedItems,
                     customer: {
                         name: customer.name,
                         email: customer.email,
-                        type: 'individual',
-                        document: sanitize(customer.document), // CPF
+                        type: customerType,
+                        code: customer?.code || orderCode || orderId || customerDocument,
+                        document: customerDocument,
+                        document_type: customerDocumentType,
+                        address: normalizeAddress(customer?.address) || normalizedBillingAddress,
                         phones: {
-                            mobile_phone: {
-                                country_code: '55',
-                                area_code: sanitize(customer.phone).length > 11
-                                    ? sanitize(customer.phone).substring(2, 4)
-                                    : sanitize(customer.phone).substring(0, 2),
-                                number: sanitize(customer.phone).length > 11
-                                    ? sanitize(customer.phone).substring(4)
-                                    : sanitize(customer.phone).substring(2)
-                            }
-                        }
+                            home_phone: customerPhone,
+                            mobile_phone: customerPhone,
+                        },
+                        metadata: customer?.metadata || undefined,
                     },
+                    shipping: normalizedShipping,
                     payments: [{
                         payment_method: paymentMethod === 'pix' ? 'pix' : 'credit_card',
                         credit_card: paymentMethod === 'credit_card' ? {
-                            card: {
-                                number: cardToken.number,
-                                holder_name: cardToken.name,
-                                exp_month: parseInt(cardToken.expiry.split('/')[0]),
-                                exp_year: parseInt('20' + cardToken.expiry.split('/')[1]),
-                                cvv: cardToken.cvv
-                            },
+                            operation_type: 'auth_and_capture',
+                            ...(cardToken?.token
+                                ? { card_token: cardToken.token }
+                                : {
+                                    card: {
+                                        number: cardToken.number,
+                                        holder_name: cardToken.name,
+                                        exp_month: parseInt(cardToken.expiry.split('/')[0], 10),
+                                        exp_year: parseInt(cardToken.expiry.split('/')[1], 10),
+                                        cvv: cardToken.cvv,
+                                        billing_address: normalizedBillingAddress,
+                                    },
+                                }),
+                            ...(cardToken?.token && normalizedBillingAddress
+                                ? { billing_address: normalizedBillingAddress }
+                                : {}),
                             installments: installments || 1,
                             statement_descriptor: 'THEADORO'
                         } : undefined,
                         pix: paymentMethod === 'pix' ? {
-                            expires_in: 3600 // 1 hour
+                            expires_in: 600 // 10 minutes
                         } : undefined
                     }]
                 })
@@ -241,13 +388,21 @@ serve(async (req) => {
                 })
                 : extractPixDetails(charge)
 
+            const normalizedStatus =
+                charge.status === 'paid'
+                    ? 'succeeded'
+                    : charge.status === 'failed'
+                        ? 'failed'
+                        : 'pending'
+
             result = {
                 id: data.id,
-                status: charge.status === 'paid' ? 'succeeded' : 'pending',
+                status: normalizedStatus,
                 pix_code: pixDetails.pix_code,
                 pix_url: pixDetails.pix_url,
                 pix_expiration: pixDetails.pix_expiration,
                 is_test_mode: isTestMode,
+                gateway_error_message: extractGatewayErrorMessage(charge) || extractGatewayErrorMessage(data),
                 gateway_response: data
             }
 

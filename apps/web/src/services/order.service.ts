@@ -406,10 +406,6 @@ class OrderService extends BaseService<Order> {
         updateData.delivered_at = new Date().toISOString();
       }
 
-      if (status === 'cancelled') {
-        updateData.cancelled_at = new Date().toISOString();
-      }
-
       return this.update(orderId, updateData);
     } catch (error) {
       console.error('Error updating order status:', error);
@@ -429,9 +425,7 @@ class OrderService extends BaseService<Order> {
   ): Promise<{ data: Order | null; error: PostgrestError | null }> {
     try {
       return this.update(orderId, {
-        status: 'cancelled',
-        cancelled_at: new Date().toISOString(),
-        cancellation_reason: reason
+        status: 'cancelled'
       });
     } catch (error) {
       console.error('Error cancelling order:', error);

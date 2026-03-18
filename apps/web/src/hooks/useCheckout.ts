@@ -4,8 +4,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { shippingService, ShippingOption } from '@/services/shippingService';
-import { paymentService } from '@/services/payment.service';
+import { paymentService, type PaymentOrderItem, type PaymentShippingData } from '@/services/payment.service';
 import { EmailService } from '@/services/EmailService';
+import { calculatePixCancelAt } from '@/lib/pix-payment';
 
 export interface CheckoutData {
   // Customer Information
@@ -77,8 +78,12 @@ export interface Order {
     pixCode?: string;
     pixUrl?: string;
     pixExpiration?: string;
+    cancelAt?: string;
     boletoUrl?: string;
     isTestMode?: boolean;
+    status?: 'pending' | 'approved' | 'failed' | 'expired';
+    gatewayErrorMessage?: string;
+    regenerationCount?: number;
   };
 }
 
@@ -86,6 +91,139 @@ interface ShippingOverride {
   price: number;
   label?: string;
 }
+
+const sanitizeDigits = (value?: string) => (value || '').replace(/\D/g, '');
+
+const normalizeCountryCode = (country?: string) =>
+  !country || country === 'Brasil' ? 'BR' : country;
+
+const formatDateAsYmd = (date: Date) => {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const buildAddressLine = (number?: string, street?: string, neighborhood?: string) =>
+  [number, street, neighborhood].filter(Boolean).join(', ');
+
+const buildBillingAddress = (checkoutData: CheckoutData) => {
+  if (checkoutData.billingAddress?.address) {
+    return {
+      line_1: checkoutData.billingAddress.address,
+      zip_code: sanitizeDigits(checkoutData.billingAddress.zipCode),
+      city: checkoutData.billingAddress.city,
+      state: checkoutData.billingAddress.state,
+      country: normalizeCountryCode(checkoutData.billingAddress.country),
+    };
+  }
+
+  return {
+    line_1: buildAddressLine(checkoutData.number, checkoutData.street, checkoutData.neighborhood),
+    line_2: checkoutData.complement || '',
+    zip_code: sanitizeDigits(checkoutData.zipCode),
+    city: checkoutData.city,
+    state: checkoutData.state,
+    country: normalizeCountryCode(checkoutData.country),
+  };
+};
+
+const buildShippingPayload = (
+  checkoutData: CheckoutData,
+  shippingPrice: number,
+  selectedShippingOption: ShippingOption | null,
+  hasPhysicalItems: boolean
+): PaymentShippingData | undefined => {
+  if (!hasPhysicalItems) {
+    return undefined;
+  }
+
+  const today = new Date();
+  const estimatedDate = new Date(today);
+  estimatedDate.setDate(today.getDate() + Math.max(selectedShippingOption?.deliveryTime || 0, 0));
+  const maxDate = new Date(estimatedDate);
+  maxDate.setDate(estimatedDate.getDate() + 2);
+
+  return {
+    amount: Math.round(shippingPrice * 100),
+    description: selectedShippingOption?.name || 'Entrega padrão',
+    recipient_name: `${checkoutData.firstName} ${checkoutData.lastName}`.trim(),
+    recipient_phone: sanitizeDigits(checkoutData.phone),
+    address: {
+      line_1: buildAddressLine(checkoutData.number, checkoutData.street, checkoutData.neighborhood),
+      line_2: checkoutData.complement || '',
+      zip_code: sanitizeDigits(checkoutData.zipCode),
+      city: checkoutData.city,
+      state: checkoutData.state,
+      country: normalizeCountryCode(checkoutData.country),
+    },
+    estimated_delivery_date: formatDateAsYmd(estimatedDate),
+    max_delivery_date: formatDateAsYmd(maxDate),
+    type: selectedShippingOption?.name || 'Padrão',
+  };
+};
+
+const buildPaymentItems = (
+  items: CartItem[],
+  giftWrapPrice: number,
+  giftWrapName: string,
+  discount: number
+): PaymentOrderItem[] => {
+  const expandedItems = items.flatMap((item, itemIndex) => {
+    const unitAmount = Math.round(item.product.price * 100);
+
+    return Array.from({ length: item.quantity }, (_, quantityIndex) => ({
+      description: item.product.name,
+      code: item.product.id,
+      category: item.product.category?.name || undefined,
+      originalAmount: unitAmount,
+      sortKey: `${itemIndex}-${quantityIndex}`,
+    }));
+  });
+
+  if (giftWrapPrice > 0) {
+    expandedItems.push({
+      description: giftWrapName ? `Embalagem para presente - ${giftWrapName}` : 'Embalagem para presente',
+      code: 'gift-wrap',
+      category: 'Embalagem',
+      originalAmount: Math.round(giftWrapPrice * 100),
+      sortKey: 'gift-wrap',
+    });
+  }
+
+  const targetTotal = Math.max(
+    expandedItems.length,
+    Math.round(
+      items.reduce((sum, item) => sum + item.product.price * item.quantity, 0) * 100 +
+      Math.round(giftWrapPrice * 100) -
+      Math.round(discount * 100)
+    )
+  );
+  const originalTotal = expandedItems.reduce((sum, item) => sum + item.originalAmount, 0);
+
+  if (expandedItems.length === 0 || originalTotal <= 0) {
+    return [];
+  }
+
+  let remaining = targetTotal;
+
+  return expandedItems.map((item, index) => {
+    const amount =
+      index === expandedItems.length - 1
+        ? remaining
+        : Math.max(1, Math.floor((item.originalAmount / originalTotal) * targetTotal));
+
+    remaining -= amount;
+
+    return {
+      amount,
+      description: item.description,
+      quantity: 1,
+      code: item.code,
+      category: item.category,
+    };
+  });
+};
 
 export const useCheckout = () => {
   const [loading, setLoading] = useState(false);
@@ -168,6 +306,7 @@ export const useCheckout = () => {
 
   const validateCheckoutData = useCallback((data: CheckoutData): string[] => {
     const errors: string[] = [];
+    const sanitizedDocument = data.document?.replace(/\D/g, '') || '';
 
     if (!data.email || !/\S+@\S+\.\S+/.test(data.email)) {
       errors.push('Email válido é obrigatório');
@@ -182,6 +321,11 @@ export const useCheckout = () => {
     if (!data.zipCode?.trim()) errors.push('CEP é obrigatório');
     if (!data.country?.trim()) errors.push('País é obrigatório');
     if (!data.paymentMethod) errors.push('Método de pagamento é obrigatório');
+
+    if (!sanitizedDocument) errors.push('CPF ou CNPJ Ã© obrigatÃ³rio');
+    if (sanitizedDocument && sanitizedDocument.length !== 11 && sanitizedDocument.length !== 14) {
+      errors.push('CPF ou CNPJ invÃ¡lido');
+    }
 
     return errors;
   }, []);
@@ -247,11 +391,42 @@ export const useCheckout = () => {
       const paymentDescription = `Pedido TheAdoro - ${items.length} item(ns)`;
 
       // 3. Process Payment
+      const customerDocument =
+        checkoutData.document ||
+        (user?.user_metadata as any)?.cpf ||
+        (profile as any)?.document ||
+        '';
+      const sanitizedCustomerDocument = customerDocument.replace(/\D/g, '');
+
+      if (!sanitizedCustomerDocument) {
+        throw new Error('CPF do comprador é obrigatório para gerar o pagamento.');
+      }
+
+      if (sanitizedCustomerDocument.length !== 11 && sanitizedCustomerDocument.length !== 14) {
+        throw new Error('Informe um CPF ou CNPJ vÃ¡lido para gerar o pagamento.');
+      }
+
+      const documentType = sanitizedCustomerDocument.length === 14 ? 'CNPJ' : 'CPF';
+      const customerType = sanitizedCustomerDocument.length === 14 ? 'company' : 'individual';
+      const merchantOrderCode = `TA-${paymentIdempotencyKey.replace(/[^a-zA-Z0-9]/g, '').slice(-24)}`;
+      const billingAddress = buildBillingAddress(checkoutData);
+      const hasPhysicalItems = items.some(item => !item.product.is_service);
+      const paymentItems = buildPaymentItems(items, giftWrapPrice, giftWrapName, discount);
+      const shippingPayload = buildShippingPayload(checkoutData, shipping, selectedShipping, hasPhysicalItems);
+
       const customerData = {
         name: `${checkoutData.firstName} ${checkoutData.lastName}`.trim(),
         email: checkoutData.email,
         phone: checkoutData.phone,
-        document: checkoutData.document || (user?.user_metadata as any)?.cpf || (profile as any)?.document || '00000000000'
+        document: sanitizedCustomerDocument,
+        code: user?.id || sanitizedCustomerDocument,
+        type: customerType,
+        document_type: documentType,
+        metadata: {
+          source: 'web_checkout',
+          merchant_order_code: merchantOrderCode,
+        },
+        address: billingAddress
       };
 
       let paymentResult;
@@ -260,32 +435,64 @@ export const useCheckout = () => {
 
         // SECURITY WARNING: In a real production app, use client-side tokenization (Stripe.js, Pagarme.js)
         // Never send raw card data to your backend.
-        paymentResult = await paymentService.processCard(total, {
+        const cardToken = await paymentService.tokenizeCard({
           number: checkoutData.paymentDetails.cardNumber,
           name: checkoutData.paymentDetails.cardName || '',
           expiry: checkoutData.paymentDetails.cardExpiry || '',
           cvv: checkoutData.paymentDetails.cardCvv || '',
+        });
+
+        paymentResult = await paymentService.processCard(total, {
+          token: cardToken,
           installments: checkoutData.paymentDetails.installments || 1
         }, customerData, {
           idempotencyKey: paymentIdempotencyKey,
-          description: paymentDescription
+          description: paymentDescription,
+          orderCode: merchantOrderCode,
+          items: paymentItems,
+          shipping: shippingPayload,
+          billingAddress,
         } as any);
       } else if (checkoutData.paymentMethod === 'pix') {
         paymentResult = await paymentService.generatePix(total, customerData, {
           idempotencyKey: paymentIdempotencyKey,
-          description: paymentDescription
+          description: paymentDescription,
+          orderCode: merchantOrderCode,
+          items: paymentItems,
+          shipping: shippingPayload,
+          billingAddress,
         });
       } else {
         // Boleto
         paymentResult = await paymentService.generateBoleto(total, customerData, {
           idempotencyKey: paymentIdempotencyKey,
-          description: paymentDescription
+          description: paymentDescription,
+          orderCode: merchantOrderCode,
+          items: paymentItems,
+          shipping: shippingPayload,
+          billingAddress,
         });
       }
 
       if (paymentResult.status === 'failed') {
-        throw new Error('Pagamento recusado. Verifique os dados e tente novamente.');
+        const gatewayErrorMessage = (paymentResult as any).gateway_error_message;
+        const friendlyMessage =
+          gatewayErrorMessage?.includes('action_forbidden')
+            ? 'O gateway recusou a geraÃ§Ã£o do PIX. Verifique se a conta Pagar.me tem PIX habilitado e se o ambiente/credencial estÃ¡ correto.'
+            : gatewayErrorMessage
+              ? `Pagamento recusado pelo gateway: ${gatewayErrorMessage}`
+              : 'Pagamento recusado. Verifique os dados e tente novamente.';
+
+        throw new Error(friendlyMessage);
       }
+
+      const paymentStatus =
+        paymentResult.status === 'succeeded'
+          ? 'approved'
+          : paymentResult.status === 'failed'
+            ? 'failed'
+            : 'pending';
+      const pixCancelAt = calculatePixCancelAt(paymentResult.pix_expiration);
 
       // 3.5 Save User Data & Address if requested
       if (user?.id) {
@@ -327,7 +534,8 @@ export const useCheckout = () => {
           firstName: checkoutData.firstName,
           lastName: checkoutData.lastName,
           phone: checkoutData.phone,
-          email: checkoutData.email
+          email: checkoutData.email,
+          document: sanitizedCustomerDocument,
         },
         billingAddress: checkoutData.billingAddress,
         userNote: checkoutData.notes,
@@ -339,11 +547,16 @@ export const useCheckout = () => {
         deliverySchedule: checkoutData.deliverySchedule,
         paymentInfo: {
           id: paymentResult.id,
+          merchantOrderCode,
           pixCode: paymentResult.pix_code,
           pixUrl: paymentResult.pix_url,
           pixExpiration: paymentResult.pix_expiration,
+          cancelAt: pixCancelAt,
           boletoUrl: paymentResult.boleto_url,
-          isTestMode: paymentResult.is_test_mode
+          isTestMode: paymentResult.is_test_mode,
+          status: paymentStatus,
+          gatewayErrorMessage: (paymentResult as any).gateway_error_message || null,
+          regenerationCount: 0,
         }
       });
 
@@ -412,22 +625,19 @@ export const useCheckout = () => {
         throw itemsError;
       }
 
-      const paymentStatus =
-        paymentResult.status === 'succeeded'
-          ? 'approved'
-          : paymentResult.status === 'failed'
-            ? 'failed'
-            : 'pending';
-
       const paymentMetadata = {
         method: checkoutData.paymentMethod,
         pixCode: paymentResult.pix_code || null,
         pixUrl: paymentResult.pix_url || null,
         pixExpiration: paymentResult.pix_expiration || null,
+        cancelAt: pixCancelAt,
         boletoUrl: paymentResult.boleto_url || null,
         isTestMode: paymentResult.is_test_mode || false,
         customerEmail: checkoutData.email,
+        gatewayErrorMessage: (paymentResult as any).gateway_error_message || null,
         gatewayResponse: (paymentResult as any).gateway_response || null,
+        providerTransactionId: paymentResult.id,
+        regenerationCount: 0,
       };
 
       let paymentRow: any = null;
@@ -542,8 +752,12 @@ export const useCheckout = () => {
           pixCode: paymentResult.pix_code,
           pixUrl: paymentResult.pix_url,
           pixExpiration: paymentResult.pix_expiration,
+          cancelAt: pixCancelAt,
           boletoUrl: paymentResult.boleto_url,
-          isTestMode: paymentResult.is_test_mode
+          isTestMode: paymentResult.is_test_mode,
+          status: paymentStatus,
+          gatewayErrorMessage: (paymentResult as any).gateway_error_message || null,
+          regenerationCount: 0,
         }
       };
 
@@ -574,6 +788,7 @@ export const useCheckout = () => {
         .from('orders')
         .select(`
           *,
+          payments (*),
           order_items (
             *,
             products (
@@ -602,6 +817,9 @@ export const useCheckout = () => {
       const shippingAddressData = typeof data.shipping_address === 'string'
         ? JSON.parse(data.shipping_address)
         : data.shipping_address;
+      const latestPayment = [ ...((data as any).payments || []) ]
+        .sort((left: any, right: any) => new Date(right.created_at || 0).getTime() - new Date(left.created_at || 0).getTime())[0];
+      const latestPaymentMetadata = latestPayment?.metadata || {};
 
       // Transform data to match Order interface
       const items: CartItem[] = data.order_items.map((item: any) => ({
@@ -680,6 +898,35 @@ export const useCheckout = () => {
         gift_options: notesData.giftOptions,
         delivery_schedule: notesData.deliverySchedule,
         paymentInfo: notesData.paymentInfo
+          ? {
+              ...notesData.paymentInfo,
+              id:
+                latestPaymentMetadata.providerTransactionId ||
+                latestPayment?.provider_transaction_id ||
+                notesData.paymentInfo.id,
+              pixCode: latestPaymentMetadata.pixCode || notesData.paymentInfo.pixCode,
+              pixUrl: latestPaymentMetadata.pixUrl || notesData.paymentInfo.pixUrl,
+              pixExpiration: latestPaymentMetadata.pixExpiration || notesData.paymentInfo.pixExpiration,
+              cancelAt:
+                latestPaymentMetadata.cancelAt ||
+                notesData.paymentInfo.cancelAt ||
+                calculatePixCancelAt(
+                  latestPaymentMetadata.pixExpiration || notesData.paymentInfo.pixExpiration
+                ),
+              status:
+                notesData.paymentInfo.status === 'expired'
+                  ? 'expired'
+                  : latestPayment?.status || notesData.paymentInfo.status,
+              regenerationCount:
+                latestPaymentMetadata.regenerationCount ??
+                notesData.paymentInfo.regenerationCount ??
+                0,
+              gatewayErrorMessage:
+                latestPaymentMetadata.gatewayErrorMessage ||
+                latestPaymentMetadata.gatewayResponse?.charges?.[0]?.last_transaction?.gateway_response?.errors?.[0]?.message ||
+                notesData.paymentInfo.gatewayErrorMessage
+            }
+          : undefined
       };
 
       return order;

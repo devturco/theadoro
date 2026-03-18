@@ -1,18 +1,16 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft,
   CreditCard,
   MapPin,
   User,
-  Lock,
   CheckCircle,
   Truck,
-  Gift,
-  ChevronRight,
   ShieldCheck,
   Zap,
-  ShoppingCart
+  ShoppingCart,
+  Plus
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/hooks/useCart';
@@ -29,7 +27,24 @@ interface GiftWrap {
   seller_id: string;
   is_active: boolean;
 }
-import { Button, Input, Label, Separator, Badge, Avatar, AvatarFallback, AvatarImage, Card, CardContent, CardHeader, CardTitle, RadioGroup, RadioGroupItem, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@theadoro/ui';
+interface SavedAddress {
+  id: string;
+  label: string | null;
+  zip_code: string;
+  street: string;
+  number: string;
+  complement: string | null;
+  neighborhood: string;
+  city: string;
+  state: string;
+  is_default: boolean | null;
+}
+
+type CheckoutGateMode = 'required' | 'new-address';
+
+const CUSTOM_ADDRESS_VALUE = 'custom';
+
+import { Button, Input, Label, Separator, Badge, Avatar, AvatarFallback, AvatarImage, Card, CardContent, CardHeader, CardTitle, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, RadioGroup, RadioGroupItem, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@theadoro/ui';
 import { cn } from '@/lib/utils';
 import { couponService } from '@/services/coupon.service';
 import { toast as toastSonner } from 'sonner';
@@ -40,6 +55,7 @@ interface CheckoutFormData {
   lastName: string;
   email: string;
   phone: string;
+  document: string;
   zipCode: string;
   street: string;
   number: string;
@@ -47,6 +63,7 @@ interface CheckoutFormData {
   neighborhood: string;
   city: string;
   state: string;
+  addressLabel: string;
   paymentMethod: 'credit' | 'debit' | 'pix';
   cardNumber: string;
   cardName: string;
@@ -65,7 +82,9 @@ const INITIAL_DELIVERY_SCHEDULE: DeliveryScheduleType = { scheduled_date: '', sc
 
 const INITIAL_STATE: CheckoutFormData = {
   firstName: '', lastName: '', email: '', phone: '',
+  document: '',
   zipCode: '', street: '', number: '', complement: '', neighborhood: '', city: '', state: '',
+  addressLabel: 'Casa',
   paymentMethod: 'credit', cardNumber: '', cardName: '', cardExpiry: '', cardCvv: '', installments: 1,
   isGift: false, giftMessage: '', newsletter: false,
   giftOptions: INITIAL_GIFT_OPTIONS,
@@ -76,12 +95,17 @@ export const Checkout: React.FC = () => {
   const navigate = useNavigate();
   const { cart, clearCart } = useCart();
   const { processOrder, getShippingQuotes, shippingQuotes, selectedShipping, setSelectedShipping } = useCheckout();
-  const { user, profile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
 
   const [currentStep, setCurrentStep] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [profileAutoFilled, setProfileAutoFilled] = useState(false);
+  const [profileGateOpen, setProfileGateOpen] = useState(false);
+  const [profileGateSaving, setProfileGateSaving] = useState(false);
+  const [profileGateErrors, setProfileGateErrors] = useState<Record<string, string>>({});
+  const [profileGateMode, setProfileGateMode] = useState<CheckoutGateMode>('required');
+  const [selectedAddressId, setSelectedAddressId] = useState<string>(CUSTOM_ADDRESS_VALUE);
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
   const [searchingCep, setSearchingCep] = useState(false);
@@ -107,6 +131,7 @@ export const Checkout: React.FC = () => {
         lastName: prev.lastName || profile.full_name?.split(' ').slice(1).join(' ') || '',
         email: prev.email || profile.email || '',
         phone: prev.phone || profile.phone || '',
+        document: prev.document || (profile as any)?.document || (user?.user_metadata as any)?.cpf || '',
         zipCode: prev.zipCode || profile.postal_code || '',
         street: prev.street || profile.address || '',
         number: prev.number || (profile as any).address_number || '',
@@ -116,7 +141,83 @@ export const Checkout: React.FC = () => {
       }));
       setProfileAutoFilled(true);
     }
-  }, [profile, profileAutoFilled]);
+  }, [profile, profileAutoFilled, user]);
+
+  const {
+    data: savedAddresses = [],
+    isLoading: savedAddressesLoading,
+    refetch: refetchSavedAddresses
+  } = useQuery({
+    queryKey: ['checkout-saved-addresses', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data, error } = await supabase
+        .from('user_addresses' as any)
+        .select('*')
+        .eq('user_id', user.id)
+        .order('is_default', { ascending: false })
+        .order('updated_at', { ascending: false });
+
+      if (error) throw error;
+      return (data || []) as SavedAddress[];
+    },
+    enabled: !!user?.id
+  });
+
+  const applySavedAddress = useCallback((address: SavedAddress) => {
+    setSelectedAddressId(address.id);
+    setFormData(prev => ({
+      ...prev,
+      addressLabel: address.label || prev.addressLabel || 'Endereco',
+      zipCode: address.zip_code || '',
+      street: address.street || '',
+      number: address.number || '',
+      complement: address.complement || '',
+      neighborhood: address.neighborhood || '',
+      city: address.city || '',
+      state: address.state || '',
+    }));
+  }, []);
+
+  const documentDigits = useMemo(() => formData.document.replace(/\D/g, ''), [formData.document]);
+  const phoneDigits = useMemo(() => formData.phone.replace(/\D/g, ''), [formData.phone]);
+  const hasSavedAddress = savedAddresses.length > 0;
+  const shouldCollectAddressInGate = profileGateMode === 'new-address' || !hasSavedAddress;
+
+  const profileGateMissingItems = useMemo(() => {
+    if (!user) return [];
+
+    const missing: string[] = [];
+    if (!formData.firstName.trim() || !formData.lastName.trim()) missing.push('nome completo');
+    if (phoneDigits.length < 10) missing.push('whatsapp');
+    if (documentDigits.length !== 11 && documentDigits.length !== 14) missing.push('cpf/cnpj');
+    if (!hasSavedAddress) missing.push('um endereço salvo');
+
+    return missing;
+  }, [documentDigits, formData.firstName, formData.lastName, hasSavedAddress, phoneDigits.length, user]);
+
+  const profileReadyForCheckout = !user || profileGateMissingItems.length === 0;
+
+  useEffect(() => {
+    if (!savedAddresses.length) {
+      setSelectedAddressId(CUSTOM_ADDRESS_VALUE);
+      return;
+    }
+
+    const selectedAddress = savedAddresses.find(address => address.id === selectedAddressId);
+    if (selectedAddress) return;
+
+    const defaultAddress = savedAddresses.find(address => address.is_default) || savedAddresses[0];
+    if (defaultAddress) applySavedAddress(defaultAddress);
+  }, [applySavedAddress, savedAddresses, selectedAddressId]);
+
+  useEffect(() => {
+    if (!user || savedAddressesLoading) return;
+    if (!profileReadyForCheckout) {
+      setProfileGateMode('required');
+      setProfileGateOpen(true);
+    }
+  }, [profileReadyForCheckout, savedAddressesLoading, user]);
 
   const { data: giftWraps } = useQuery({
     queryKey: ['gift-wraps', cart.items],
@@ -163,9 +264,128 @@ export const Checkout: React.FC = () => {
   const formatPrice = (p: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p);
 
   const handleInputChange = (field: keyof CheckoutFormData, value: any) => {
+    const addressFields: Array<keyof CheckoutFormData> = ['zipCode', 'street', 'number', 'complement', 'neighborhood', 'city', 'state'];
+
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors(prev => ({ ...prev, [field]: '' }));
+    if (profileGateErrors[field]) setProfileGateErrors(prev => ({ ...prev, [field]: '' }));
+    if (addressFields.includes(field) && selectedAddressId !== CUSTOM_ADDRESS_VALUE) {
+      setSelectedAddressId(CUSTOM_ADDRESS_VALUE);
+    }
   };
+
+  const openProfileGate = useCallback((mode: CheckoutGateMode = 'required') => {
+    setProfileGateMode(mode);
+    setProfileGateErrors({});
+    setProfileGateOpen(true);
+  }, []);
+
+  const validateProfileGate = useCallback(() => {
+    const nextErrors: Record<string, string> = {};
+
+    if (!formData.firstName.trim()) nextErrors.firstName = 'Informe seu nome';
+    if (!formData.lastName.trim()) nextErrors.lastName = 'Informe seu sobrenome';
+    if (!formData.email.trim()) nextErrors.email = 'Informe seu e-mail';
+    if (phoneDigits.length < 10) nextErrors.phone = 'Informe um WhatsApp valido';
+    if (documentDigits.length !== 11 && documentDigits.length !== 14) nextErrors.document = 'Informe um CPF ou CNPJ valido';
+
+    if (shouldCollectAddressInGate) {
+      if (!formData.addressLabel.trim()) nextErrors.addressLabel = 'Dê um nome para este endereço';
+      if (!formData.zipCode.trim()) nextErrors.zipCode = 'Informe o CEP';
+      if (!formData.street.trim()) nextErrors.street = 'Informe a rua';
+      if (!formData.number.trim()) nextErrors.number = 'Informe o numero';
+      if (!formData.neighborhood.trim()) nextErrors.neighborhood = 'Informe o bairro';
+      if (!formData.city.trim()) nextErrors.city = 'Informe a cidade';
+      if (!formData.state.trim()) nextErrors.state = 'Informe a UF';
+    }
+
+    setProfileGateErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  }, [documentDigits.length, formData.addressLabel, formData.city, formData.email, formData.firstName, formData.lastName, formData.neighborhood, formData.number, formData.state, formData.street, formData.zipCode, phoneDigits.length, shouldCollectAddressInGate]);
+
+  const handleSaveProfileGate = useCallback(async () => {
+    if (!user) {
+      toastSonner.error('Faça login para salvar seu cadastro antes da compra.');
+      return;
+    }
+
+    if (!validateProfileGate()) {
+      toastSonner.error('Preencha os campos obrigatorios para continuar.');
+      return;
+    }
+
+    try {
+      setProfileGateSaving(true);
+
+      const profilePayload = {
+        full_name: `${formData.firstName} ${formData.lastName}`.trim(),
+        phone: formData.phone,
+      } as any;
+
+      if (shouldCollectAddressInGate) {
+        profilePayload.address = formData.street;
+        profilePayload.address_number = formData.number;
+        profilePayload.address_complement = formData.complement || '';
+        profilePayload.neighborhood = formData.neighborhood || '';
+        profilePayload.city = formData.city;
+        profilePayload.state = formData.state;
+        profilePayload.postal_code = formData.zipCode;
+      }
+
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update(profilePayload)
+        .eq('id', user.id);
+
+      if (profileError) throw profileError;
+
+      const { error: authUpdateError } = await supabase.auth.updateUser({
+        data: {
+          ...(user.user_metadata || {}),
+          cpf: documentDigits,
+        }
+      });
+
+      if (authUpdateError) throw authUpdateError;
+
+      if (shouldCollectAddressInGate) {
+        const addressPayload = {
+          user_id: user.id,
+          label: formData.addressLabel.trim(),
+          zip_code: formData.zipCode,
+          street: formData.street,
+          number: formData.number,
+          complement: formData.complement || '',
+          neighborhood: formData.neighborhood || '',
+          city: formData.city,
+          state: formData.state,
+          is_default: savedAddresses.length === 0
+        };
+
+        const { data: insertedAddress, error: addressError } = await (supabase
+          .from('user_addresses' as any)
+          .insert(addressPayload)
+          .select('*')
+          .single() as any);
+
+        if (addressError) throw addressError;
+
+        if (insertedAddress) {
+          applySavedAddress(insertedAddress as SavedAddress);
+        }
+      }
+
+      await Promise.all([refreshProfile(), refetchSavedAddresses()]);
+      setProfileGateOpen(false);
+      setProfileGateMode('required');
+      toastSonner.success(shouldCollectAddressInGate ? 'Cadastro e endereço salvos com sucesso.' : 'Cadastro atualizado com sucesso.');
+    } catch (error: any) {
+      console.error('Erro ao salvar cadastro no checkout:', error);
+      toastSonner.error(error.message || 'Não foi possível salvar seu cadastro agora.');
+    } finally {
+      setProfileGateSaving(false);
+    }
+  }, [applySavedAddress, documentDigits, formData.addressLabel, formData.city, formData.complement, formData.firstName, formData.lastName, formData.neighborhood, formData.number, formData.phone, formData.state, formData.street, formData.zipCode, refreshProfile, refetchSavedAddresses, savedAddresses.length, shouldCollectAddressInGate, user, validateProfileGate]);
 
   useEffect(() => {
     const cleanCep = formData.zipCode.replace(/\D/g, '');
@@ -233,6 +453,7 @@ export const Checkout: React.FC = () => {
       if (!formData.firstName) errs.firstName = 'Obrigatório';
       if (!formData.email) errs.email = 'Obrigatório';
     }
+    if (step === 1 && !formData.document.replace(/\D/g, '')) errs.document = 'ObrigatÃ³rio';
     if (step === 2) {
       if (!formData.zipCode) errs.zipCode = 'Obrigatório';
       if (!selectedShipping) toastSonner.error('Selecione uma opção de frete');
@@ -241,10 +462,24 @@ export const Checkout: React.FC = () => {
     return Object.keys(errs).length === 0 && (step !== 2 || !!selectedShipping);
   };
 
-  const handleNext = () => { if (validateStep(currentStep)) setCurrentStep(prev => prev + 1); };
+  const handleNext = () => {
+    if (user && !profileReadyForCheckout) {
+      openProfileGate('required');
+      toastSonner.error(`Complete seu cadastro para comprar: ${profileGateMissingItems.join(', ')}.`);
+      return;
+    }
+
+    if (validateStep(currentStep)) setCurrentStep(prev => prev + 1);
+  };
   const handleBack = () => setCurrentStep(prev => prev - 1);
 
   const handleFinish = async () => {
+    if (user && !profileReadyForCheckout) {
+      openProfileGate('required');
+      toastSonner.error('Seu cadastro precisa estar completo antes de finalizar a compra.');
+      return;
+    }
+
     setIsProcessing(true);
     try {
       const order = await processOrder(cart.items as any, {
@@ -252,7 +487,7 @@ export const Checkout: React.FC = () => {
         paymentMethod: formData.paymentMethod === 'credit' ? 'credit_card' : formData.paymentMethod === 'debit' ? 'debit_card' : 'pix',
         address: `${formData.street}, ${formData.number}`,
         country: 'Brasil', // Ensure country is passed
-        document: (profile as any)?.document || '', // Optional but recommended
+        document: formData.document,
       } as any, cart.isFreeShippingApplied ? {
         price: 0,
         label: 'Frete gratis'
@@ -279,6 +514,204 @@ export const Checkout: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50/50 pb-32 pt-2 sm:pt-10">
+      <Dialog
+        open={profileGateOpen}
+        onOpenChange={(open) => {
+          if (open) {
+            setProfileGateOpen(true);
+            return;
+          }
+
+          if (profileGateMode === 'new-address' || profileReadyForCheckout) {
+            setProfileGateOpen(false);
+            setProfileGateMode('required');
+            setProfileGateErrors({});
+            return;
+          }
+
+          setProfileGateOpen(true);
+        }}
+      >
+        <DialogContent className="sm:max-w-[720px] max-h-[90vh] overflow-y-auto rounded-3xl border-gray-100">
+          <DialogHeader className="space-y-3">
+            <DialogTitle className="text-2xl font-serif font-black text-gray-900">
+              {profileGateMode === 'new-address' ? 'Adicionar novo endereço' : 'Complete seu cadastro para comprar'}
+            </DialogTitle>
+            <DialogDescription className="text-sm text-gray-500">
+              {profileGateMode === 'new-address'
+                ? 'Salve um novo endereço para usar neste pedido e nos próximos.'
+                : 'Antes de finalizar a compra, precisamos do seu nome completo, WhatsApp, CPF/CNPJ e pelo menos um endereço salvo.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {profileGateMode === 'required' && profileGateMissingItems.length > 0 && (
+            <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              Faltando: <strong>{profileGateMissingItems.join(', ')}</strong>
+            </div>
+          )}
+
+          <div className="grid gap-5 py-2 md:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Nome</Label>
+              <Input
+                value={formData.firstName}
+                onChange={(event) => handleInputChange('firstName', event.target.value)}
+                className="h-12 rounded-xl bg-gray-50/70"
+              />
+              {profileGateErrors.firstName && <p className="text-xs font-medium text-red-500">{profileGateErrors.firstName}</p>}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Sobrenome</Label>
+              <Input
+                value={formData.lastName}
+                onChange={(event) => handleInputChange('lastName', event.target.value)}
+                className="h-12 rounded-xl bg-gray-50/70"
+              />
+              {profileGateErrors.lastName && <p className="text-xs font-medium text-red-500">{profileGateErrors.lastName}</p>}
+            </div>
+
+            <div className="space-y-1.5 md:col-span-2">
+              <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">E-mail</Label>
+              <Input value={formData.email} disabled className="h-12 rounded-xl bg-gray-100 text-gray-500" />
+              {profileGateErrors.email && <p className="text-xs font-medium text-red-500">{profileGateErrors.email}</p>}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">WhatsApp</Label>
+              <Input
+                value={formData.phone}
+                onChange={(event) => handleInputChange('phone', event.target.value)}
+                className="h-12 rounded-xl bg-gray-50/70"
+              />
+              {profileGateErrors.phone && <p className="text-xs font-medium text-red-500">{profileGateErrors.phone}</p>}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">CPF / CNPJ</Label>
+              <Input
+                value={formData.document}
+                onChange={(event) => handleInputChange('document', event.target.value.replace(/\D/g, '').slice(0, 14))}
+                className="h-12 rounded-xl bg-gray-50/70"
+                placeholder="Somente numeros"
+              />
+              {profileGateErrors.document && <p className="text-xs font-medium text-red-500">{profileGateErrors.document}</p>}
+            </div>
+          </div>
+
+          {shouldCollectAddressInGate ? (
+            <div className="space-y-5 rounded-3xl border border-gray-100 bg-gray-50/70 p-5">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-gray-500">Endereco salvo</p>
+                <p className="mt-1 text-sm text-gray-600">
+                  Esse endereço fica disponível para usar nas próximas compras.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Nome do endereço</Label>
+                <Input
+                  value={formData.addressLabel}
+                  onChange={(event) => handleInputChange('addressLabel', event.target.value)}
+                  className="h-12 rounded-xl bg-white"
+                  placeholder="Ex.: Casa, Trabalho, Mae"
+                />
+                {profileGateErrors.addressLabel && <p className="text-xs font-medium text-red-500">{profileGateErrors.addressLabel}</p>}
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="space-y-1.5 sm:col-span-1">
+                  <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">CEP</Label>
+                  <Input
+                    value={formData.zipCode}
+                    onChange={(event) => handleInputChange('zipCode', event.target.value.replace(/\D/g, '').slice(0, 8).replace(/(\d{5})(\d)/, '$1-$2'))}
+                    className="h-12 rounded-xl bg-white"
+                    placeholder="00000-000"
+                  />
+                  {profileGateErrors.zipCode && <p className="text-xs font-medium text-red-500">{profileGateErrors.zipCode}</p>}
+                </div>
+
+                <div className="sm:col-span-2 flex items-end">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="h-12 w-full rounded-xl bg-white text-gray-700"
+                    onClick={() => getShippingQuotes(cart.items as any[], formData.zipCode)}
+                    disabled={searchingCep}
+                  >
+                    {searchingCep ? 'Buscando CEP...' : 'Buscar CEP e frete'}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-12">
+                <div className="space-y-1.5 sm:col-span-8">
+                  <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Rua</Label>
+                  <Input value={formData.street} onChange={(event) => handleInputChange('street', event.target.value)} className="h-12 rounded-xl bg-white" />
+                  {profileGateErrors.street && <p className="text-xs font-medium text-red-500">{profileGateErrors.street}</p>}
+                </div>
+                <div className="space-y-1.5 sm:col-span-4">
+                  <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Numero</Label>
+                  <Input value={formData.number} onChange={(event) => handleInputChange('number', event.target.value)} className="h-12 rounded-xl bg-white" />
+                  {profileGateErrors.number && <p className="text-xs font-medium text-red-500">{profileGateErrors.number}</p>}
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-12">
+                <div className="space-y-1.5 sm:col-span-4">
+                  <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Complemento</Label>
+                  <Input value={formData.complement} onChange={(event) => handleInputChange('complement', event.target.value)} className="h-12 rounded-xl bg-white" />
+                </div>
+                <div className="space-y-1.5 sm:col-span-4">
+                  <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Bairro</Label>
+                  <Input value={formData.neighborhood} onChange={(event) => handleInputChange('neighborhood', event.target.value)} className="h-12 rounded-xl bg-white" />
+                  {profileGateErrors.neighborhood && <p className="text-xs font-medium text-red-500">{profileGateErrors.neighborhood}</p>}
+                </div>
+                <div className="space-y-1.5 sm:col-span-3">
+                  <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Cidade</Label>
+                  <Input value={formData.city} onChange={(event) => handleInputChange('city', event.target.value)} className="h-12 rounded-xl bg-white" />
+                  {profileGateErrors.city && <p className="text-xs font-medium text-red-500">{profileGateErrors.city}</p>}
+                </div>
+                <div className="space-y-1.5 sm:col-span-1">
+                  <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">UF</Label>
+                  <Input value={formData.state} onChange={(event) => handleInputChange('state', event.target.value.toUpperCase().slice(0, 2))} className="h-12 rounded-xl bg-white" />
+                  {profileGateErrors.state && <p className="text-xs font-medium text-red-500">{profileGateErrors.state}</p>}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-green-100 bg-green-50 px-4 py-3 text-sm text-green-800">
+              Você já possui {savedAddresses.length} endereço(s) salvo(s). Se quiser, pode adicionar outro no passo de entrega.
+            </div>
+          )}
+
+          <DialogFooter className="gap-3 sm:justify-between">
+            {(profileGateMode === 'new-address' || profileReadyForCheckout) ? (
+              <Button
+                type="button"
+                variant="ghost"
+                className="rounded-xl"
+                onClick={() => {
+                  setProfileGateOpen(false);
+                  setProfileGateMode('required');
+                  setProfileGateErrors({});
+                }}
+              >
+                Cancelar
+              </Button>
+            ) : (
+              <div className="text-xs font-semibold text-gray-400">
+                Esse cadastro e obrigatorio para seguir com a compra.
+              </div>
+            )}
+
+            <Button type="button" onClick={handleSaveProfileGate} disabled={profileGateSaving} className="rounded-xl bg-wine px-8">
+              {profileGateSaving ? 'Salvando...' : shouldCollectAddressInGate ? 'Salvar cadastro e endereço' : 'Salvar cadastro'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* Header/Logo for Checkout */}
@@ -319,6 +752,15 @@ export const Checkout: React.FC = () => {
                   <div className="space-y-1.5"><Label className="text-xs font-bold text-gray-500 uppercase px-1">Sobrenome</Label><Input value={formData.lastName} onChange={e => handleInputChange('lastName', e.target.value)} className="rounded-xl bg-gray-50/50 border-gray-100 h-12" /></div>
                   <div className="md:col-span-2 space-y-1.5"><Label className="text-xs font-bold text-gray-500 uppercase px-1">E-mail</Label><Input type="email" value={formData.email} onChange={e => handleInputChange('email', e.target.value)} className="rounded-xl bg-gray-50/50 border-gray-100 h-12" /></div>
                   <div className="md:col-span-2 space-y-1.5"><Label className="text-xs font-bold text-gray-500 uppercase px-1">WhatsApp / Telefone</Label><Input value={formData.phone} onChange={e => handleInputChange('phone', e.target.value)} className="rounded-xl bg-gray-50/50 border-gray-100 h-12" /></div>
+                  <div className="md:col-span-2 space-y-1.5">
+                    <Label className="text-xs font-bold text-gray-500 uppercase px-1">CPF / CNPJ</Label>
+                    <Input
+                      value={formData.document}
+                      onChange={e => handleInputChange('document', e.target.value.replace(/\D/g, '').slice(0, 14))}
+                      className="rounded-xl bg-gray-50/50 border-gray-100 h-12"
+                      placeholder="Somente numeros"
+                    />
+                  </div>
                 </div>
               </div>
             )}
@@ -327,6 +769,61 @@ export const Checkout: React.FC = () => {
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-gray-100">
                   <h2 className="text-xl font-serif font-black text-gray-900 mb-6 flex items-center gap-3"><MapPin className="text-wine h-6 w-6" /> Entrega</h2>
+                  {user && (
+                    <div className="mb-6 rounded-2xl border border-amber-100 bg-amber-50/80 p-4">
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                        <div className="space-y-1">
+                          <p className="text-xs font-black uppercase tracking-[0.2em] text-amber-700">Enderecos salvos</p>
+                          <p className="text-sm text-amber-900">
+                            Escolha um endereço já salvo ou cadastre outro sem sair do checkout.
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="rounded-xl border-amber-200 bg-white text-amber-900"
+                          onClick={() => openProfileGate('new-address')}
+                        >
+                          <Plus className="mr-2 h-4 w-4" />
+                          Adicionar endereço
+                        </Button>
+                      </div>
+
+                      <div className="mt-4">
+                        <Select
+                          value={selectedAddressId}
+                          onValueChange={(value) => {
+                            if (value === CUSTOM_ADDRESS_VALUE) {
+                              setSelectedAddressId(CUSTOM_ADDRESS_VALUE);
+                              return;
+                            }
+
+                            const selectedAddress = savedAddresses.find(address => address.id === value);
+                            if (selectedAddress) applySavedAddress(selectedAddress);
+                          }}
+                        >
+                          <SelectTrigger className="h-12 rounded-xl border-amber-200 bg-white">
+                            <SelectValue placeholder={savedAddressesLoading ? 'Carregando endereços...' : 'Selecione um endereço salvo'} />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl">
+                            {savedAddresses.map(address => (
+                              <SelectItem key={address.id} value={address.id}>
+                                {address.label || 'Endereço'} - {address.street}, {address.number}
+                              </SelectItem>
+                            ))}
+                            <SelectItem value={CUSTOM_ADDRESS_VALUE}>Preencher manualmente</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {!hasSavedAddress && (
+                        <p className="mt-3 text-xs font-semibold text-amber-800">
+                          Salve pelo menos um endereço para liberar a finalização da compra.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   <div className="space-y-5">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div className="sm:col-span-1 space-y-1.5"><Label className="text-xs font-bold text-gray-500 uppercase">CEP</Label><Input value={formData.zipCode} onChange={e => handleInputChange('zipCode', e.target.value.replace(/\D/g, '').slice(0, 8).replace(/(\d{5})(\d)/, '$1-$2'))} className="rounded-xl bg-gray-50/50 border-gray-100 h-12" placeholder="00000-000" /></div>

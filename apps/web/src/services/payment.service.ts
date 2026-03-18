@@ -13,6 +13,7 @@ export interface PaymentIntent {
     pix_expiration?: string;
     boleto_url?: string;
     is_test_mode?: boolean;
+    gateway_error_message?: string;
 }
 
 export interface CreditCardData {
@@ -23,17 +24,76 @@ export interface CreditCardData {
     installments: number;
 }
 
+export interface CardTokenizedData {
+    token: string;
+    installments: number;
+}
+
 export interface CustomerData {
     name: string;
     email: string;
     phone: string;
     document: string; // CPF/CNPJ
+    code?: string;
+    document_type?: 'CPF' | 'CNPJ';
+    type?: 'individual' | 'company';
+    metadata?: Record<string, unknown>;
+    address?: {
+        line_1: string;
+        line_2?: string;
+        zip_code: string;
+        city: string;
+        state: string;
+        country: string;
+    };
+}
+
+export interface PaymentOrderItem {
+    amount: number;
+    description: string;
+    quantity: number;
+    code?: string;
+    category?: string;
+}
+
+export interface PaymentShippingData {
+    amount: number;
+    description?: string;
+    recipient_name: string;
+    recipient_phone: string;
+    address: {
+        line_1: string;
+        line_2?: string;
+        zip_code: string;
+        city: string;
+        state: string;
+        country: string;
+    };
+    max_delivery_date?: string;
+    estimated_delivery_date?: string;
+    type?: string;
 }
 
 export interface PaymentRequestOptions {
     orderId?: string;
     idempotencyKey?: string;
     description?: string;
+    orderCode?: string;
+    items?: PaymentOrderItem[];
+    shipping?: PaymentShippingData;
+    billingAddress?: {
+        line_1: string;
+        line_2?: string;
+        zip_code: string;
+        city: string;
+        state: string;
+        country: string;
+    };
+}
+
+interface PagarmeClientConfig {
+    testMode: boolean;
+    publicKey: string;
 }
 
 class PaymentService extends BaseService<any> {
@@ -119,6 +179,69 @@ class PaymentService extends BaseService<any> {
         return parsed as PaymentIntent;
     }
 
+    private async getPagarmeClientConfig(): Promise<PagarmeClientConfig> {
+        const { data, error } = await supabase
+            .from('site_settings' as any)
+            .select('key, value')
+            .in('key', [
+                'payment_pagarme_test_mode',
+                'payment_pagarme_public_key',
+                'payment_pagarme_test_public_key',
+            ]);
+
+        if (error) {
+            throw new Error('Não foi possível carregar a configuração pública do Pagar.me.');
+        }
+
+        const getSetting = (key: string) => data?.find((item: any) => item.key === key)?.value;
+        const testMode = getSetting('payment_pagarme_test_mode') === true || getSetting('payment_pagarme_test_mode') === 'true';
+        const publicKey = String(
+            testMode
+                ? (getSetting('payment_pagarme_test_public_key') || getSetting('payment_pagarme_public_key') || '')
+                : (getSetting('payment_pagarme_public_key') || '')
+        ).trim();
+
+        if (!publicKey) {
+            throw new Error('Public Key do Pagar.me não configurada.');
+        }
+
+        return { testMode, publicKey };
+    }
+
+    async tokenizeCard(card: Omit<CreditCardData, 'installments'>): Promise<string> {
+        const { publicKey } = await this.getPagarmeClientConfig();
+        const [expMonth, expYear] = (card.expiry || '').split('/');
+
+        const response = await fetch(`https://api.pagar.me/core/v5/tokens?appId=${encodeURIComponent(publicKey)}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                type: 'card',
+                card: {
+                    number: card.number.replace(/\s+/g, ''),
+                    holder_name: card.name,
+                    exp_month: parseInt(expMonth || '0', 10),
+                    exp_year: parseInt(expYear || '0', 10),
+                    cvv: card.cvv,
+                },
+            }),
+        });
+
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok || !payload?.id) {
+            const message =
+                payload?.message ||
+                payload?.error ||
+                'Não foi possível tokenizar o cartão no Pagar.me.';
+            throw new Error(message);
+        }
+
+        return payload.id as string;
+    }
+
     /**
      * Process a credit card payment.
      * @param amount Amount in decimal (e.g. 150.50)
@@ -127,7 +250,7 @@ class PaymentService extends BaseService<any> {
      */
     async processCard(
         amount: number,
-        card: CreditCardData | { token: string },
+        card: CreditCardData | CardTokenizedData,
         customer: CustomerData,
         options?: PaymentRequestOptions
     ): Promise<PaymentIntent> {
@@ -136,16 +259,33 @@ class PaymentService extends BaseService<any> {
             paymentMethod: 'credit_card',
             amount,
             cardToken: card,
-            installments: (card as CreditCardData).installments || 1,
+            installments: card.installments || 1,
             orderId: options?.orderId,
             idempotencyKey: options?.idempotencyKey,
             description: options?.description,
+            orderCode: options?.orderCode,
+            items: options?.items,
+            shipping: options?.shipping,
+            billingAddress: options?.billingAddress,
             customer: {
                 name: customer.name,
                 email: customer.email,
                 document: customer.document,
-                phone: customer.phone
+                phone: customer.phone,
+                address: customer.address,
+                code: customer.code,
+                type: customer.type,
+                document_type: customer.document_type,
+                metadata: customer.metadata,
             }
+        });
+    }
+
+    async cancelRemoteOrder(providerTransactionId: string): Promise<void> {
+        await this.callProcessPayment({
+            gateway: 'pagarme',
+            action: 'cancel_remote_order',
+            providerTransactionId,
         });
     }
 
@@ -160,11 +300,20 @@ class PaymentService extends BaseService<any> {
             orderId: options?.orderId,
             idempotencyKey: options?.idempotencyKey,
             description: options?.description,
+            orderCode: options?.orderCode,
+            items: options?.items,
+            shipping: options?.shipping,
+            billingAddress: options?.billingAddress,
             customer: {
                 name: customer.name,
                 email: customer.email,
                 document: customer.document,
-                phone: customer.phone
+                phone: customer.phone,
+                address: customer.address,
+                code: customer.code,
+                type: customer.type,
+                document_type: customer.document_type,
+                metadata: customer.metadata,
             }
         });
     }
@@ -180,11 +329,20 @@ class PaymentService extends BaseService<any> {
             orderId: options?.orderId,
             idempotencyKey: options?.idempotencyKey,
             description: options?.description,
+            orderCode: options?.orderCode,
+            items: options?.items,
+            shipping: options?.shipping,
+            billingAddress: options?.billingAddress,
             customer: {
                 name: customer.name,
                 email: customer.email,
                 document: customer.document,
-                phone: customer.phone
+                phone: customer.phone,
+                address: customer.address,
+                code: customer.code,
+                type: customer.type,
+                document_type: customer.document_type,
+                metadata: customer.metadata,
             }
         });
     }

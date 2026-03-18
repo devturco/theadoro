@@ -62,8 +62,12 @@ const AdminSettings = () => {
     const [pagarmeEnabledId, setPagarmeEnabledId] = useState<string | null>(null);
     const [pagarmeTestMode, setPagarmeTestMode] = useState(false);
     const [pagarmeTestModeId, setPagarmeTestModeId] = useState<string | null>(null);
+    const [pagarmePublicKey, setPagarmePublicKey] = useState('');
+    const [pagarmePublicKeyId, setPagarmePublicKeyId] = useState<string | null>(null);
     const [pagarmeSecretKey, setPagarmeSecretKey] = useState('');
     const [pagarmeSecretKeyId, setPagarmeSecretKeyId] = useState<string | null>(null);
+    const [pagarmeTestPublicKey, setPagarmeTestPublicKey] = useState('');
+    const [pagarmeTestPublicKeyId, setPagarmeTestPublicKeyId] = useState<string | null>(null);
     const [pagarmeTestSecretKey, setPagarmeTestSecretKey] = useState('');
     const [pagarmeTestSecretKeyId, setPagarmeTestSecretKeyId] = useState<string | null>(null);
 
@@ -190,10 +194,20 @@ const AdminSettings = () => {
                 setPagarmeTestMode(Boolean(pgTestMode.value));
                 setPagarmeTestModeId(pgTestMode.id);
             }
+            const pgPublicKey = settings.find(s => s.key === 'payment_pagarme_public_key');
+            if (pgPublicKey) {
+                setPagarmePublicKey(String(pgPublicKey.value));
+                setPagarmePublicKeyId(pgPublicKey.id);
+            }
             const pgTestKey = settings.find(s => s.key === 'payment_pagarme_test_secret_key');
             if (pgTestKey) {
                 setPagarmeTestSecretKey(String(pgTestKey.value));
                 setPagarmeTestSecretKeyId(pgTestKey.id);
+            }
+            const pgTestPublicKey = settings.find(s => s.key === 'payment_pagarme_test_public_key');
+            if (pgTestPublicKey) {
+                setPagarmeTestPublicKey(String(pgTestPublicKey.value));
+                setPagarmeTestPublicKeyId(pgTestPublicKey.id);
             }
 
             // Integrations - Asaas
@@ -325,7 +339,9 @@ const AdminSettings = () => {
             // Allow the UI to update with the new ID if one was created
             if (key === 'payment_pagarme_enabled') setPagarmeEnabledId(newId);
             if (key === 'payment_pagarme_test_mode') setPagarmeTestModeId(newId);
+            if (key === 'payment_pagarme_public_key') setPagarmePublicKeyId(newId);
             if (key === 'payment_pagarme_secret_key') setPagarmeSecretKeyId(newId);
+            if (key === 'payment_pagarme_test_public_key') setPagarmeTestPublicKeyId(newId);
             if (key === 'payment_pagarme_test_secret_key') setPagarmeTestSecretKeyId(newId);
 
             if (key === 'payment_asaas_enabled') setAsaasEnabledId(newId);
@@ -682,6 +698,27 @@ const AdminSettings = () => {
                                             />
                                         </div>
                                         <div className="space-y-2">
+                                            <Label htmlFor="pagarme-pk">Public Key Produção (pk_live_...)</Label>
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    id="pagarme-pk"
+                                                    value={pagarmePublicKey}
+                                                    onChange={(e) => setPagarmePublicKey(e.target.value)}
+                                                    placeholder="pk_live_..."
+                                                />
+                                                <Button
+                                                    onClick={() => handleSaveIntegration(pagarmePublicKeyId, pagarmePublicKey, 'payment_pagarme_public_key', 'Pagar.me Public Key')}
+                                                    disabled={updating}
+                                                    variant="secondary"
+                                                >
+                                                    Salvar
+                                                </Button>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">
+                                                Usada para tokenização do cartão no frontend.
+                                            </p>
+                                        </div>
+                                        <div className="space-y-2">
                                             <Label htmlFor="pagarme-sk">Secret Key Produção (sk_live_...)</Label>
                                             <div className="flex gap-2">
                                                 <Input
@@ -693,6 +730,24 @@ const AdminSettings = () => {
                                                 />
                                                 <Button
                                                     onClick={() => handleSaveIntegration(pagarmeSecretKeyId, pagarmeSecretKey, 'payment_pagarme_secret_key', 'Pagar.me Secret Key')}
+                                                    disabled={updating}
+                                                    variant="secondary"
+                                                >
+                                                    Salvar
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="pagarme-pk-test">Public Key Teste (pk_test_...)</Label>
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    id="pagarme-pk-test"
+                                                    value={pagarmeTestPublicKey}
+                                                    onChange={(e) => setPagarmeTestPublicKey(e.target.value)}
+                                                    placeholder="pk_test_..."
+                                                />
+                                                <Button
+                                                    onClick={() => handleSaveIntegration(pagarmeTestPublicKeyId, pagarmeTestPublicKey, 'payment_pagarme_test_public_key', 'Pagar.me Test Public Key')}
                                                     disabled={updating}
                                                     variant="secondary"
                                                 >

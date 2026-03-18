@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@theadoro/ui';
 import { Button } from '@theadoro/ui';
@@ -6,6 +6,8 @@ import { Badge } from '@theadoro/ui';
 import { Separator } from '@theadoro/ui';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrders } from '@/hooks/useOrders';
+import { usePixCountdown } from '@/hooks/usePixCountdown';
+import { cancelExpiredPixOrder, regeneratePixForOrder } from '@/services/pixOrder.service';
 import { Order } from '@/types/order';
 import {
     ArrowLeft,
@@ -18,7 +20,9 @@ import {
     Clock,
     MessageCircle,
     ChevronRight,
-    ExternalLink
+    Copy,
+    Loader2,
+    RefreshCcw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -29,6 +33,9 @@ export default function OrderDetail() {
     const { user } = useAuth();
     const { getOrder, loading } = useOrders();
     const [order, setOrder] = useState<Order | null>(null);
+    const [regeneratingPix, setRegeneratingPix] = useState(false);
+    const [cancellingExpiredOrder, setCancellingExpiredOrder] = useState(false);
+    const [cancelAttemptFailed, setCancelAttemptFailed] = useState(false);
 
     useEffect(() => {
         if (user && id) {
@@ -47,27 +54,56 @@ export default function OrderDetail() {
         }
     };
 
-    if (loading && !order) {
-        return (
-            <div className="flex items-center justify-center min-h-[400px]">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
-        );
-    }
+    const notes = order?.notes ? (typeof order.notes === 'string' ? JSON.parse(order.notes) : order.notes) : {};
+    const shippingAddress = order?.shipping_address ? (typeof order.shipping_address === 'string' ? JSON.parse(order.shipping_address) : order.shipping_address) : null;
 
-    if (!order) return null;
-
-    // Helper to safely access parsed notes and address
-    // OrderService/Supabase might return these as strings or objects depending on client config
-    const notes = order.notes ? (typeof order.notes === 'string' ? JSON.parse(order.notes) : order.notes) : {};
-    const shippingAddress = order.shipping_address ? (typeof order.shipping_address === 'string' ? JSON.parse(order.shipping_address) : order.shipping_address) : null;
-
-    // Derived values
     const giftWrapPrice = notes.gift_wrap_price || notes.giftWrapPrice || 0;
-    const shippingCost = order.shipping_cost || notes.shipping_cost || notes.shippingCost || 0;
-    const discountAmount = order.discount_amount || notes.discount_amount || notes.discountAmount || 0;
-    const subtotal = order.subtotal || notes.subtotal || notes.subtotal_amount ||
-        (order.total_amount - shippingCost - giftWrapPrice + discountAmount);
+    const shippingCost = order?.shipping_cost || notes.shipping_cost || notes.shippingCost || 0;
+    const discountAmount = order?.discount_amount || notes.discount_amount || notes.discountAmount || 0;
+    const subtotal = order?.subtotal || notes.subtotal || notes.subtotal_amount ||
+        ((order?.total_amount || 0) - shippingCost - giftWrapPrice + discountAmount);
+    const paymentInfo = notes?.paymentInfo || {};
+    const paymentMethod = (order?.payment_method || '').toLowerCase();
+    const isPixPayment = paymentMethod === 'pix';
+    const isCardPayment = ['credit', 'credit_card', 'debit', 'debit_card'].includes(paymentMethod);
+    const orderCancelled = order?.status === 'cancelled';
+    const paymentPending = paymentInfo.status === 'pending' || order?.status === 'pending';
+    const paymentFailed = paymentInfo.status === 'failed';
+    const paymentExpired = paymentInfo.status === 'expired';
+    const paymentApproved =
+        !orderCancelled &&
+        !paymentFailed &&
+        !paymentExpired &&
+        (paymentInfo.status === 'approved' || ['confirmed', 'processing', 'shipped', 'delivered'].includes(order?.status || ''));
+    const pixCode = paymentInfo.pixCode || '';
+    const pixExpiration = paymentInfo.pixExpiration || '';
+    const pixCancelAt = paymentInfo.cancelAt || '';
+    const gatewayErrorMessage = paymentInfo.gatewayErrorMessage || '';
+    const paymentMethodLabel = isPixPayment
+        ? 'PIX'
+        : isCardPayment
+            ? 'cartão'
+            : (order?.payment_method || 'pagamento');
+    const pixLifecycle = usePixCountdown(
+        {
+            pixExpiration,
+            cancelAt: pixCancelAt,
+            status: paymentInfo.status,
+        },
+        isPixPayment && order?.status === 'pending'
+    );
+
+    const qrCodeUrl = paymentInfo.pixUrl
+        ? paymentInfo.pixUrl
+        : pixCode
+            ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(pixCode)}`
+            : '';
+
+    useEffect(() => {
+        if (!pixLifecycle.isCancellationDue || order?.status !== 'pending') {
+            setCancelAttemptFailed(false);
+        }
+    }, [order?.status, pixLifecycle.isCancellationDue]);
 
     const steps = [
         { label: 'Pendente', icon: Clock, status: 'pending' },
@@ -77,7 +113,7 @@ export default function OrderDetail() {
         { label: 'Entregue', icon: CheckCircle, status: 'delivered' },
     ];
 
-    const currentStepIndex = steps.findIndex(s => s.status === order.status);
+    const currentStepIndex = steps.findIndex(s => s.status === order?.status);
 
     const formatDate = (date: string) => {
         return new Date(date).toLocaleDateString('pt-BR', {
@@ -88,6 +124,71 @@ export default function OrderDetail() {
             minute: '2-digit'
         });
     };
+
+    const handleCopyPix = async () => {
+        if (!pixCode) return;
+
+        try {
+            await navigator.clipboard.writeText(pixCode);
+            toast.success('Código PIX copiado!');
+        } catch (error) {
+            toast.error('Não foi possível copiar o código PIX.');
+        }
+    };
+
+    useEffect(() => {
+        const syncExpiredOrder = async () => {
+            if (
+                !id ||
+                !isPixPayment ||
+                order?.status !== 'pending' ||
+                !pixLifecycle.isCancellationDue ||
+                cancellingExpiredOrder ||
+                cancelAttemptFailed
+            ) {
+                return;
+            }
+
+            try {
+                setCancellingExpiredOrder(true);
+                await cancelExpiredPixOrder(id);
+                await loadOrderDetails();
+            } catch (error) {
+                setCancelAttemptFailed(true);
+                console.error('Erro ao cancelar pedido PIX expirado:', error);
+            } finally {
+                setCancellingExpiredOrder(false);
+            }
+        };
+
+        syncExpiredOrder();
+    }, [cancelAttemptFailed, cancellingExpiredOrder, id, isPixPayment, order?.status, pixLifecycle.isCancellationDue]);
+
+    const handleRegeneratePix = async () => {
+        if (!id) return;
+
+        try {
+            setRegeneratingPix(true);
+            await regeneratePixForOrder(id);
+            await loadOrderDetails();
+            toast.success('Novo PIX gerado com sucesso.');
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Não foi possível gerar um novo PIX.';
+            toast.error(message);
+        } finally {
+            setRegeneratingPix(false);
+        }
+    };
+
+    if (loading && !order) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+        );
+    }
+
+    if (!order) return null;
 
     return (
         <div className="space-y-6 max-w-5xl mx-auto pb-12">
@@ -106,19 +207,14 @@ export default function OrderDetail() {
                 </div>
             </div>
 
-            {/* Progress Timeline */}
             <Card>
                 <CardContent className="pt-8 pb-12">
                     <div className="relative flex justify-between items-center px-4 md:px-12">
-                        {/* Progress Bar Background */}
                         <div className="absolute left-0 right-0 top-1/2 h-1 bg-gray-100 -translate-y-1/2 mx-12 hidden md:block"></div>
-
-                        {/* Active Progress Bar */}
                         <div
                             className="absolute left-0 top-1/2 h-1 bg-primary -translate-y-1/2 transition-all duration-500 mx-12 hidden md:block"
                             style={{ width: `${(Math.max(0, currentStepIndex) / (steps.length - 1)) * 100}%` }}
                         ></div>
-
                         {steps.map((step, index) => {
                             const Icon = step.icon;
                             const isCompleted = index <= currentStepIndex;
@@ -127,15 +223,15 @@ export default function OrderDetail() {
                             return (
                                 <div key={step.status} className="relative flex flex-col items-center z-10">
                                     <div className={cn(
-                                        "w-10 h-10 rounded-full flex items-center justify-center border-2 transition-colors duration-300",
-                                        isCompleted ? "bg-primary border-primary text-white" : "bg-white border-gray-200 text-gray-400",
-                                        isCurrent && "ring-4 ring-primary/20 scale-110"
+                                        'w-10 h-10 rounded-full flex items-center justify-center border-2 transition-colors duration-300',
+                                        isCompleted ? 'bg-primary border-primary text-white' : 'bg-white border-gray-200 text-gray-400',
+                                        isCurrent && 'ring-4 ring-primary/20 scale-110'
                                     )}>
                                         <Icon className="h-5 w-5" />
                                     </div>
                                     <span className={cn(
-                                        "absolute top-12 text-xs font-medium whitespace-nowrap text-center",
-                                        isCompleted ? "text-primary" : "text-gray-400"
+                                        'absolute top-12 text-xs font-medium whitespace-nowrap text-center',
+                                        isCompleted ? 'text-primary' : 'text-gray-400'
                                     )}>
                                         {step.label}
                                     </span>
@@ -147,7 +243,6 @@ export default function OrderDetail() {
             </Card>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Order Items */}
                 <div className="lg:col-span-2 space-y-6">
                     <Card>
                         <CardHeader>
@@ -195,7 +290,6 @@ export default function OrderDetail() {
                         </CardContent>
                     </Card>
 
-                    {/* Tracking */}
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-lg flex items-center gap-2">
@@ -207,17 +301,16 @@ export default function OrderDetail() {
                             <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg">
                                 <div className="flex items-center justify-between mb-4">
                                     <div>
-                                        <p className="text-sm font-medium text-blue-900">Método de Envio</p>
-                                        <p className="text-blue-700 font-bold">{notes.shipping_method || 'Entrega Padrão'}</p>
+                                        <p className="text-sm font-medium text-blue-900">Método de envio</p>
+                                        <p className="text-blue-700 font-bold">{notes.shipping_method || 'Entrega padrão'}</p>
                                     </div>
                                     <div className="text-right">
-                                        <p className="text-sm font-medium text-blue-900">Previsão de Entrega</p>
+                                        <p className="text-sm font-medium text-blue-900">Previsão de entrega</p>
                                         <p className="text-blue-700 font-bold">
                                             {order.estimated_delivery ? new Date(order.estimated_delivery).toLocaleDateString('pt-BR') : 'A definir'}
                                         </p>
                                     </div>
                                 </div>
-
                                 {order.status === 'shipped' || order.status === 'delivered' ? (
                                     <div className="flex items-center gap-2 text-sm">
                                         <span className="font-semibold text-blue-800">Código:</span>
@@ -232,8 +325,6 @@ export default function OrderDetail() {
                                     <p className="text-sm text-blue-600">O código será gerado assim que o vendedor despachar seu produto.</p>
                                 )}
                             </div>
-
-                            {/* Tracking History */}
                             <div className="space-y-4">
                                 <div className="flex gap-4">
                                     <div className="flex flex-col items-center">
@@ -241,18 +332,48 @@ export default function OrderDetail() {
                                         <div className="w-0.5 h-full bg-gray-200 mt-1"></div>
                                     </div>
                                     <div>
-                                        <p className="text-sm font-bold">Pedido Confirmado</p>
+                                        <p className="text-sm font-bold">Pedido criado</p>
                                         <p className="text-xs text-muted-foreground">{formatDate(order.created_at)}</p>
                                     </div>
                                 </div>
-                                {order.status !== 'pending' && (
+                                {paymentPending && (
                                     <div className="flex gap-4">
                                         <div className="flex flex-col items-center">
-                                            <div className="w-2.5 h-2.5 bg-primary rounded-full"></div>
+                                            <div className="w-2.5 h-2.5 bg-amber-500 rounded-full"></div>
                                             <div className="w-0.5 h-full bg-gray-200 mt-1"></div>
                                         </div>
                                         <div>
-                                            <p className="text-sm font-bold">Pagamento Aprovado</p>
+                                            <p className="text-sm font-bold">Aguardando pagamento</p>
+                                            <p className="text-xs text-muted-foreground">
+                                                Assim que o pagamento for confirmado, o pedido avança automaticamente.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                                {(paymentFailed || paymentExpired || orderCancelled || paymentApproved) && (
+                                    <div className="flex gap-4">
+                                        <div className="flex flex-col items-center">
+                                            <div className={cn(
+                                                'w-2.5 h-2.5 rounded-full',
+                                                paymentFailed || paymentExpired || orderCancelled ? 'bg-red-500' : 'bg-primary'
+                                            )}></div>
+                                            <div className="w-0.5 h-full bg-gray-200 mt-1"></div>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-bold">
+                                                {paymentFailed
+                                                    ? 'Pagamento recusado'
+                                                    : paymentExpired
+                                                        ? 'PIX expirado'
+                                                        : orderCancelled
+                                                            ? 'Pedido cancelado'
+                                                            : 'Pagamento aprovado'}
+                                            </p>
+                                            {(paymentFailed || paymentExpired || orderCancelled) && (
+                                                <p className="text-xs text-muted-foreground">
+                                                    {gatewayErrorMessage || 'O pedido não seguiu para processamento.'}
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
                                 )}
@@ -260,10 +381,7 @@ export default function OrderDetail() {
                         </CardContent>
                     </Card>
                 </div>
-
-                {/* Sidebar Info */}
                 <div className="space-y-6">
-                    {/* Summary */}
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-lg">Resumo</CardTitle>
@@ -298,23 +416,143 @@ export default function OrderDetail() {
                                 <span>Total</span>
                                 <span className="text-primary">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(order.total_amount)}</span>
                             </div>
-
                             <div className="pt-4 space-y-2">
                                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                     <CreditCard className="h-4 w-4" />
-                                    <span>Pago via {(order.payment_method || 'Desconhecido').toUpperCase()}</span>
+                                    <span>Pagamento via {paymentMethodLabel.toUpperCase()}</span>
                                 </div>
+                                <p className={cn(
+                                    'text-sm font-medium',
+                                    paymentFailed || paymentExpired ? 'text-red-600' : paymentApproved ? 'text-green-600' : 'text-amber-600'
+                                )}>
+                                    {paymentFailed
+                                        ? 'Pagamento recusado'
+                                        : paymentExpired
+                                            ? 'PIX expirado'
+                                            : paymentApproved
+                                                ? 'Pagamento aprovado'
+                                                : 'Pagamento pendente'}
+                                </p>
                             </div>
                         </CardContent>
                     </Card>
 
-                    {/* Gift Options */}
+                    <Card className={cn(
+                        paymentFailed || paymentExpired
+                            ? 'border-red-200 bg-red-50/40'
+                            : paymentPending
+                                ? 'border-amber-200 bg-amber-50/40'
+                                : 'border-green-200 bg-green-50/40'
+                    )}>
+                        <CardHeader className="pb-3">
+                            <CardTitle className="text-lg flex items-center gap-2">
+                                <CreditCard className="h-5 w-5" />
+                                Pagamento
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            {paymentFailed ? (
+                                <>
+                                    <p className="text-sm text-red-700">
+                                        O pagamento foi recusado e este pedido ainda não pode seguir para processamento.
+                                    </p>
+                                    {gatewayErrorMessage && (
+                                        <div className="rounded-lg border border-red-200 bg-white p-3 text-sm text-red-800">
+                                            {gatewayErrorMessage}
+                                        </div>
+                                    )}
+                                </>
+                            ) : paymentExpired ? (
+                                <p className="text-sm text-red-700">
+                                    O PIX expirou e o pedido foi cancelado automaticamente porque nenhum novo código foi gerado a tempo.
+                                </p>
+                            ) : paymentPending && isPixPayment ? (
+                                <>
+                                    <p className="text-sm text-amber-800">
+                                        O pagamento via PIX ainda não foi confirmado.
+                                        Se você já pagou, aguarde alguns minutos que esta tela vai mudar automaticamente.
+                                        Se ainda não pagou, use as informações abaixo.
+                                    </p>
+                                    {!pixLifecycle.isExpired && pixLifecycle.formattedExpirationCountdown && (
+                                        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center">
+                                            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
+                                                Pague em até
+                                            </p>
+                                            <p className="mt-1 text-4xl font-bold tabular-nums text-emerald-900">
+                                                {pixLifecycle.formattedExpirationCountdown}
+                                            </p>
+                                            <p className="mt-2 text-sm text-emerald-800">
+                                                Depois disso, o QR Code expira.
+                                            </p>
+                                        </div>
+                                    )}
+                                    {pixLifecycle.isInGracePeriod && pixLifecycle.formattedCancellationCountdown && (
+                                        <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-4 text-center">
+                                            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-700">
+                                                PIX expirado
+                                            </p>
+                                            <p className="mt-1 text-3xl font-bold tabular-nums text-amber-900">
+                                                {pixLifecycle.formattedCancellationCountdown}
+                                            </p>
+                                            <p className="mt-2 text-sm text-amber-800">
+                                                Você ainda pode gerar um novo PIX antes do cancelamento automático do pedido.
+                                            </p>
+                                        </div>
+                                    )}
+                                    {qrCodeUrl && !pixLifecycle.isExpired && (
+                                        <div className="flex justify-center rounded-xl border bg-white p-4">
+                                            <img src={qrCodeUrl} alt="QR Code PIX" className="h-48 w-48 max-w-full" />
+                                        </div>
+                                    )}
+                                    {pixCode && (
+                                        <div className="space-y-2">
+                                            <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Copia e cola</p>
+                                            <div className="rounded-xl border bg-white p-3 text-sm text-gray-700 break-all">
+                                                {pixCode}
+                                            </div>
+                                            <Button type="button" variant="outline" className="w-full" onClick={handleCopyPix} disabled={pixLifecycle.isExpired}>
+                                                <Copy className="mr-2 h-4 w-4" />
+                                                Copiar código PIX
+                                            </Button>
+                                        </div>
+                                    )}
+                                    <div className="space-y-1 text-xs text-amber-700">
+                                        {pixExpiration && (
+                                            <p>QR Code expira em {new Date(pixExpiration).toLocaleString('pt-BR')}.</p>
+                                        )}
+                                        {pixLifecycle.cancelAt && (
+                                            <p>Cancelamento automático do pedido em {new Date(pixLifecycle.cancelAt).toLocaleString('pt-BR')}.</p>
+                                        )}
+                                    </div>
+                                    {pixLifecycle.isInGracePeriod && (
+                                        <Button type="button" className="w-full" onClick={handleRegeneratePix} disabled={regeneratingPix}>
+                                            {regeneratingPix ? (
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            ) : (
+                                                <RefreshCcw className="mr-2 h-4 w-4" />
+                                            )}
+                                            Gerar novo PIX
+                                        </Button>
+                                    )}
+                                </>
+                            ) : paymentPending && isCardPayment ? (
+                                <p className="text-sm text-amber-800">
+                                    Seu pagamento com cartão foi enviado para processamento.
+                                    Se você já concluiu a compra, aguarde alguns minutos que esta tela será atualizada.
+                                </p>
+                            ) : (
+                                <p className="text-sm text-green-700">
+                                    Pagamento confirmado. O pedido já pode seguir normalmente para processamento e envio.
+                                </p>
+                            )}
+                        </CardContent>
+                    </Card>
                     {notes?.giftOptions?.is_gift && (
                         <Card className="border-purple-200 bg-purple-50/30">
                             <CardHeader className="pb-2">
                                 <CardTitle className="text-lg flex items-center gap-2 text-purple-900">
                                     <Gift className="h-5 w-5 text-purple-600" />
-                                    Opções de Presente
+                                    Opções de presente
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="text-sm space-y-4">
@@ -330,7 +568,7 @@ export default function OrderDetail() {
                                     )}
                                     <div className="flex-1">
                                         <p className="font-semibold text-purple-800">Embalagem:</p>
-                                        <p className="text-purple-700">{notes.giftOptions.wrap_style_name || 'Embalagem Selecionada'}</p>
+                                        <p className="text-purple-700">{notes.giftOptions.wrap_style_name || 'Embalagem selecionada'}</p>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
@@ -357,7 +595,6 @@ export default function OrderDetail() {
                         </Card>
                     )}
 
-                    {/* Delivery Address */}
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-lg flex items-center gap-2">
@@ -394,14 +631,14 @@ export default function OrderDetail() {
                                 }}
                             >
                                 <MessageCircle className="h-4 w-4" />
-                                Falar com Vendedor
+                                Falar com vendedor
                             </Button>
                         )}
                         <Button variant="ghost" className="w-full text-muted-foreground" size="sm" onClick={() => navigate('/buyer/support')}>
                             Problema com o pedido? Fale com o suporte
                         </Button>
                         <Button variant="ghost" className="w-full text-muted-foreground" size="sm">
-                            Imprimir Recibo
+                            Imprimir recibo
                         </Button>
                     </div>
                 </div>

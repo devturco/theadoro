@@ -1,8 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { CheckCircle, Copy, CreditCard, Home, Loader2, QrCode, ShoppingBag } from 'lucide-react';
+import {
+    CheckCircle,
+    Copy,
+    CreditCard,
+    Home,
+    Loader2,
+    QrCode,
+    RefreshCcw,
+    ShoppingBag,
+} from 'lucide-react';
 import { Button } from '@theadoro/ui';
 import { useCheckout, Order } from '@/hooks/useCheckout';
+import { usePixCountdown } from '@/hooks/usePixCountdown';
+import { cancelExpiredPixOrder, regeneratePixForOrder } from '@/services/pixOrder.service';
 import { toast } from 'sonner';
 
 const OrderSuccess: React.FC = () => {
@@ -12,6 +23,9 @@ const OrderSuccess: React.FC = () => {
 
     const [order, setOrder] = useState<Order | null>(null);
     const [loading, setLoading] = useState(true);
+    const [regeneratingPix, setRegeneratingPix] = useState(false);
+    const [cancellingExpiredOrder, setCancellingExpiredOrder] = useState(false);
+    const [cancelAttemptFailed, setCancelAttemptFailed] = useState(false);
 
     useEffect(() => {
         const loadOrder = async () => {
@@ -31,7 +45,19 @@ const OrderSuccess: React.FC = () => {
     const isPix = order?.checkoutData.paymentMethod === 'pix';
     const pixCode = order?.paymentInfo?.pixCode || '';
     const pixExpiration = order?.paymentInfo?.pixExpiration || '';
+    const pixCancelAt = order?.paymentInfo?.cancelAt || '';
     const isTestMode = Boolean(order?.paymentInfo?.isTestMode);
+    const paymentFailed = order?.paymentInfo?.status === 'failed';
+    const paymentExpired = order?.paymentInfo?.status === 'expired' || order?.status === 'cancelled';
+    const gatewayErrorMessage = order?.paymentInfo?.gatewayErrorMessage || '';
+    const pixLifecycle = usePixCountdown(
+        {
+            pixExpiration,
+            cancelAt: pixCancelAt,
+            status: order?.paymentInfo?.status,
+        },
+        isPix && order?.status === 'pending'
+    );
 
     const qrCodeUrl = useMemo(() => {
         if (order?.paymentInfo?.pixUrl) return order.paymentInfo.pixUrl;
@@ -40,14 +66,66 @@ const OrderSuccess: React.FC = () => {
         return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(pixCode)}`;
     }, [order?.paymentInfo?.pixUrl, pixCode]);
 
+    useEffect(() => {
+        if (!pixLifecycle.isCancellationDue || order?.status !== 'pending') {
+            setCancelAttemptFailed(false);
+        }
+    }, [order?.status, pixLifecycle.isCancellationDue]);
+
+    useEffect(() => {
+        const syncExpiredOrder = async () => {
+            if (
+                !id ||
+                !isPix ||
+                order?.status !== 'pending' ||
+                !pixLifecycle.isCancellationDue ||
+                cancellingExpiredOrder ||
+                cancelAttemptFailed
+            ) {
+                return;
+            }
+
+            try {
+                setCancellingExpiredOrder(true);
+                await cancelExpiredPixOrder(id);
+                const refreshedOrder = await getOrderById(id);
+                setOrder(refreshedOrder);
+            } catch (error) {
+                setCancelAttemptFailed(true);
+                console.error('Erro ao cancelar pedido PIX expirado:', error);
+            } finally {
+                setCancellingExpiredOrder(false);
+            }
+        };
+
+        syncExpiredOrder();
+    }, [cancelAttemptFailed, cancellingExpiredOrder, getOrderById, id, isPix, order?.status, pixLifecycle.isCancellationDue]);
+
     const handleCopyPix = async () => {
         if (!pixCode) return;
 
         try {
             await navigator.clipboard.writeText(pixCode);
-            toast.success('Codigo PIX copiado!');
+            toast.success('Código PIX copiado!');
         } catch (error) {
-            toast.error('Nao foi possivel copiar o codigo PIX.');
+            toast.error('Não foi possível copiar o código PIX.');
+        }
+    };
+
+    const handleRegeneratePix = async () => {
+        if (!id) return;
+
+        try {
+            setRegeneratingPix(true);
+            await regeneratePixForOrder(id);
+            const refreshedOrder = await getOrderById(id);
+            setOrder(refreshedOrder);
+            toast.success('Novo PIX gerado com sucesso.');
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Não foi possível gerar um novo PIX.';
+            toast.error(message);
+        } finally {
+            setRegeneratingPix(false);
         }
     };
 
@@ -73,15 +151,19 @@ const OrderSuccess: React.FC = () => {
 
                 <div className="space-y-2">
                     <h1 className="text-2xl font-bold text-gray-900">
-                        {isPix ? 'Pedido recebido!' : 'Pedido Realizado!'}
+                        {isPix ? 'Pedido recebido!' : 'Pedido realizado!'}
                     </h1>
                     <p className="text-gray-600">
-                        {isPix
-                            ? 'Seu pedido foi criado. Agora finalize o pagamento via PIX para liberar o processamento.'
-                            : 'Seu pedido foi confirmado e ja esta sendo processado.'}
+                        {paymentFailed
+                            ? 'O pedido foi criado, mas o gateway recusou a geração do PIX. Revise os dados e tente novamente.'
+                            : paymentExpired
+                                ? 'O prazo do PIX terminou e este pedido foi encerrado automaticamente.'
+                                : isPix
+                                    ? 'Seu pedido foi criado. Agora finalize o pagamento via PIX para liberar o processamento.'
+                                    : 'Seu pedido foi confirmado e já está sendo processado.'}
                     </p>
                     <div className="pt-2">
-                        <span className="text-sm text-gray-500 uppercase tracking-wide">Numero do Pedido</span>
+                        <span className="text-sm text-gray-500 uppercase tracking-wide">Número do pedido</span>
                         <p className="text-lg font-mono font-medium text-gray-900 select-all">
                             #{id?.slice(0, 8).toUpperCase()}
                         </p>
@@ -97,7 +179,7 @@ const OrderSuccess: React.FC = () => {
                             <div>
                                 <h2 className="font-semibold text-gray-900">Pagamento via PIX</h2>
                                 <p className="text-sm text-gray-600">
-                                    Escaneie o QR Code ou copie o codigo abaixo para pagar.
+                                    Escaneie o QR Code ou copie o código abaixo para pagar.
                                 </p>
                                 {isTestMode && (
                                     <p className="mt-2 text-xs font-medium text-amber-700">
@@ -107,7 +189,35 @@ const OrderSuccess: React.FC = () => {
                             </div>
                         </div>
 
-                        {qrCodeUrl && (
+                        {!paymentFailed && order?.status === 'pending' && !pixLifecycle.isExpired && pixLifecycle.formattedExpirationCountdown && (
+                            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center">
+                                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
+                                    Pague em até
+                                </p>
+                                <p className="mt-1 text-4xl font-bold tabular-nums text-emerald-900">
+                                    {pixLifecycle.formattedExpirationCountdown}
+                                </p>
+                                <p className="mt-2 text-sm text-emerald-800">
+                                    Depois disso, o QR Code expira.
+                                </p>
+                            </div>
+                        )}
+
+                        {!paymentFailed && order?.status === 'pending' && pixLifecycle.isInGracePeriod && pixLifecycle.formattedCancellationCountdown && (
+                            <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-4 text-center">
+                                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-700">
+                                    PIX expirado
+                                </p>
+                                <p className="mt-1 text-3xl font-bold tabular-nums text-amber-900">
+                                    {pixLifecycle.formattedCancellationCountdown}
+                                </p>
+                                <p className="mt-2 text-sm text-amber-800">
+                                    Você ainda pode gerar um novo PIX antes do cancelamento automático do pedido.
+                                </p>
+                            </div>
+                        )}
+
+                        {qrCodeUrl && !pixLifecycle.isExpired && order?.status === 'pending' && (
                             <div className="flex justify-center rounded-xl bg-white p-4">
                                 <img
                                     src={qrCodeUrl}
@@ -117,7 +227,15 @@ const OrderSuccess: React.FC = () => {
                             </div>
                         )}
 
-                        {pixCode ? (
+                        {paymentFailed ? (
+                            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                                {gatewayErrorMessage || 'O gateway recusou a geração do PIX para este pedido.'}
+                            </div>
+                        ) : paymentExpired ? (
+                            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                                Este pedido foi cancelado porque o prazo do PIX terminou sem pagamento.
+                            </div>
+                        ) : pixCode ? (
                             <div className="space-y-2">
                                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                                     Copia e cola
@@ -129,21 +247,40 @@ const OrderSuccess: React.FC = () => {
                                     className="w-full"
                                     variant="secondary"
                                     onClick={handleCopyPix}
+                                    disabled={pixLifecycle.isExpired}
                                 >
                                     <Copy className="mr-2 h-4 w-4" />
-                                    Copiar codigo PIX
+                                    Copiar código PIX
                                 </Button>
                             </div>
                         ) : (
                             <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                                O gateway nao retornou o codigo PIX para exibicao. Verifique o pedido no painel admin.
+                                O gateway não retornou o código PIX para exibição. Verifique o pedido no painel admin.
                             </div>
                         )}
 
-                        {pixExpiration && (
-                            <p className="text-xs text-gray-500">
-                                Expira em: {new Date(pixExpiration).toLocaleString('pt-BR')}
-                            </p>
+                        {pixExpiration && !paymentFailed && (
+                            <div className="space-y-1 text-xs text-gray-500">
+                                <p>QR Code expira em: {new Date(pixExpiration).toLocaleString('pt-BR')}</p>
+                                {pixLifecycle.cancelAt && (
+                                    <p>Cancelamento automático do pedido em: {new Date(pixLifecycle.cancelAt).toLocaleString('pt-BR')}</p>
+                                )}
+                            </div>
+                        )}
+
+                        {order?.status === 'pending' && pixLifecycle.isInGracePeriod && (
+                            <Button
+                                className="w-full"
+                                onClick={handleRegeneratePix}
+                                disabled={regeneratingPix}
+                            >
+                                {regeneratingPix ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                    <RefreshCcw className="mr-2 h-4 w-4" />
+                                )}
+                                Gerar novo PIX
+                            </Button>
                         )}
                     </div>
                 )}
@@ -154,7 +291,7 @@ const OrderSuccess: React.FC = () => {
                         onClick={() => navigate('/buyer/orders')}
                     >
                         <ShoppingBag className="mr-2 h-4 w-4" />
-                        Meus Pedidos
+                        Meus pedidos
                     </Button>
 
                     <Button
@@ -163,7 +300,7 @@ const OrderSuccess: React.FC = () => {
                         onClick={() => navigate('/')}
                     >
                         <Home className="mr-2 h-4 w-4" />
-                        Voltar para Loja
+                        Voltar para loja
                     </Button>
                 </div>
 
@@ -171,8 +308,14 @@ const OrderSuccess: React.FC = () => {
                     <p className="flex items-center justify-center gap-2">
                         <CreditCard className="h-4 w-4" />
                         {isPix
-                            ? 'Assim que o PIX for compensado, o pedido segue para processamento.'
-                            : 'Voce recebera um e-mail com os detalhes da compra.'}
+                            ? paymentFailed
+                                ? 'Esse pedido precisa de uma nova tentativa de pagamento para seguir no processamento.'
+                                : paymentExpired
+                                    ? 'O pedido foi encerrado porque o PIX expirou sem pagamento.'
+                                    : pixLifecycle.isInGracePeriod
+                                        ? 'O QR Code expirou, mas você ainda pode gerar um novo PIX antes do cancelamento automático.'
+                                        : 'Assim que o PIX for compensado, o pedido segue para processamento.'
+                            : 'Você receberá um e-mail com os detalhes da compra.'}
                     </p>
                 </div>
             </div>

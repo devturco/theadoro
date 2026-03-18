@@ -179,7 +179,17 @@ export default function SellerOnboarding() {
             };
 
             if (paymentMethod === 'credit') {
-                const result = await paymentService.processCard(selectedPlan.price, cardData, customer);
+                const cardToken = await paymentService.tokenizeCard({
+                    number: cardData.number,
+                    name: cardData.name,
+                    expiry: cardData.expiry,
+                    cvv: cardData.cvv,
+                });
+
+                const result = await paymentService.processCard(selectedPlan.price, {
+                    token: cardToken,
+                    installments: cardData.installments,
+                }, customer);
                 if (result.status === 'succeeded' || result.status === 'pending') {
                     toast.success('Assinatura processada com sucesso!');
                     handleNext();
