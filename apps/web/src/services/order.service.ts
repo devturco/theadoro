@@ -22,6 +22,14 @@ class OrderService extends BaseService<Order> {
           *,
           buyer:profiles!orders_buyer_id_fkey(id, full_name, email, avatar_url),
           seller:profiles!orders_seller_id_fkey(id, full_name, email, avatar_url),
+          payments(
+            id,
+            provider,
+            provider_transaction_id,
+            status,
+            metadata,
+            created_at
+          ),
           items:order_items(
             id,
             product_id,
@@ -346,6 +354,14 @@ class OrderService extends BaseService<Order> {
           *,
           buyer:profiles!orders_buyer_id_fkey(id, full_name, email, avatar_url),
           seller:profiles!orders_seller_id_fkey(id, full_name, email, avatar_url),
+          payments(
+            id,
+            provider,
+            provider_transaction_id,
+            status,
+            metadata,
+            created_at
+          ),
           items:order_items(
             id,
             product_id,

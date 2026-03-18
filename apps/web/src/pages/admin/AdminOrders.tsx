@@ -418,6 +418,7 @@ const AdminOrders = () => {
             const giftOptions = notes.giftOptions || selectedOrder.gift_options;
             const deliverySchedule = notes.deliverySchedule || selectedOrder.delivery_schedule;
             const paymentInfo = notes.paymentInfo;
+            const paymentMetadata = (selectedOrder as any).payments?.[0]?.metadata;
             const hasValidScheduleDate = Boolean(
               deliverySchedule?.scheduled_date &&
               !Number.isNaN(new Date(deliverySchedule.scheduled_date).getTime())
@@ -551,6 +552,16 @@ const AdminOrders = () => {
                               <p className="mt-1 text-amber-700">
                                 O gateway ainda nÃ£o retornou o payload do PIX.
                               </p>
+                            )}
+                            {paymentMetadata?.gatewayResponse && (
+                              <details className="mt-2">
+                                <summary className="cursor-pointer font-medium text-[10px] text-slate-600">
+                                  Ver retorno bruto do gateway
+                                </summary>
+                                <pre className="mt-2 max-h-40 overflow-auto rounded bg-white p-2 text-[9px] text-slate-600">
+                                  {JSON.stringify(paymentMetadata.gatewayResponse, null, 2)}
+                                </pre>
+                              </details>
                             )}
                           </div>
                         )}

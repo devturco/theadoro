@@ -186,27 +186,14 @@ export const useCheckout = () => {
     return errors;
   }, []);
 
-  const buildPaymentIdempotencyKey = useCallback((items: CartItem[], data: CheckoutData, total: number) => {
-    const itemSignature = [...items]
-      .map((item) => `${item.product.id}:${item.quantity}`)
-      .sort()
-      .join('|');
+  const buildPaymentIdempotencyKey = useCallback((data: CheckoutData) => {
+    const attemptId =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-    const raw = [
-      user?.id || data.email.toLowerCase(),
-      data.paymentMethod,
-      data.zipCode.replace(/\D/g, ''),
-      Math.round(total * 100).toString(),
-      itemSignature
-    ].join(':');
-
-    let hash = 7;
-    for (const char of raw) {
-      hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
-    }
-
-    return `checkout:${data.paymentMethod}:${Math.round(total * 100)}:${hash.toString(16)}`;
-  }, [user?.id]);
+    return `checkout:${data.paymentMethod}:${attemptId}`;
+  }, []);
 
   const processOrder = useCallback(async (
     items: CartItem[],
@@ -256,7 +243,7 @@ export const useCheckout = () => {
 
       const total = subtotal + shipping + giftWrapPrice - discount;
       const tax = 0; // Tax is currently not part of the active pricing model but kept for interface consistency
-      const paymentIdempotencyKey = buildPaymentIdempotencyKey(items, checkoutData, total);
+      const paymentIdempotencyKey = buildPaymentIdempotencyKey(checkoutData);
       const paymentDescription = `Pedido TheAdoro - ${items.length} item(ns)`;
 
       // 3. Process Payment
@@ -440,9 +427,11 @@ export const useCheckout = () => {
         boletoUrl: paymentResult.boleto_url || null,
         isTestMode: paymentResult.is_test_mode || false,
         customerEmail: checkoutData.email,
+        gatewayResponse: (paymentResult as any).gateway_response || null,
       };
 
-      const { data: paymentRow, error: paymentPersistenceError } = await (supabase
+      let paymentRow: any = null;
+      const { data: insertedPaymentRow, error: paymentPersistenceError } = await (supabase
         .from('payments' as any)
         .insert({
           order_id: data.id,
@@ -456,9 +445,26 @@ export const useCheckout = () => {
         .select()
         .single() as any);
 
-      if (paymentPersistenceError) {
+      if (paymentPersistenceError?.code === '23505' && paymentResult.id) {
+        const { data: existingPaymentRow, error: existingPaymentLookupError } = await (supabase
+          .from('payments' as any)
+          .select('*')
+          .eq('provider', 'pagarme')
+          .eq('provider_transaction_id', paymentResult.id)
+          .maybeSingle() as any);
+
+        if (existingPaymentLookupError) {
+          console.error('Existing payment lookup FAILED:', existingPaymentLookupError);
+        } else {
+          paymentRow = existingPaymentRow;
+        }
+      } else if (paymentPersistenceError) {
         console.error('Payment persistence FAILED:', paymentPersistenceError);
       } else {
+        paymentRow = insertedPaymentRow;
+      }
+
+      if (paymentRow) {
         const { error: paymentEventError } = await supabase
           .from('payment_events' as any)
           .insert({
