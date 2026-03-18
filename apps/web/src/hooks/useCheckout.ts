@@ -112,6 +112,7 @@ const buildBillingAddress = (checkoutData: CheckoutData) => {
   if (checkoutData.billingAddress?.address) {
     return {
       line_1: checkoutData.billingAddress.address,
+      line_2: checkoutData.billingAddress.complement || '',
       zip_code: sanitizeDigits(checkoutData.billingAddress.zipCode),
       city: checkoutData.billingAddress.city,
       state: checkoutData.billingAddress.state,

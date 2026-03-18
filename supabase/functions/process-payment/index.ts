@@ -348,7 +348,16 @@ serve(async (req) => {
                         credit_card: paymentMethod === 'credit_card' ? {
                             operation_type: 'auth_and_capture',
                             ...(cardToken?.token
-                                ? { card_token: cardToken.token }
+                                ? {
+                                    card_token: cardToken.token,
+                                    ...(normalizedBillingAddress
+                                        ? {
+                                            card: {
+                                                billing_address: normalizedBillingAddress,
+                                            },
+                                        }
+                                        : {}),
+                                }
                                 : {
                                     card: {
                                         number: cardToken.number,
@@ -359,9 +368,6 @@ serve(async (req) => {
                                         billing_address: normalizedBillingAddress,
                                     },
                                 }),
-                            ...(cardToken?.token && normalizedBillingAddress
-                                ? { billing_address: normalizedBillingAddress }
-                                : {}),
                             installments: installments || 1,
                             statement_descriptor: 'THEADORO'
                         } : undefined,
