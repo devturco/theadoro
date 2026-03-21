@@ -44,6 +44,14 @@ export interface Order extends Orders {
     avatar_url?: string;
   };
   items?: OrderItem[];
+  payments?: {
+    id: string;
+    provider: string;
+    provider_transaction_id: string | null;
+    status: string;
+    metadata?: Record<string, any> | null;
+    created_at: string;
+  }[];
   
   // Computed/UI fields
   gift_options?: GiftOptions;

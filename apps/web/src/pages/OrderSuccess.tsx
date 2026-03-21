@@ -43,6 +43,7 @@ const OrderSuccess: React.FC = () => {
     }, [getOrderById, id]);
 
     const isPix = order?.checkoutData.paymentMethod === 'pix';
+    const isCardPayment = !isPix;
     const pixCode = order?.paymentInfo?.pixCode || '';
     const pixExpiration = order?.paymentInfo?.pixExpiration || '';
     const pixCancelAt = order?.paymentInfo?.cancelAt || '';
@@ -50,6 +51,7 @@ const OrderSuccess: React.FC = () => {
     const paymentFailed = order?.paymentInfo?.status === 'failed';
     const paymentExpired = order?.paymentInfo?.status === 'expired' || order?.status === 'cancelled';
     const gatewayErrorMessage = order?.paymentInfo?.gatewayErrorMessage || '';
+    const cardPaymentApproved = isCardPayment && !paymentFailed && !paymentExpired;
     const pixLifecycle = usePixCountdown(
         {
             pixExpiration,
@@ -151,7 +153,7 @@ const OrderSuccess: React.FC = () => {
 
                 <div className="space-y-2">
                     <h1 className="text-2xl font-bold text-gray-900">
-                        {isPix ? 'Pedido recebido!' : 'Pedido realizado!'}
+                        {isPix ? 'Pedido recebido!' : cardPaymentApproved ? 'Pagamento aprovado!' : 'Pedido realizado!'}
                     </h1>
                     <p className="text-gray-600">
                         {paymentFailed
@@ -160,8 +162,16 @@ const OrderSuccess: React.FC = () => {
                                 ? 'O prazo do PIX terminou e este pedido foi encerrado automaticamente.'
                                 : isPix
                                     ? 'Seu pedido foi criado. Agora finalize o pagamento via PIX para liberar o processamento.'
-                                    : 'Seu pedido foi confirmado e já está sendo processado.'}
+                                    : 'Seu pagamento foi aprovado com sucesso e seu pedido já está em preparação.'}
                     </p>
+                    {cardPaymentApproved && (
+                        <div className="flex justify-center pt-1">
+                            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700">
+                                <CheckCircle className="h-4 w-4" />
+                                Compra confirmada e pagamento aprovado
+                            </span>
+                        </div>
+                    )}
                     <div className="pt-2">
                         <span className="text-sm text-gray-500 uppercase tracking-wide">Número do pedido</span>
                         <p className="text-lg font-mono font-medium text-gray-900 select-all">
@@ -315,7 +325,7 @@ const OrderSuccess: React.FC = () => {
                                     : pixLifecycle.isInGracePeriod
                                         ? 'O QR Code expirou, mas você ainda pode gerar um novo PIX antes do cancelamento automático.'
                                         : 'Assim que o PIX for compensado, o pedido segue para processamento.'
-                            : 'Você receberá um e-mail com os detalhes da compra.'}
+                            : 'Pagamento confirmado. Você receberá um e-mail com os detalhes da compra e os próximos passos do pedido.'}
                     </p>
                 </div>
             </div>

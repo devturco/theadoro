@@ -67,6 +67,7 @@ import SellerProducts from '@/pages/seller/Products';
 import SellerProductForm from '@/pages/seller/SellerProductForm';
 import ProductWizard from '@/pages/seller/ProductWizard';
 import SellerSales from '@/pages/seller/SellerSales';
+import SellerSaleDetail from '@/pages/seller/SellerSaleDetail';
 import SellerAppointments from '@/pages/seller/SellerAppointments';
 import SellerReports from '@/pages/seller/SellerReports';
 import SellerInsights from '@/pages/seller/SellerInsights';
@@ -205,6 +206,7 @@ function App() {
                               <Route path="products/new" element={<ProductWizard />} />
                               <Route path="products/:id" element={<SellerProductForm />} />
                               <Route path="sales" element={<SellerSales />} />
+                              <Route path="sales/:id" element={<SellerSaleDetail />} />
                               <Route path="appointments" element={<SellerAppointments />} />
                               <Route path="reports" element={<SellerReports />} />
                               <Route path="insights" element={<SellerInsights />} />

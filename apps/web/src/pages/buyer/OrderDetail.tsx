@@ -1,5 +1,6 @@
 ﻿import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@theadoro/ui';
 import { Button } from '@theadoro/ui';
 import { Badge } from '@theadoro/ui';
@@ -37,13 +38,7 @@ export default function OrderDetail() {
     const [cancellingExpiredOrder, setCancellingExpiredOrder] = useState(false);
     const [cancelAttemptFailed, setCancelAttemptFailed] = useState(false);
 
-    useEffect(() => {
-        if (user && id) {
-            loadOrderDetails();
-        }
-    }, [user, id]);
-
-    const loadOrderDetails = async () => {
+    const loadOrderDetails = useCallback(async () => {
         if (!id) return;
         const data = await getOrder(id);
         if (data) {
@@ -52,29 +47,87 @@ export default function OrderDetail() {
             toast.error('Pedido não encontrado');
             navigate('/buyer/orders');
         }
-    };
+    }, [getOrder, id, navigate]);
 
-    const notes = order?.notes ? (typeof order.notes === 'string' ? JSON.parse(order.notes) : order.notes) : {};
-    const shippingAddress = order?.shipping_address ? (typeof order.shipping_address === 'string' ? JSON.parse(order.shipping_address) : order.shipping_address) : null;
+    useEffect(() => {
+        if (user && id) {
+            loadOrderDetails();
+        }
+    }, [id, loadOrderDetails, user]);
+
+    const notes = useMemo(
+        () => order?.notes ? (typeof order.notes === 'string' ? JSON.parse(order.notes) : order.notes) : {},
+        [order?.notes]
+    );
+    const shippingAddress = useMemo(
+        () => order?.shipping_address ? (typeof order.shipping_address === 'string' ? JSON.parse(order.shipping_address) : order.shipping_address) : null,
+        [order?.shipping_address]
+    );
+    const latestPayment = useMemo(() => {
+        if (!order?.payments?.length) return null;
+
+        return [...order.payments].sort((a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )[0];
+    }, [order?.payments]);
+    const latestPaymentMetadata = useMemo(() => {
+        if (!latestPayment?.metadata) return {};
+
+        return typeof latestPayment.metadata === 'string'
+            ? JSON.parse(latestPayment.metadata)
+            : latestPayment.metadata;
+    }, [latestPayment?.metadata]);
 
     const giftWrapPrice = notes.gift_wrap_price || notes.giftWrapPrice || 0;
     const shippingCost = order?.shipping_cost || notes.shipping_cost || notes.shippingCost || 0;
     const discountAmount = order?.discount_amount || notes.discount_amount || notes.discountAmount || 0;
+    const trackingNumber =
+        notes?.tracking_number ||
+        notes?.trackingNumber ||
+        notes?.fulfillment?.tracking_number ||
+        notes?.fulfillment?.trackingNumber ||
+        order?.tracking_number ||
+        '';
     const subtotal = order?.subtotal || notes.subtotal || notes.subtotal_amount ||
         ((order?.total_amount || 0) - shippingCost - giftWrapPrice + discountAmount);
-    const paymentInfo = notes?.paymentInfo || {};
+    const paymentInfo = {
+        ...(notes?.paymentInfo || {}),
+        id: latestPaymentMetadata.providerTransactionId || latestPayment?.provider_transaction_id || notes?.paymentInfo?.id,
+        pixCode: latestPaymentMetadata.pixCode || notes?.paymentInfo?.pixCode,
+        pixUrl: latestPaymentMetadata.pixUrl || notes?.paymentInfo?.pixUrl,
+        pixExpiration: latestPaymentMetadata.pixExpiration || notes?.paymentInfo?.pixExpiration,
+        cancelAt: latestPaymentMetadata.cancelAt || notes?.paymentInfo?.cancelAt,
+        status:
+            notes?.paymentInfo?.status === 'expired'
+                ? 'expired'
+                : latestPayment?.status || notes?.paymentInfo?.status,
+        gatewayErrorMessage:
+            latestPaymentMetadata.gatewayErrorMessage ||
+            latestPaymentMetadata.gatewayResponse?.charges?.[0]?.last_transaction?.gateway_response?.errors?.[0]?.message ||
+            notes?.paymentInfo?.gatewayErrorMessage,
+    };
     const paymentMethod = (order?.payment_method || '').toLowerCase();
     const isPixPayment = paymentMethod === 'pix';
     const isCardPayment = ['credit', 'credit_card', 'debit', 'debit_card'].includes(paymentMethod);
     const orderCancelled = order?.status === 'cancelled';
-    const paymentPending = paymentInfo.status === 'pending' || order?.status === 'pending';
     const paymentFailed = paymentInfo.status === 'failed';
     const paymentExpired = paymentInfo.status === 'expired';
     const paymentApproved =
         !orderCancelled &&
         !paymentFailed &&
         !paymentExpired &&
-        (paymentInfo.status === 'approved' || ['confirmed', 'processing', 'shipped', 'delivered'].includes(order?.status || ''));
+        (['approved', 'paid', 'succeeded'].includes(paymentInfo.status) || ['confirmed', 'processing', 'shipped', 'delivered'].includes(order?.status || ''));
+    const displayOrderStatus = (() => {
+        if (orderCancelled) return 'cancelled';
+        if (['confirmed', 'processing', 'shipped', 'delivered'].includes(order?.status || '')) return order!.status;
+        if (paymentApproved) return 'processing';
+        return 'pending';
+    })();
+    const paymentPending =
+        !orderCancelled &&
+        !paymentFailed &&
+        !paymentExpired &&
+        !paymentApproved;
     const pixCode = paymentInfo.pixCode || '';
     const pixExpiration = paymentInfo.pixExpiration || '';
     const pixCancelAt = paymentInfo.cancelAt || '';
@@ -90,7 +143,7 @@ export default function OrderDetail() {
             cancelAt: pixCancelAt,
             status: paymentInfo.status,
         },
-        isPixPayment && order?.status === 'pending'
+        isPixPayment && displayOrderStatus === 'pending'
     );
 
     const qrCodeUrl = paymentInfo.pixUrl
@@ -105,6 +158,43 @@ export default function OrderDetail() {
         }
     }, [order?.status, pixLifecycle.isCancellationDue]);
 
+    useEffect(() => {
+        if (!id || !user) return;
+
+        const shouldAutoRefresh =
+            displayOrderStatus === 'pending' ||
+            displayOrderStatus === 'processing' ||
+            order?.status === 'confirmed';
+
+        if (!shouldAutoRefresh) return;
+
+        const intervalId = window.setInterval(() => {
+            if (document.visibilityState === 'visible') {
+                loadOrderDetails();
+            }
+        }, 12000);
+
+        return () => window.clearInterval(intervalId);
+    }, [displayOrderStatus, id, loadOrderDetails, order?.status, user]);
+
+    useEffect(() => {
+        if (!id || !user) return;
+
+        const handleFocusRefresh = () => {
+            if (document.visibilityState === 'visible') {
+                void loadOrderDetails();
+            }
+        };
+
+        window.addEventListener('focus', handleFocusRefresh);
+        document.addEventListener('visibilitychange', handleFocusRefresh);
+
+        return () => {
+            window.removeEventListener('focus', handleFocusRefresh);
+            document.removeEventListener('visibilitychange', handleFocusRefresh);
+        };
+    }, [id, loadOrderDetails, user]);
+
     const steps = [
         { label: 'Pendente', icon: Clock, status: 'pending' },
         { label: 'Confirmado', icon: CheckCircle, status: 'confirmed' },
@@ -113,7 +203,15 @@ export default function OrderDetail() {
         { label: 'Entregue', icon: CheckCircle, status: 'delivered' },
     ];
 
-    const currentStepIndex = steps.findIndex(s => s.status === order?.status);
+    const currentStepIndex = steps.findIndex(s => s.status === displayOrderStatus);
+    const currentStepLabel = steps[currentStepIndex]?.label || displayOrderStatus;
+    const paymentSummaryLabel = paymentFailed
+        ? 'Pagamento recusado'
+        : paymentExpired
+            ? 'PIX expirado'
+            : paymentApproved
+                ? 'Pagamento aprovado'
+                : 'Pagamento pendente';
 
     const formatDate = (date: string) => {
         return new Date(date).toLocaleDateString('pt-BR', {
@@ -201,8 +299,15 @@ export default function OrderDetail() {
                     <p className="text-muted-foreground">Realizado em {formatDate(order.created_at)}</p>
                 </div>
                 <div className="ml-auto">
-                    <Badge className="text-sm px-3 py-1">
-                        {steps[currentStepIndex]?.label || order.status}
+                    <Badge className={cn(
+                        'text-sm px-3 py-1',
+                        paymentFailed || paymentExpired || orderCancelled
+                            ? 'bg-red-100 text-red-700 hover:bg-red-100'
+                            : paymentApproved
+                                ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100'
+                                : 'bg-amber-100 text-amber-700 hover:bg-amber-100'
+                    )}>
+                        {currentStepLabel}
                     </Badge>
                 </div>
             </div>
@@ -314,8 +419,8 @@ export default function OrderDetail() {
                                 {order.status === 'shipped' || order.status === 'delivered' ? (
                                     <div className="flex items-center gap-2 text-sm">
                                         <span className="font-semibold text-blue-800">Código:</span>
-                                        <code className="bg-white px-2 py-0.5 rounded border text-blue-900">{order.tracking_number || 'Não disponível'}</code>
-                                        {order.tracking_number && (
+                                        <code className="bg-white px-2 py-0.5 rounded border text-blue-900">{trackingNumber || 'Não disponível'}</code>
+                                        {trackingNumber && (
                                             <Button variant="link" size="sm" className="h-auto p-0 text-blue-800 underline">
                                                 Copiar
                                             </Button>
@@ -377,6 +482,47 @@ export default function OrderDetail() {
                                         </div>
                                     </div>
                                 )}
+                                {paymentApproved && displayOrderStatus === 'processing' && (
+                                    <div className="flex gap-4">
+                                        <div className="flex flex-col items-center">
+                                            <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full"></div>
+                                            <div className="w-0.5 h-full bg-gray-200 mt-1"></div>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-bold">Pedido em preparação</p>
+                                            <p className="text-xs text-muted-foreground">
+                                                O pagamento já foi aprovado e o vendedor pode separar e preparar o envio.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                                {order.status === 'shipped' && (
+                                    <div className="flex gap-4">
+                                        <div className="flex flex-col items-center">
+                                            <div className="w-2.5 h-2.5 bg-primary rounded-full"></div>
+                                            <div className="w-0.5 h-full bg-gray-200 mt-1"></div>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-bold">Pedido enviado</p>
+                                            <p className="text-xs text-muted-foreground">
+                                                Seu pedido já foi despachado e o rastreio aparece assim que estiver disponível.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                                {order.status === 'delivered' && (
+                                    <div className="flex gap-4">
+                                        <div className="flex flex-col items-center">
+                                            <div className="w-2.5 h-2.5 bg-emerald-600 rounded-full"></div>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-bold">Pedido entregue</p>
+                                            <p className="text-xs text-muted-foreground">
+                                                A entrega foi concluída com sucesso.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -425,14 +571,13 @@ export default function OrderDetail() {
                                     'text-sm font-medium',
                                     paymentFailed || paymentExpired ? 'text-red-600' : paymentApproved ? 'text-green-600' : 'text-amber-600'
                                 )}>
-                                    {paymentFailed
-                                        ? 'Pagamento recusado'
-                                        : paymentExpired
-                                            ? 'PIX expirado'
-                                            : paymentApproved
-                                                ? 'Pagamento aprovado'
-                                                : 'Pagamento pendente'}
+                                    {paymentSummaryLabel}
                                 </p>
+                                {paymentApproved && displayOrderStatus === 'processing' && (
+                                    <p className="text-xs text-muted-foreground">
+                                        Pedido em preparação. Esta página se atualiza automaticamente.
+                                    </p>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -540,6 +685,19 @@ export default function OrderDetail() {
                                     Seu pagamento com cartão foi enviado para processamento.
                                     Se você já concluiu a compra, aguarde alguns minutos que esta tela será atualizada.
                                 </p>
+                            ) : paymentApproved && displayOrderStatus === 'processing' ? (
+                                <div className="space-y-3">
+                                    <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-100/70 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-800">
+                                        <CheckCircle className="h-3.5 w-3.5" />
+                                        Acompanhamento em tempo real
+                                    </div>
+                                    <p className="text-sm text-green-700">
+                                        Pagamento aprovado. Seu pedido já entrou em preparação e esta página acompanha automaticamente as próximas mudanças de status.
+                                    </p>
+                                    <p className="text-sm text-green-700/90">
+                                        Assim que o vendedor despachar, o andamento aqui mudará para envio e o rastreio aparecerá nesta mesma tela.
+                                    </p>
+                                </div>
                             ) : (
                                 <p className="text-sm text-green-700">
                                     Pagamento confirmado. O pedido já pode seguir normalmente para processamento e envio.

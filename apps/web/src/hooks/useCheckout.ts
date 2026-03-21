@@ -561,6 +561,11 @@ export const useCheckout = () => {
         }
       });
 
+      const initialOrderStatus =
+        paymentStatus === 'approved' && (checkoutData.paymentMethod === 'credit_card' || checkoutData.paymentMethod === 'debit_card')
+          ? 'processing'
+          : 'pending';
+
       const orderData = {
         buyer_id: user?.id || null,
         seller_id: items[0]?.product.seller?.id || (items[0]?.product as any).seller_id || null,
@@ -571,7 +576,7 @@ export const useCheckout = () => {
         discount_amount: discount,
         tax_amount: tax,
         shipping_method: selectedShipping?.name || 'Padrão',
-        status: 'pending' as 'pending',
+        status: initialOrderStatus as 'pending' | 'processing',
         shipping_address: JSON.stringify({
           street: checkoutData.street,
           number: checkoutData.number,

@@ -398,12 +398,31 @@ class OrderService extends BaseService<Order> {
     try {
       const updateData: any = { status };
 
-      if (status === 'shipped' && trackingNumber) {
-        updateData.tracking_number = trackingNumber;
-      }
+      if (trackingNumber || status === 'delivered') {
+        const { data: currentOrder, error: currentOrderError } = await supabase
+          .from(this.tableName)
+          .select('notes')
+          .eq('id', orderId)
+          .single();
 
-      if (status === 'delivered') {
-        updateData.delivered_at = new Date().toISOString();
+        if (currentOrderError) throw currentOrderError;
+
+        const currentNotes =
+          currentOrder?.notes
+            ? (typeof currentOrder.notes === 'string' ? JSON.parse(currentOrder.notes) : currentOrder.notes)
+            : {};
+
+        const nextNotes = {
+          ...currentNotes,
+          fulfillment: {
+            ...(currentNotes?.fulfillment || {}),
+            ...(trackingNumber ? { tracking_number: trackingNumber } : {}),
+            ...(status === 'delivered' ? { delivered_at: new Date().toISOString() } : {}),
+          },
+          ...(trackingNumber ? { tracking_number: trackingNumber } : {}),
+        };
+
+        updateData.notes = JSON.stringify(nextNotes);
       }
 
       return this.update(orderId, updateData);
