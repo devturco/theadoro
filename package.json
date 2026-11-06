@@ -5,7 +5,7 @@
   "scripts": {
     "prebuild": "node scripts/ensure-rollup-native.cjs",
     "build": "turbo build && node scripts/sync-dist.cjs",
-    "start": "npm run build && node server.cjs",
+    "start": "node start.cjs",
     "dev": "turbo dev",
     "lint": "turbo lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\""
