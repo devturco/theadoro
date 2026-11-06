@@ -253,12 +253,8 @@ const HomeMarketplaceTop = () => {
             </div>
 
             {/* Desktop Nav Row */}
-            <div className="flex flex-col gap-3 border-t border-white/15 pt-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[14px]">
-                <span className="flex items-center gap-1 font-medium text-white/95">
-                  <MapPin className="h-4 w-4" />
-                  Enviar para Sao Paulo
-                </span>
+            <div className="border-t border-white/15 pt-3">
+              <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[14px]">
                 <span className="inline-flex items-center gap-1 text-white/90">
                   Categorias
                   <ChevronDown className="h-4 w-4" />
