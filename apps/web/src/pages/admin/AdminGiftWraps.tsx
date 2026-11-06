@@ -73,11 +73,14 @@ const AdminGiftWraps = () => {
         e.preventDefault();
 
         try {
+            // Embalagem criada pelo admin vale para toda a loja (sem vendedor).
+            const payload = { ...formData, seller_id: editingGiftWrap?.seller_id ?? null };
+
             if (editingGiftWrap) {
-                await updateItem(editingGiftWrap.id, formData);
+                await updateItem(editingGiftWrap.id, payload);
                 toast.success('Embalagem atualizada com sucesso!');
             } else {
-                await createItem(formData);
+                await createItem(payload);
                 toast.success('Embalagem criada com sucesso!');
             }
 

@@ -78,7 +78,7 @@ export const userActivitySchema = z.object({
   user_id: z.string().uuid(),
   action: z.string().min(1, 'Ação é obrigatória'),
   description: z.string().min(1, 'Descrição é obrigatória'),
-  ip_address: z.string().ip().optional(),
+  ip_address: z.union([z.ipv4(), z.ipv6()]).optional(),
   user_agent: z.string().optional(),
   created_at: z.string(),
 });
@@ -88,7 +88,7 @@ export const createUserActivitySchema = z.object({
   user_id: z.string().uuid('ID do usuário inválido'),
   action: z.string().min(1, 'Ação é obrigatória'),
   description: z.string().min(1, 'Descrição é obrigatória'),
-  ip_address: z.string().ip('Endereço IP inválido').optional(),
+  ip_address: z.union([z.ipv4('Endereço IP inválido'), z.ipv6('Endereço IP inválido')]).optional(),
   user_agent: z.string().optional(),
 });
 
@@ -97,7 +97,7 @@ export const userSessionSchema = z.object({
   id: z.string().uuid(),
   user_id: z.string().uuid(),
   session_token: z.string().min(1, 'Token da sessão é obrigatório'),
-  ip_address: z.string().ip('Endereço IP inválido'),
+  ip_address: z.union([z.ipv4('Endereço IP inválido'), z.ipv6('Endereço IP inválido')]),
   user_agent: z.string().min(1, 'User agent é obrigatório'),
   created_at: z.string(),
   expires_at: z.string(),

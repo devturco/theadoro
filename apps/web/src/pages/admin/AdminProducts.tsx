@@ -490,7 +490,6 @@ const AdminProducts = () => {
             data={products || []}
             columns={columns}
             loading={loading}
-            searchable={true}
             searchPlaceholder="Buscar produtos..."
           />
         </CardContent>

@@ -86,9 +86,9 @@ export default function OrderDetail() {
         notes?.trackingNumber ||
         notes?.fulfillment?.tracking_number ||
         notes?.fulfillment?.trackingNumber ||
-        order?.tracking_number ||
+        order?.tracking_url ||
         '';
-    const subtotal = order?.subtotal || notes.subtotal || notes.subtotal_amount ||
+    const subtotal = order?.subtotal_amount || notes.subtotal || notes.subtotal_amount ||
         ((order?.total_amount || 0) - shippingCost - giftWrapPrice + discountAmount);
     const paymentInfo = {
         ...(notes?.paymentInfo || {}),
@@ -412,7 +412,9 @@ export default function OrderDetail() {
                                     <div className="text-right">
                                         <p className="text-sm font-medium text-blue-900">Previsão de entrega</p>
                                         <p className="text-blue-700 font-bold">
-                                            {order.estimated_delivery ? new Date(order.estimated_delivery).toLocaleDateString('pt-BR') : 'A definir'}
+                                            {notes.estimated_delivery || notes.estimatedDelivery
+                                                ? new Date(notes.estimated_delivery || notes.estimatedDelivery).toLocaleDateString('pt-BR')
+                                                : 'A definir'}
                                         </p>
                                     </div>
                                 </div>

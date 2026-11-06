@@ -45,7 +45,7 @@ class ShippingService {
         };
 
         return {
-            originCep: getVal('store_cep') || '01310-100', // Default if missing
+            originCep: String(getVal('store_cep') || '78000-000'), // Padrão: Cuiabá/MT
             store: {
                 street: String(getVal('store_address') || ''),
                 city: String(getVal('store_city') || ''),

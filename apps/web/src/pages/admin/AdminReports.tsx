@@ -37,6 +37,36 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+/** Linhas mínimas usadas no relatório (ver `integrations/supabase/types.ts`). */
+interface ReportOrder {
+  id: string;
+  total_amount: number;
+  created_at: string;
+}
+interface ReportProduct {
+  id: string;
+  name: string;
+  seller_id: string | null;
+  category_id: string | null;
+}
+interface ReportUser {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  created_at: string;
+}
+interface ReportCategory {
+  id: string;
+  name: string;
+}
+interface ReportOrderItem {
+  id: string;
+  product_id: string | null;
+  quantity: number;
+  unit_price: number;
+  total_price: number | null;
+}
+
 interface ReportData {
   salesByMonth: { month: string; sales: number; revenue: number }[];
   topProducts: { name: string; sales: number; revenue: number }[];
@@ -58,11 +88,11 @@ const AdminReports = () => {
   });
   const [loading, setLoading] = useState(true);
 
-  const { data: orders } = useCRUD({ table: 'orders' });
-  const { data: products } = useCRUD({ table: 'products' });
-  const { data: users } = useCRUD({ table: 'profiles' });
-  const { data: categories } = useCRUD({ table: 'categories' });
-  const { data: orderItems } = useCRUD({ table: 'order_items' });
+  const { data: orders } = useCRUD<ReportOrder>({ table: 'orders' });
+  const { data: products } = useCRUD<ReportProduct>({ table: 'products' });
+  const { data: users } = useCRUD<ReportUser>({ table: 'profiles' });
+  const { data: categories } = useCRUD<ReportCategory>({ table: 'categories' });
+  const { data: orderItems } = useCRUD<ReportOrderItem>({ table: 'order_items' });
 
   useEffect(() => {
     if (!isAdmin) {
@@ -112,7 +142,7 @@ const AdminReports = () => {
         const current = productSales.get(item.product_id) || { qty: 0, revenue: 0 };
         productSales.set(item.product_id, {
           qty: current.qty + (item.quantity || 1),
-          revenue: current.revenue + (item.price * (item.quantity || 1))
+          revenue: current.revenue + Number(item.total_price ?? item.unit_price * (item.quantity || 1))
         });
       });
 
@@ -141,7 +171,7 @@ const AdminReports = () => {
           const current = sellerStats.get(product.seller_id) || { sales: 0, revenue: 0 };
           sellerStats.set(product.seller_id, {
             sales: current.sales + (item.quantity || 1),
-            revenue: current.revenue + (item.price * (item.quantity || 1))
+            revenue: current.revenue + Number(item.total_price ?? item.unit_price * (item.quantity || 1))
           });
         }
       });

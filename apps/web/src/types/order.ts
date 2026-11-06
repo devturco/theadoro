@@ -27,7 +27,27 @@ export interface BillingAddress {
   country: string;
 }
 
-export interface Order extends Orders {
+/**
+ * `Orders` (swagger) só conhece os status até `cancelled`; o banco também
+ * aceita `refunded` (ver `order_status` em `integrations/supabase/types.ts`).
+ */
+export type Order = Omit<Orders, 'status'> & {
+  status: OrderStatus;
+
+  // Colunas que existem no banco mas não no swagger (Kubb desatualizado).
+  // Fonte: `orders` em `integrations/supabase/types.ts`.
+  tracking_url?: string | null;
+  shipping_provider?: string | null;
+  shipping_quote_id?: string | null;
+  uber_delivery_id?: string | null;
+  uber_delivery_status?: string | null;
+  uber_quote_id?: string | null;
+  uber_tracking_url?: string | null;
+  subtotal_amount?: number | null;
+  discount_amount?: number | null;
+  gift_wrap_price?: number | null;
+  tax_amount?: number | null;
+
   // UI and Relation Extensions
   buyer?: {
     id: string;
@@ -56,9 +76,16 @@ export interface Order extends Orders {
   // Computed/UI fields
   gift_options?: GiftOptions;
   delivery_schedule?: DeliverySchedule;
-}
+};
 
-export interface OrderItem extends OrderItems {
+/**
+ * `OrderItems` vem do swagger (Kubb), que está desatualizado para estas
+ * colunas: no banco elas são anuláveis. Ver `order_items` em
+ * `integrations/supabase/types.ts`.
+ */
+export type OrderItem = Omit<OrderItems, 'gift_message' | 'variant_id'> & {
+  gift_message?: string | null;
+  variant_id?: string | null;
   product?: {
     id: string;
     name: string;
@@ -101,6 +128,19 @@ export interface OrderFilters {
   min_amount?: number;
   max_amount?: number;
   search?: string;
+}
+
+/** Linha da tabela `gift_wraps` (embalagens para presente). */
+export interface GiftWrap {
+  id: string;
+  name: string;
+  description: string | null;
+  price: number;
+  image_url: string | null;
+  is_active: boolean | null;
+  seller_id: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface GiftOptions {

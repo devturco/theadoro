@@ -1,25 +1,18 @@
-
 import { describe, it, expect } from 'vitest';
-
-// Simulating the Cart Storage logic
-const getCartKey = (userId?: string) => {
-    // Current bug: maybe it returns a static key
-    return 'theadoro-cart';
-};
+import { getCartKey, CART_KEY_PREFIX } from '@/lib/cartStorage';
 
 describe('Cart Isolation', () => {
-    it('should have different storage keys for different users', () => {
-        const userA = 'user-aaa';
-        const userB = 'user-bbb';
-        
-        const keyA = getCartKey(userA);
-        const keyB = getCartKey(userB);
-        
-        // This will FAIL now because both return 'theadoro-cart'
+    it('should give each user their own storage key', () => {
+        const keyA = getCartKey('user-aaa');
+        const keyB = getCartKey('user-bbb');
+
+        expect(keyA).toBe(`${CART_KEY_PREFIX}-user-aaa`);
+        expect(keyB).toBe(`${CART_KEY_PREFIX}-user-bbb`);
         expect(keyA).not.toBe(keyB);
     });
 
     it('should return a guest key for unauthenticated users', () => {
-        expect(getCartKey()).toBe('theadoro-cart-guest');
+        expect(getCartKey()).toBe(`${CART_KEY_PREFIX}-guest`);
+        expect(getCartKey(null)).toBe(`${CART_KEY_PREFIX}-guest`);
     });
 });

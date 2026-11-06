@@ -1,5 +1,6 @@
 import { BaseService, BaseEntity } from './base.service';
 import { supabase } from '@/integrations/supabase/client';
+import { supabaseLoose } from '@/integrations/supabase/loose';
 import { PostgrestError } from '@supabase/supabase-js';
 
 export interface Category extends BaseEntity {
@@ -48,7 +49,34 @@ class CategoryService extends BaseService<Category> {
       const { count: activeCategories, error: activeError } = await this.count({ is_active: true });
       if (activeError) throw activeError;
 
-      // ... rest of method ...
+      // Conta produtos por categoria em uma única leitura e agrega aqui.
+      const { data: productRows, error: productsError } = await supabaseLoose
+        .from('products')
+        .select('category_id')
+        .not('category_id', 'is', null);
+
+      if (productsError) throw productsError;
+
+      const productsByCategory = new Map<string, number>();
+      for (const row of productRows || []) {
+        const id = (row as { category_id: string | null }).category_id;
+        if (!id) continue;
+        productsByCategory.set(id, (productsByCategory.get(id) || 0) + 1);
+      }
+
+      const categoriesWithProductsCount = productsByCategory.size;
+
+      let topCategory: CategoryStats['top_category_by_products'] = null;
+      if (categoriesWithProductsCount > 0) {
+        const [topId, topCount] = [...productsByCategory.entries()]
+          .sort((a, b) => b[1] - a[1])[0];
+        const { data: top } = await supabaseLoose
+          .from('categories')
+          .select('name')
+          .eq('id', topId)
+          .maybeSingle();
+        topCategory = { name: (top as { name?: string } | null)?.name || 'Sem nome', product_count: topCount };
+      }
 
       const stats: CategoryStats = {
         total_categories: totalCategories,
@@ -69,7 +97,7 @@ class CategoryService extends BaseService<Category> {
    */
   async getActiveCategories(): Promise<{ data: Category[]; error: PostgrestError | null }> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseLoose
         .from(this.tableName)
         .select('*')
         .eq('is_active', true)
@@ -93,7 +121,7 @@ class CategoryService extends BaseService<Category> {
    */
   async getSubcategories(parentId: string): Promise<{ data: Category[]; error: PostgrestError | null }> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseLoose
         .from(this.tableName)
         .select('*')
         .eq('parent_id', parentId)
@@ -118,7 +146,7 @@ class CategoryService extends BaseService<Category> {
    */
   async getRootCategories(): Promise<{ data: Category[]; error: PostgrestError | null }> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseLoose
         .from(this.tableName)
         .select('*')
         .is('parent_id', null)
@@ -186,7 +214,7 @@ class CategoryService extends BaseService<Category> {
    */
   async isSlugUnique(slug: string, excludeId?: string): Promise<{ isUnique: boolean; error: PostgrestError | null }> {
     try {
-      let query = supabase
+      let query = supabaseLoose
         .from(this.tableName)
         .select('id')
         .eq('slug', slug);
@@ -286,7 +314,7 @@ class CategoryService extends BaseService<Category> {
    */
   async getCategoryBySlug(slug: string): Promise<{ data: Category | null; error: PostgrestError | null }> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseLoose
         .from(this.tableName)
         .select('*')
         .eq('slug', slug)
@@ -310,7 +338,7 @@ class CategoryService extends BaseService<Category> {
    */
   async searchCategories(searchTerm: string): Promise<{ data: Category[]; error: PostgrestError | null }> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseLoose
         .from(this.tableName)
         .select('*')
         .or(`name.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`)

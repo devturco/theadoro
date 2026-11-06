@@ -15,6 +15,8 @@ interface MetricCardProps {
     period?: string;
   };
   variant?: 'default' | 'success' | 'warning' | 'destructive';
+  /** Como formatar valores numéricos. `auto` mantém a heurística antiga. */
+  format?: 'auto' | 'currency' | 'number';
   loading?: boolean;
   className?: string;
   onClick?: () => void;
@@ -27,18 +29,25 @@ export const MetricCard = ({
   icon,
   trend,
   variant = 'default',
+  format = 'auto',
   loading = false,
   className,
   onClick
 }: MetricCardProps) => {
   const formatValue = (val: string | number): string => {
     if (typeof val === 'number') {
-      // Format currency if it looks like a price
-      if (val > 1000 && title.toLowerCase().includes('receita')) {
+      const asCurrency = format === 'currency' ||
+        (format === 'auto' && val > 1000 && title.toLowerCase().includes('receita'));
+
+      if (asCurrency) {
         return new Intl.NumberFormat('pt-BR', {
           style: 'currency',
           currency: 'BRL'
         }).format(val);
+      }
+
+      if (format === 'number') {
+        return val.toLocaleString('pt-BR');
       }
 
       // Format large numbers

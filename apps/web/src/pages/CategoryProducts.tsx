@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Filter, SortAsc } from 'lucide-react';
-import { ProductFilters } from '@/types/product';
+import { Product, ProductFilters } from '@/types/product';
 import { Button } from '@theadoro/ui';
 import { Badge } from '@theadoro/ui';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@theadoro/ui';
@@ -20,20 +20,6 @@ interface Category {
   parentId?: string;
   subcategories?: Category[];
   parent?: Category;
-}
-
-interface Product {
-  id: string;
-  name: string;
-  price: number;
-  originalPrice?: number;
-  image: string;
-  rating: number;
-  reviewCount: number;
-  sellerId: string;
-  sellerName: string;
-  categoryId: string;
-  isWishlisted?: boolean;
 }
 
 import { supabase } from '@/integrations/supabase/client';
@@ -95,32 +81,23 @@ export default function CategoryProducts() {
         } else {
           // Map to interface
           setProducts((productsData || []).map((p: any) => ({
+            ...p,
             stock_quantity: p.stock_quantity || 0,
             in_stock: p.in_stock ?? (p.stock_quantity > 0),
             is_service: p.is_service || false,
             tags: p.tags || [],
+            images: p.images || [],
             category: {
               id: p.category_id,
               name: categoryData.name,
               slug: categoryData.slug
             },
-            id: p.id,
-            name: p.name,
-            price: p.price,
-            original_price: p.original_price,
-            image: p.image_url || 'https://placehold.co/400',
-            images: p.images || [],
-            rating: 5.0, // placeholder
-            review_count: 0,
-            sellerId: p.seller_id,
-            sellerName: p.profiles?.full_name || 'Vendedor',
-            categoryId: p.category_id,
-            isWishlisted: false,
             seller: {
               id: p.seller_id,
               name: p.profiles?.full_name || 'Vendedor',
+              full_name: p.profiles?.full_name || 'Vendedor',
             }
-          })));
+          }) as Product));
         }
 
       } catch (error) {

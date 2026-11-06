@@ -110,7 +110,7 @@ function App() {
         <Toaster />
         <Sonner />
         <TIAdoroAssistant />
-        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <BrowserRouter>
           <ScrollToTop />
           <AuthProvider>
             <CartProvider>

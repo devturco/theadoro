@@ -44,6 +44,11 @@ const FeaturedProducts = () => {
           images: p.images || [],
           rating: 5.0,
           review_count: 0,
+          // Colunas obrigatórias da tabela `products`
+          type: p.type || 'physical',
+          created_at: p.created_at,
+          updated_at: p.updated_at,
+          display_id: p.display_id,
           seller: {
             id: p.seller_id,
             name: p.seller?.full_name || 'Vendedor',

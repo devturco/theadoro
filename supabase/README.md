@@ -34,6 +34,17 @@ Sem CLI: cole o SQL no **SQL Editor** do dashboard.
 - Aprovação de vendedor dispara `handle_seller_approval_subscription`.
 - Helpers de autorização para RLS: `has_role`, `is_admin`, `can_access_order`, `is_order_seller_check`.
 
+### Admin master
+
+`migrations/20261107000000_bootstrap_master_admin.sql` cria o administrador padrão de uma instalação nova:
+
+- e-mail `admin@theadoro.com.br`, senha `theadoro@2025`
+- perfil em `profiles` (`role = 'admin'`, `verified`, `is_approved`)
+- papel `admin` em `user_roles`
+- identidade de e-mail em `auth.identities`, com e-mail confirmado
+
+É **idempotente**: se o e-mail já existir, não altera a senha — apenas garante perfil e papel. Troque a senha no primeiro acesso ou edite `v_password` antes de aplicar.
+
 ### Segurança
 
 `public.exec_sql(query text)` é `SECURITY DEFINER` e permitia execução por `anon` — qualquer visitante com a chave pública podia rodar SQL arbitrário. O `EXECUTE` foi revogado de `PUBLIC`, `anon` e `authenticated`; permanece apenas para `service_role`, que é o que os scripts de `scripts/` usam.
@@ -51,6 +62,7 @@ functions/
 ├── process-payment/     # Pagar.me: cria/consulta/cancela cobranças
 ├── pagarme-webhook/     # recebe eventos e confirma pagamento
 ├── uber-delivery/       # Uber Direct: quote + request
+├── admin-users/         # exclusão de usuário + troca de e-mail/senha (admin)
 └── ai-gift-assistant/   # sugestão de presentes (Gemini)
 ```
 
@@ -67,6 +79,9 @@ verify_jwt = false
 
 [functions.uber-delivery]
 verify_jwt = false
+
+[functions.admin-users]
+verify_jwt = false
 ```
 
 `ai-gift-assistant` não tem entrada → mantém o padrão (`true`).
@@ -76,6 +91,7 @@ verify_jwt = false
 - `pagarme-webhook` exige autenticação (Basic Auth ou `x-webhook-secret`) e recusa tudo se nenhum secret estiver configurado.
 - `uber-delivery` só executa ações previstas e usa a service role para ler/gravar o pedido.
 - `process-payment` valida o payload e nunca devolve segredo ao cliente.
+- `admin-users` valida o JWT do chamador e confere o papel `admin` em `user_roles` antes de qualquer ação.
 
 ### Secrets
 
@@ -94,6 +110,7 @@ supabase secrets set PAGARME_WEBHOOK_SECRET=...
 supabase functions deploy process-payment   --project-ref pfpbaepzvgovqheeqxlg --no-verify-jwt
 supabase functions deploy pagarme-webhook   --project-ref pfpbaepzvgovqheeqxlg --no-verify-jwt
 supabase functions deploy uber-delivery     --project-ref pfpbaepzvgovqheeqxlg --no-verify-jwt
+supabase functions deploy admin-users        --project-ref pfpbaepzvgovqheeqxlg --no-verify-jwt
 supabase functions deploy ai-gift-assistant --project-ref pfpbaepzvgovqheeqxlg
 ```
 
@@ -116,6 +133,29 @@ O arquivo `supabase/.env.local` não é versionado — crie com os secrets acima
 ```
 
 Respostas de erro são sempre `{ error, message }` com o motivo legível. O despacho é idempotente por `orders.uber_delivery_id`.
+
+### `admin-users` — contrato
+
+```jsonc
+// confere o que existe vinculado ao usuário antes de excluir
+{ "action": "preview-delete", "userId": "<uuid>" }
+
+// exclui; sem `cascade` recusa (409) quando há produtos/pedidos do vendedor
+{ "action": "delete", "userId": "<uuid>", "cascade": true }
+
+// troca e-mail e/ou senha (mínimo de 8 caracteres)
+{ "action": "set-credentials", "userId": "<uuid>", "email": "...", "password": "..." }
+```
+
+Regras da exclusão:
+
+1. Sem `cascade`, a function responde **409** com as contagens quando o usuário tem produtos ou pedidos como vendedor.
+2. Com `cascade`, apaga **produtos** e **embalagens** do vendedor.
+3. **Pedidos nunca são apagados**: são registro financeiro. O vínculo (`orders.seller_id`, `order_items.seller_id`) vai para `null` — as FKs são `NO ACTION` e bloqueariam o delete.
+4. Remove `seller_invoices`, `seller_subscriptions`, `seller_applications`, `user_roles` e `profiles`.
+5. Por último, exclui o usuário em `auth.users` pela Admin API.
+
+O próprio admin não pode excluir a própria conta (`{ "error": "self_delete" }`).
 
 ### `pagarme-webhook` — contrato
 

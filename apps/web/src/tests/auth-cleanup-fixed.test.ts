@@ -1,50 +1,48 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { clearUserStorage, getCartKey } from '@/lib/cartStorage';
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-
-// Mock do localStorage
-const localStorageMock = (() => {
+// Storage em memória — mesmo contrato do localStorage.
+const createStorage = (): Storage => {
   let store: Record<string, string> = {};
   return {
-    getItem: (key: string) => store[key] || null,
-    setItem: (key: string, value: string) => { store[key] = value.toString(); },
+    getItem: (key: string) => store[key] ?? null,
+    setItem: (key: string, value: string) => { store[key] = String(value); },
     removeItem: (key: string) => { delete store[key]; },
     clear: () => { store = {}; },
-    key: (index: number) => Object.keys(store)[index],
-    get length() { return Object.keys(store).length; }
-  };
-})();
+    key: (index: number) => Object.keys(store)[index] ?? null,
+    get length() { return Object.keys(store).length; },
+  } as Storage;
+};
 
-// Definindo o mock globalmente para o ambiente Node
-global.localStorage = localStorageMock as any;
-global.sessionStorage = localStorageMock as any;
+describe('Auth State Cleanup', () => {
+  let storage: Storage;
 
-describe('Auth State Cleanup (FIXED)', () => {
   beforeEach(() => {
-    localStorage.clear();
+    storage = createStorage();
   });
 
-  it('should clean up cart items with the correct prefix', () => {
-    const userId = 'user-123';
-    const cartKey = `theadoro-cart-${userId}`;
-    const rolesKey = 'auth_db_roles';
-    
-    localStorage.setItem(cartKey, JSON.stringify({ items: [{ id: '1' }] }));
-    localStorage.setItem(rolesKey, JSON.stringify(['seller']));
+  it('removes the user cart, auth roles and checkout data on logout', () => {
+    storage.setItem(getCartKey('user-123'), JSON.stringify({ items: [{ id: '1' }] }));
+    storage.setItem(getCartKey(), JSON.stringify({ items: [{ id: '2' }] }));
+    storage.setItem('auth_db_roles', JSON.stringify(['seller']));
+    storage.setItem('checkoutFormData', '{}');
+    storage.setItem('sb-abcdef-auth-token', 'token');
 
-    // Simulação do código corrigido
-    const cleanup = () => {
-      localStorage.removeItem('auth_db_roles');
-      Object.keys(localStorage).forEach(key => {
-        // Agora usando o prefixo correto 'theadoro-cart-'
-        if (key.startsWith('theadoro-cart-')) {
-          localStorage.removeItem(key);
-        }
-      });
-    };
+    clearUserStorage(storage);
 
-    cleanup();
+    expect(storage.getItem(getCartKey('user-123'))).toBeNull();
+    expect(storage.getItem(getCartKey())).toBeNull();
+    expect(storage.getItem('auth_db_roles')).toBeNull();
+    expect(storage.getItem('checkoutFormData')).toBeNull();
+    expect(storage.getItem('sb-abcdef-auth-token')).toBeNull();
+  });
 
-    expect(localStorage.getItem(cartKey)).toBeNull();
-    expect(localStorage.getItem(rolesKey)).toBeNull();
+  it('keeps global preferences after logout', () => {
+    storage.setItem('theme', 'dark');
+    storage.setItem(getCartKey('user-123'), '{}');
+
+    clearUserStorage(storage);
+
+    expect(storage.getItem('theme')).toBe('dark');
   });
 });

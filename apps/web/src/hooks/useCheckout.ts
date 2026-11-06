@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { shippingService, ShippingOption } from '@/services/shippingService';
-import { paymentService, type PaymentOrderItem, type PaymentShippingData } from '@/services/payment.service';
+import { paymentService, type PaymentOrderItem, type PaymentShippingData, type CustomerData } from '@/services/payment.service';
 import { EmailService } from '@/services/EmailService';
 import { calculatePixCancelAt } from '@/lib/pix-payment';
 
@@ -30,6 +30,8 @@ export interface CheckoutData {
   // Billing Address (optional, if different from shipping)
   billingAddress?: {
     address: string;
+    complement?: string;
+    neighborhood?: string;
     city: string;
     state: string;
     zipCode: string;
@@ -416,7 +418,7 @@ export const useCheckout = () => {
       const paymentItems = buildPaymentItems(items, giftWrapPrice, giftWrapName, discount);
       const shippingPayload = buildShippingPayload(checkoutData, shipping, selectedShipping, hasPhysicalItems);
 
-      const customerData = {
+      const customerData: CustomerData = {
         name: `${checkoutData.firstName} ${checkoutData.lastName}`.trim(),
         email: checkoutData.email,
         phone: checkoutData.phone,
@@ -870,6 +872,8 @@ export const useCheckout = () => {
           is_active: item.products.is_active ?? true,
           tags: item.products.tags || [],
           is_service: item.products.is_service,
+          type: item.products.type || 'physical',
+          display_id: item.products.display_id ?? 0,
           created_at: item.products.created_at,
           updated_at: item.products.updated_at,
           category: item.products.categories || {
@@ -880,8 +884,8 @@ export const useCheckout = () => {
           seller: {
             id: item.products.profiles?.id || '',
             name: item.products.profiles?.full_name || 'Vendedor',
-            avatar: item.products.profiles?.avatar_url,
-            location: item.products.profiles?.location || '',
+            avatar: item.products.profiles?.avatar_url ?? undefined,
+            location: item.products.profiles?.location ?? undefined,
             rating: 0,
             reviewCount: 0,
             verified: false,

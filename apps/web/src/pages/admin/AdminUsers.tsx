@@ -32,9 +32,21 @@ import {
   Trash2,
   Shield,
   ShieldCheck,
-  UserCheck
+  UserCheck,
+  KeyRound,
+  AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
+
+interface DeleteSummary {
+  products: number;
+  ordersAsSeller: number;
+  ordersAsBuyer: number;
+  coupons: number;
+  giftWraps: number;
+  reviews: number;
+  requiresConfirmation: boolean;
+}
 
 interface UserFormData {
   name: string;
@@ -62,7 +74,6 @@ const AdminUsers = () => {
     loading,
     fetchUsers,
     assignRole,
-    deleteUser,
     toggleStatus
   } = useUsers({ fetchOnMount: true });
 
@@ -126,15 +137,84 @@ const AdminUsers = () => {
       name: user.full_name || '',
       email: user.email || '',
       phone: user.phone || '',
-      role: user.role || 'buyer',
+      role: (user.role as UserRole) || 'buyer',
       status: user.status || 'active'
     });
     setIsDialogOpen(true);
   };
 
-  const handleDelete = async (userId: string) => {
-    if (!confirm('Tem certeza que deseja excluir este usuário?')) return;
-    await deleteUser(userId);
+  // -- Exclusao com previa de dependencias -------------------------------
+  const [deleteTarget, setDeleteTarget] = useState<UserProfile | null>(null);
+  const [deleteSummary, setDeleteSummary] = useState<DeleteSummary | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async (target: UserProfile) => {
+    setDeleteTarget(target);
+    setDeleteSummary(null);
+    setIsDeleting(true);
+
+    const { data, error } = await userService.adminPreviewDelete(target.id);
+    setIsDeleting(false);
+
+    if (error || !data) {
+      toast.error(error || 'Nao foi possivel verificar os dados do usuario.');
+      setDeleteTarget(null);
+      return;
+    }
+
+    setDeleteSummary(data);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+
+    setIsDeleting(true);
+    const { error } = await userService.adminDeleteUser(
+      deleteTarget.id,
+      deleteSummary?.requiresConfirmation ?? false
+    );
+    setIsDeleting(false);
+
+    if (error) {
+      toast.error(error);
+      return;
+    }
+
+    toast.success('Usuario excluido.');
+    setDeleteTarget(null);
+    setDeleteSummary(null);
+    fetchUsers();
+  };
+
+  // -- Alteracao de e-mail/senha -----------------------------------------
+  const [credentialsTarget, setCredentialsTarget] = useState<UserProfile | null>(null);
+  const [credentialsForm, setCredentialsForm] = useState({ email: '', password: '' });
+  const [isSavingCredentials, setIsSavingCredentials] = useState(false);
+
+  const handleCredentials = (target: UserProfile) => {
+    setCredentialsTarget(target);
+    setCredentialsForm({ email: target.email || '', password: '' });
+  };
+
+  const submitCredentials = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!credentialsTarget) return;
+
+    setIsSavingCredentials(true);
+    const { error } = await userService.adminSetCredentials(credentialsTarget.id, {
+      email: credentialsForm.email || undefined,
+      password: credentialsForm.password || undefined
+    });
+    setIsSavingCredentials(false);
+
+    if (error) {
+      toast.error(error);
+      return;
+    }
+
+    toast.success('Credenciais atualizadas.');
+    setCredentialsTarget(null);
+    fetchUsers();
   };
 
   const handleRoleToggle = async (user: UserProfile) => {
@@ -226,9 +306,14 @@ const AdminUsers = () => {
       onClick: (item: UserProfile) => handleStatusToggle(item)
     },
     {
+      label: 'Alterar Senha',
+      icon: <KeyRound className="h-4 w-4" />,
+      onClick: (item: UserProfile) => handleCredentials(item)
+    },
+    {
       label: 'Excluir',
       icon: <Trash2 className="h-4 w-4" />,
-      onClick: (item: UserProfile) => handleDelete(item.id),
+      onClick: (item: UserProfile) => handleDelete(item),
       variant: 'destructive' as const,
       show: (item: UserProfile) => item.id !== user?.id
     }
@@ -424,6 +509,117 @@ const AdminUsers = () => {
           />
         </CardContent>
       </Card>
+
+      {/* Exclusao com previa das dependencias */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Excluir usuario
+            </DialogTitle>
+            <DialogDescription>
+              {deleteTarget?.full_name || deleteTarget?.email} sera removido do Auth, do perfil e das tabelas de acesso.
+            </DialogDescription>
+          </DialogHeader>
+
+          {isDeleting && (
+            <p className="text-sm text-muted-foreground">Verificando dados vinculados...</p>
+          )}
+
+          {deleteSummary && (
+            <div className="space-y-3 text-sm">
+              <ul className="grid grid-cols-2 gap-2">
+                <li className="rounded-md border p-2">
+                  <span className="block text-muted-foreground text-xs">Produtos do vendedor</span>
+                  <strong>{deleteSummary.products}</strong>
+                </li>
+                <li className="rounded-md border p-2">
+                  <span className="block text-muted-foreground text-xs">Pedidos como vendedor</span>
+                  <strong>{deleteSummary.ordersAsSeller}</strong>
+                </li>
+                <li className="rounded-md border p-2">
+                  <span className="block text-muted-foreground text-xs">Pedidos como comprador</span>
+                  <strong>{deleteSummary.ordersAsBuyer}</strong>
+                </li>
+                <li className="rounded-md border p-2">
+                  <span className="block text-muted-foreground text-xs">Cupons / embalagens</span>
+                  <strong>{deleteSummary.coupons} / {deleteSummary.giftWraps}</strong>
+                </li>
+              </ul>
+
+              {deleteSummary.requiresConfirmation ? (
+                <p className="rounded-md bg-destructive/10 p-3 text-destructive">
+                  Este usuario tem produtos ou pedidos como vendedor. Ao continuar, o catalogo
+                  (produtos e embalagens) sera apagado. Os pedidos ja feitos sao mantidos como
+                  historico e ficam sem vinculo com o vendedor.
+                </p>
+              ) : (
+                <p className="text-muted-foreground">
+                  Nenhum produto ou pedido de venda vinculado. A exclusao e direta.
+                </p>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={isDeleting}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={confirmDelete} disabled={isDeleting || !deleteSummary}>
+              {deleteSummary?.requiresConfirmation ? 'Excluir usuario e catalogo' : 'Excluir usuario'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* E-mail e senha */}
+      <Dialog open={!!credentialsTarget} onOpenChange={(open) => !open && setCredentialsTarget(null)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="h-5 w-5" />
+              Alterar e-mail e senha
+            </DialogTitle>
+            <DialogDescription>
+              {credentialsTarget?.full_name || credentialsTarget?.email}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={submitCredentials} className="space-y-4">
+            <div className="grid gap-2">
+              <Label htmlFor="cred-email">E-mail</Label>
+              <Input
+                id="cred-email"
+                type="email"
+                value={credentialsForm.email}
+                onChange={(e) => setCredentialsForm({ ...credentialsForm, email: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="cred-password">Nova senha</Label>
+              <Input
+                id="cred-password"
+                type="password"
+                value={credentialsForm.password}
+                onChange={(e) => setCredentialsForm({ ...credentialsForm, password: e.target.value })}
+                placeholder="Minimo de 8 caracteres"
+                minLength={8}
+              />
+              <p className="text-xs text-muted-foreground">
+                Deixe em branco para manter a senha atual.
+              </p>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setCredentialsTarget(null)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isSavingCredentials}>
+                {isSavingCredentials ? 'Salvando...' : 'Salvar'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

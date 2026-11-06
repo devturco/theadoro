@@ -19,6 +19,8 @@ interface FileUploadProps {
   multiple?: boolean;
   accept?: string;
   maxFiles?: number;
+  /** Tamanho máximo por arquivo, em bytes. */
+  maxSize?: number;
   preview?: boolean;
   className?: string;
   disabled?: boolean;
@@ -34,6 +36,7 @@ export const FileUpload = ({
   multiple = false,
   accept = 'image/*',
   maxFiles = 5,
+  maxSize,
   preview = true,
   className,
   disabled = false
@@ -48,7 +51,7 @@ export const FileUpload = ({
   const defaultOptions: FileUploadOptions = {
     bucket: 'products',
     folder: 'uploads',
-    maxSize: 5 * 1024 * 1024, // 5MB
+    maxSize: maxSize ?? 5 * 1024 * 1024, // 5MB
     allowedTypes: ['image/jpeg', 'image/png', 'image/webp'],
     ...options
   };

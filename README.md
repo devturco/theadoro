@@ -3,8 +3,8 @@
 Marketplace multi-vendedor brasileiro para **presentes, produtos físicos e serviços agendáveis**.
 Três papéis convivem na mesma base: **comprador**, **vendedor** e **administrador**.
 
-> Documento de transferência: tudo aqui foi verificado contra o código e contra o projeto Supabase real.
-> Onde algo **não** está pronto, está dito explicitamente em [Limitações conhecidas](#limitações-conhecidas).
+> Tudo aqui foi verificado contra o código e contra o projeto Supabase real.
+> O que ainda não está pronto está dito explicitamente em [Limitações conhecidas](#limitações-conhecidas).
 
 ---
 
@@ -18,13 +18,14 @@ Três papéis convivem na mesma base: **comprador**, **vendedor** e **administra
 - [Configuração do ambiente](#configuração-do-ambiente)
 - [Rodando localmente](#rodando-localmente)
 - [Banco de dados](#banco-de-dados)
+- [Acesso administrativo](#acesso-administrativo)
 - [Edge Functions](#edge-functions)
 - [Integrações](#integrações)
 - [Fluxos principais](#fluxos-principais)
 - [Build e deploy](#build-e-deploy)
 - [Verificação](#verificação)
 - [Limitações conhecidas](#limitações-conhecidas)
-- [Checklist de transferência](#checklist-de-transferência)
+- [Checklist de go-live](#checklist-de-go-live)
 
 ---
 
@@ -48,7 +49,7 @@ A entrega é **restrita a Cuiabá/MT** — o gate de CEP aceita apenas faixas `7
 | Camada | Tecnologia |
 |---|---|
 | Monorepo | npm workspaces + [Turborepo](https://turbo.build/) |
-| Frontend | React 18 + Vite 5 + React Router 6 + TanStack Query |
+| Frontend | React 18 + Vite 8 + React Router 7 + TanStack Query |
 | UI | Tailwind CSS + shadcn/ui (Radix) — design system em `packages/ui` |
 | Backend / dados | **Supabase** (Postgres, Auth, Storage, Edge Functions) |
 | Pagamentos | Pagar.me v5 (cartão, PIX, boleto) |
@@ -109,8 +110,8 @@ theadoro-gift/
 │   └── ui/                   # design system (shadcn)
 ├── supabase/
 │   ├── config.toml           # configuração do projeto + verify_jwt por function
-│   ├── migrations/           # 32 migrations SQL versionadas
-│   └── functions/            # 4 edge functions (Deno)
+│   ├── migrations/           # 33 migrations SQL versionadas
+│   └── functions/            # 5 edge functions (Deno)
 ├── scripts/                  # utilitários legados de reparo (não fazem parte do runtime)
 ├── server.cjs                # servidor HTTP de produção (serve /dist)
 ├── start.cjs                 # entrypoint de deploy: build + server
@@ -200,6 +201,26 @@ Ou, sem CLI, cole o SQL no **SQL Editor** do dashboard.
 
 > O histórico de migrations do projeto **não é rastreável pelo CLI** — as migrations foram criadas manualmente e aplicadas via SQL Editor. A tabela `supabase_migrations.schema_migrations` pode não refletir o estado real. **Verifique antes de rodar `db push` em produção**; em caso de divergência, aplique o SQL manualmente.
 
+### Admin master
+
+A migration **`20261107000000_bootstrap_master_admin.sql`** cria o administrador principal de uma instalação nova:
+
+| Campo | Valor padrão |
+|---|---|
+| E-mail | `admin@theadoro.com.br` |
+| Senha | `theadoro@2025` |
+| Papel | `admin` em `profiles.role` **e** em `user_roles` |
+| Situação | e-mail confirmado, `verified` e `is_approved` |
+
+A migration é **idempotente**: se o e-mail já existir, ela não mexe na senha e apenas garante o papel de admin e o perfil. Rode-a junto com `supabase db push` ou cole o SQL no **SQL Editor**.
+
+```bash
+supabase link --project-ref pfpbaepzvgovqheeqxlg
+supabase db push        # aplica, entre outras, a migration do admin master
+```
+
+> ⚠️ **Troque a senha no primeiro acesso** (Admin → Usuários → *Alterar Senha*) ou edite a constante `v_password` da migration antes de aplicá-la em produção.
+
 ### Tabelas (26)
 
 | Domínio | Tabelas |
@@ -222,7 +243,7 @@ Ou, sem CLI, cole o SQL no **SQL Editor** do dashboard.
 - `generate_product_slug` / `slugify` — URLs.
 - Helpers de autorização usados por RLS: `has_role`, `is_admin`, `can_access_order`, `is_order_seller_check`, `get_my_roles`, `get_my_profile_v2`.
 
-> **Segurança corrigida nesta transferência:** `public.exec_sql(query text)` era `SECURITY DEFINER` e executável por `anon` — qualquer visitante com a chave pública podia rodar SQL arbitrário. O `EXECUTE` foi revogado de `PUBLIC`, `anon` e `authenticated`, mantido apenas para `service_role`. O mesmo foi feito para os helpers de introspecção (`get_table_columns`, `get_table_info`, `list_cols`, `get_coupons_columns`, `get_user_debug_info`).
+> **Segurança do banco:** `public.exec_sql(query text)` é `SECURITY DEFINER` e executável por `anon` — qualquer visitante com a chave pública podia rodar SQL arbitrário. O `EXECUTE` foi revogado de `PUBLIC`, `anon` e `authenticated`, mantido apenas para `service_role`. O mesmo foi feito para os helpers de introspecção (`get_table_columns`, `get_table_info`, `list_cols`, `get_coupons_columns`, `get_user_debug_info`).
 > Se algum script de `scripts/` parar de funcionar, ele precisa da `service_role` key — e isso é o comportamento correto.
 
 ---
@@ -234,6 +255,7 @@ Ou, sem CLI, cole o SQL no **SQL Editor** do dashboard.
 | `process-payment` | `false` | cria cobranças no Pagar.me (cartão, PIX, boleto), consulta e cancela |
 | `pagarme-webhook` | `false` | recebe eventos do Pagar.me, confirma pagamento e dispara o despacho |
 | `uber-delivery` | `false` | cotação (`action: quote`) e despacho (`action: request`) na Uber Direct |
+| `admin-users` | `false` | exclusão de usuário (com conferência de dependências) e troca de e-mail/senha pelo admin |
 | `ai-gift-assistant` | padrão (`true`) | sugestão de presentes com Gemini |
 
 `verify_jwt = false` significa que a function aceita chamadas sem JWT do Supabase. A proteção vem do próprio código: `pagarme-webhook` exige autenticação do webhook; `uber-delivery` só executa o que o servidor permite; `process-payment` valida os dados e usa a service role.
@@ -302,10 +324,6 @@ Despacho:   POST https://api.uber.com/v1/customers/{customer_id}/deliveries
 
 `shippingService.calculateCorreios()` retorna preço calculado localmente (`28.90 + peso × 4`), **sem chamar nenhuma API**. Serve para o fluxo fechar, não para cobrar frete real.
 
-### Loggi — ⚠️ apenas configuração
-
-Existem `shipping_loggi_enabled` e `shipping_loggi_key` em `site_settings`, mas **não há implementação no código**. O `shippingService` conhece apenas Uber e Correios.
-
 ### tIAdoro (IA)
 
 `ai-gift-assistant` recebe a descrição do presente e responde com sugestões usando Gemini. Requer a chave do provedor configurada nos secrets.
@@ -356,17 +374,26 @@ O projeto é publicado como **app Node** na Hostinger, não como site estático.
 
 ### CI — GitHub Actions
 
-`.github/workflows/deploy-supabase-functions.yml` publica as functions em cada push que toque `supabase/**`.
+O deploy das functions pode ser automatizado por `.github/workflows/deploy-supabase-functions.yml` (push que toque `supabase/**` ou `supabase/config.toml`, além de `workflow_dispatch`).
 
-> ⚠️ **Estado atual: quebrado.** Todas as execuções terminam em `startup_failure`, inclusive no disparo manual, mesmo com o YAML válido e Actions habilitado. O deploy das functions foi feito **manualmente** com a CLI. A nova equipe deve investigar (permissões/billing da conta GitHub) ou manter o deploy manual.
+Requer dois secrets no repositório: `SUPABASE_ACCESS_TOKEN` e `SUPABASE_PROJECT_ID`.
+
+O caminho canônico de deploy — e o único que não depende de CI — é a CLI:
+
+```bash
+supabase functions deploy <nome> --project-ref pfpbaepzvgovqheeqxlg --no-verify-jwt
+```
 
 ---
 
 ## Verificação
 
 ```bash
-npm run build        # deve terminar com "Successfully synced build files to root /dist"
-npm run lint
+npm run build                                   # termina com "Successfully synced build files to root /dist"
+npm run lint                                    # eslint em todos os workspaces
+cd apps/web && npx tsc --noEmit -p tsconfig.app.json   # 0 erros
+cd apps/web && npx vitest run                   # testes unitários
+npm audit                                       # 0 vulnerabilidades
 ```
 
 Sondas rápidas das functions publicadas:
@@ -379,34 +406,35 @@ curl -s -X POST https://pfpbaepzvgovqheeqxlg.supabase.co/functions/v1/uber-deliv
 curl -s -X POST https://pfpbaepzvgovqheeqxlg.supabase.co/functions/v1/pagarme-webhook \
   -H "apikey: <anon>" -H "Content-Type: application/json" -d '{}'
 # esperado sem secrets: 401 {"error":"unauthorized"}
+
+curl -s -X POST https://pfpbaepzvgovqheeqxlg.supabase.co/functions/v1/admin-users \
+  -H "Content-Type: application/json" -d '{"action":"preview-delete","userId":"x"}'
+# esperado sem JWT de admin: 401 {"error":"forbidden"}
 ```
 
 ---
 
 ## Limitações conhecidas
 
-1. **Correios é simulado** — nenhuma API real dos Correios.
-2. **Loggi não implementado** — só existe configuração.
-3. **Sem webhook configurado, PIX não confirma** — depende dos secrets e do cadastro no Pagar.me.
-4. **Região limitada a Cuiabá/MT** — gate fixo no `shippingService`.
-5. **Sem geocodificação** — Uber recebe endereço textual, não lat/long. Se a conta exigir coordenadas, a cotação será recusada.
-6. **CI quebrado** (`startup_failure`) — deploy de functions é manual.
-7. **`packages/api-client`** depende de `swagger.json`; regenerar exige migrar o `kubb.config.ts` (o plugin `@kubb/plugin-tanstack-query` foi removido do npm). O `dist/` já construído atende o app.
-8. **Erros de tipagem pré-existentes** — `tsc --noEmit` reporta ~319 erros no app. O build (esbuild/Vite) funciona; a limpeza de tipos é dívida separada.
-9. **Vulnerabilidades npm** — 25 no total; as críticas são `vitest`/`@vitest/ui` (dev, fora do bundle).
+1. **Correios é simulado** — `shippingService.calculateCorreios()` calcula o preço localmente (`28.90 + peso × 4`), sem chamar nenhuma API.
+2. **Sem webhook configurado, PIX não confirma** — depende dos secrets e do cadastro da URL no Pagar.me.
+3. **Região limitada a Cuiabá/MT** — gate fixo no `shippingService` (faixas `780xx`/`781xx`).
+4. **Sem geocodificação** — a Uber recebe o endereço textual, não lat/long. Se a conta exigir coordenadas, a cotação é recusada.
+5. **`packages/api-client`** depende de `swagger.json`; regenerar exige migrar o `kubb.config.ts` (o plugin `@kubb/plugin-tanstack-query` foi removido do npm). O `dist/` já construído atende o app.
 
 ---
 
-## Checklist de transferência
+## Checklist de go-live
 
 - [ ] `.env.local` criado a partir de `.env.example`
-- [ ] `npm install` e `npm run dev` funcionando
+- [ ] `npm install`, `npm run build` e `npm run dev` funcionando
 - [ ] `supabase link` no projeto `pfpbaepzvgovqheeqxlg`
-- [ ] Confirmar schema real contra `supabase/migrations` antes de `db push`
+- [ ] Migration `20261107000000_bootstrap_master_admin.sql` aplicada (cria `admin@theadoro.com.br`)
+- [ ] **Senha do admin master trocada** em Admin → Usuários
+- [ ] Confirmar o schema real contra `supabase/migrations` antes de `db push`
 - [ ] Secrets `UBER_*` e `PAGARME_WEBHOOK_*` configurados
 - [ ] Webhook do Pagar.me cadastrado com a URL da function
 - [ ] Credenciais da Uber preenchidas no admin (sandbox primeiro)
 - [ ] `store_address`, `store_city`, `store_state`, `store_cep`, `store_phone` preenchidos
-- [ ] Deploy da Hostinger apontando startup file para `start.cjs`
-- [ ] Rotacionar: `service_role` key, token do Supabase e senha do banco (circularam durante a transferência)
-- [ ] Investigar o `startup_failure` do GitHub Actions
+- [ ] Deploy da Hostinger apontando o startup file para `start.cjs`
+- [ ] Rotacionar credenciais que já tenham circulado: `service_role` key, PAT do Supabase e senha do banco

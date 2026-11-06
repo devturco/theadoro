@@ -111,18 +111,25 @@ export const serviceAvailabilitySchema = z.object({
 });
 
 // Create Service Availability Schema
-export const createServiceAvailabilitySchema = z.object({
+const serviceAvailabilityObject = z.object({
   product_id: z.string().uuid('ID do produto inválido'),
   day_of_week: z.number().int().min(0, 'Dia da semana deve ser entre 0 e 6').max(6, 'Dia da semana deve ser entre 0 e 6'),
   start_time: z.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Horário de início inválido (HH:MM)'),
   end_time: z.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Horário de fim inválido (HH:MM)'),
-}).refine((data) => data.start_time < data.end_time, {
-  message: 'Horário de início deve ser anterior ao horário de fim',
-  path: ['end_time'],
 });
 
+export const createServiceAvailabilitySchema = serviceAvailabilityObject.refine(
+  (data) => data.start_time < data.end_time,
+  {
+    message: 'Horário de início deve ser anterior ao horário de fim',
+    path: ['end_time'],
+  }
+);
+
 // Update Service Availability Schema
-export const updateServiceAvailabilitySchema = createServiceAvailabilitySchema.partial().omit({ product_id: true });
+export const updateServiceAvailabilitySchema = serviceAvailabilityObject
+  .partial()
+  .omit({ product_id: true });
 
 // Export types
 export type ProductType = z.infer<typeof productTypeSchema>;

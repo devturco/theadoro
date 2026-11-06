@@ -32,6 +32,18 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
+/** Linha da tabela `subscription_plans`. */
+interface SubscriptionPlan {
+    id: string;
+    name: string;
+    price: number;
+    description: string | null;
+    features: string[] | null;
+    limits?: any;
+    is_active: boolean | null;
+    created_at: string;
+}
+
 interface PlanFormData {
     name: string;
     price: number;
@@ -63,7 +75,7 @@ const AdminSubscriptions = () => {
     });
 
     // Plans CRUD
-    const plansCRUD = useCRUD({
+    const plansCRUD = useCRUD<SubscriptionPlan>({
         table: 'subscription_plans',
         orderBy: { column: 'price', ascending: true }
     });

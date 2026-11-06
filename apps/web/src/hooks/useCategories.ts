@@ -3,7 +3,9 @@ import { Category } from '@/types/product'; // Adjust path if needed, ensure Cat
 import { categoryService } from '@/services/category.service';
 import { toast } from 'sonner';
 
-export const useCategories = () => {
+/** `all` inclui categorias inativas (telas de administração). */
+export const useCategories = (options: { scope?: 'all' | 'active' } = {}) => {
+    const scope = options.scope ?? 'active';
     const [categories, setCategories] = useState<Category[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -47,8 +49,12 @@ export const useCategories = () => {
     }, []);
 
     useEffect(() => {
-        fetchCategories();
-    }, [fetchCategories]);
+        if (scope === 'all') {
+            fetchAllCategories();
+        } else {
+            fetchCategories();
+        }
+    }, [scope, fetchCategories, fetchAllCategories]);
 
     const createCategory = useCallback(async (data: any) => {
         setLoading(true);

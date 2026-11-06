@@ -5,7 +5,7 @@ import { Button } from '@theadoro/ui';
 import { Badge } from '@theadoro/ui';
 import { Megaphone, Calendar, Percent, CheckCircle2, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { supabaseLoose } from '@/integrations/supabase/loose';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -36,15 +36,15 @@ export default function SellerCampaigns() {
         try {
             setLoading(true);
             // Get all active campaigns
-            const { data: allCampaigns } = await supabase
-                .from('campaigns' as any)
+            const { data: allCampaigns } = await supabaseLoose
+                .from('campaigns')
                 .select('*')
                 .eq('is_active', true)
                 .order('starts_at', { ascending: true });
 
             // Get user participation
-            const { data: participation } = await supabase
-                .from('campaign_participants' as any)
+            const { data: participation } = await supabaseLoose
+                .from('campaign_participants')
                 .select('campaign_id')
                 .eq('seller_id', user!.id);
 
@@ -64,8 +64,8 @@ export default function SellerCampaigns() {
 
     const handleJoin = async (campaignId: string) => {
         try {
-            const { error } = await supabase
-                .from('campaign_participants' as any)
+            const { error } = await supabaseLoose
+                .from('campaign_participants')
                 .insert({
                     campaign_id: campaignId,
                     seller_id: user!.id

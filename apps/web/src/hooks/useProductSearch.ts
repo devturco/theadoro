@@ -89,7 +89,7 @@ export const useProductSearch = (options: UseProductSearchOptions = {}) => {
             name,
             slug,
             description,
-            image
+            image_url
           ),
           profiles (
             id,
@@ -173,7 +173,16 @@ export const useProductSearch = (options: UseProductSearchOptions = {}) => {
         is_service: item.is_service,
         created_at: item.created_at,
         updated_at: item.updated_at,
-        category: item.categories || {
+        seller_id: item.seller_id || '',
+        type: item.type || 'physical',
+        display_id: item.display_id ?? 0,
+        category: item.categories ? {
+          id: item.categories.id,
+          name: item.categories.name,
+          slug: item.categories.slug,
+          description: item.categories.description ?? undefined,
+          image_url: item.categories.image_url ?? undefined,
+        } : {
           id: '',
           name: 'Sem categoria',
           slug: 'sem-categoria',
@@ -181,8 +190,8 @@ export const useProductSearch = (options: UseProductSearchOptions = {}) => {
         seller: {
           id: item.profiles?.id || '',
           name: item.profiles?.full_name || 'Vendedor',
-          avatar: item.profiles?.avatar_url,
-          location: item.profiles?.location || '',
+          avatar: item.profiles?.avatar_url ?? undefined,
+          location: item.profiles?.location ?? undefined,
           rating: 0,
           reviewCount: 0,
           verified: false,

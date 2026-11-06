@@ -2,6 +2,7 @@ import React, { createContext, useContext, useReducer, useEffect, useMemo, useSt
 import { Product } from '@/types/product';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { getCartKey } from '@/lib/cartStorage';
 import { supabase } from '@/integrations/supabase/client';
 import {
   FreeShippingRule,
@@ -141,9 +142,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [state, dispatch] = useReducer(cartReducer, { items: [] });
   const [campaignRules, setCampaignRules] = useState<FreeShippingRule[]>([]);
 
-  const cartKey = useMemo(() => {
-    return user ? `theadoro-cart-${user.id}` : 'theadoro-cart-guest';
-  }, [user]);
+  const cartKey = useMemo(() => getCartKey(user?.id), [user]);
 
   // Load cart from localStorage whenever the user (and thus cartKey) changes
   useEffect(() => {
@@ -221,7 +220,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         const now = Date.now();
-        const activeCampaigns = new Map(
+        const activeCampaigns = new Map<string, any>(
           (campaigns || [])
             .filter((campaign: any) => {
               const startsAt = campaign.starts_at ? new Date(campaign.starts_at).getTime() : now;
@@ -229,7 +228,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
               return startsAt <= now && now <= endsAt;
             })
-            .map((campaign: any) => [campaign.id, campaign])
+            .map((campaign: any): [string, any] => [campaign.id, campaign])
         );
 
         const rules = getCampaignFreeShippingRules(
@@ -246,7 +245,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 seller_id: participation.seller_id,
               };
             })
-            .filter(Boolean)
+            // `filter(Boolean)` não estreita o tipo para o TS.
+            .filter((rule): rule is NonNullable<typeof rule> => rule !== null)
         );
 
         if (isMounted) {

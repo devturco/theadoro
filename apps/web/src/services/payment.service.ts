@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { supabaseLoose } from '@/integrations/supabase/loose';
 import { BaseService } from './base.service';
 
 export type PaymentMethod = 'credit_card' | 'debit_card' | 'pix' | 'boleto';
@@ -180,7 +181,7 @@ class PaymentService extends BaseService<any> {
     }
 
     async getPagarmeClientConfig(): Promise<PagarmeClientConfig> {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseLoose
             .from('site_settings' as any)
             .select('key, value')
             .in('key', [

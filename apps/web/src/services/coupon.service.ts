@@ -1,9 +1,10 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { supabaseLoose } from '@/integrations/supabase/loose';
 import { BaseService } from './base.service';
 
 export interface Coupon {
-    id?: string;
+    id: string;
     seller_id: string | null;
     code: string;
     discount_type: 'percentage' | 'fixed';
@@ -24,7 +25,7 @@ class CouponService extends BaseService<Coupon> {
     }
 
     async getByCode(code: string, sellerId?: string) {
-        let query = supabase
+        let query = supabaseLoose
             .from('coupons')
             .select('*')
             .eq('code', code.toUpperCase())
@@ -41,7 +42,7 @@ class CouponService extends BaseService<Coupon> {
     }
 
     async getBySeller(sellerId: string) {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseLoose
             .from('coupons')
             .select('*')
             .eq('seller_id', sellerId)
@@ -51,7 +52,7 @@ class CouponService extends BaseService<Coupon> {
 
     // Custom update with fallback to code+seller_id
     async updateStatus(coupon: Coupon, active: boolean) {
-        let query = supabase.from('coupons').update({ is_active: active });
+        let query = supabaseLoose.from('coupons').update({ is_active: active });
         
         if (coupon.id) {
             query = query.eq('id', coupon.id);
@@ -64,7 +65,7 @@ class CouponService extends BaseService<Coupon> {
 
     // Custom delete with fallback to code+seller_id
     async remove(coupon: Coupon) {
-        let query = supabase.from('coupons').delete();
+        let query = supabaseLoose.from('coupons').delete();
         
         if (coupon.id) {
             query = query.eq('id', coupon.id);

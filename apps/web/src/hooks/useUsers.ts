@@ -1,12 +1,12 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { userService, UserStats } from '@/services/user.service';
-import { UserProfile } from '@/types/auth'; // Import UserProfile
+import { UserProfile, UserRole } from '@/types/auth';
 import { toast } from 'sonner';
 
 interface UseUsersOptions {
     fetchOnMount?: boolean;
-    role?: UserProfile['role'];
+    role?: UserRole;
     status?: UserProfile['status'];
 }
 
@@ -18,7 +18,7 @@ export function useUsers(options: UseUsersOptions = {}) {
 
     // Filters
     const [searchTerm, setSearchTerm] = useState('');
-    const [roleFilter, setRoleFilter] = useState<UserProfile['role'] | undefined>(options.role);
+    const [roleFilter, setRoleFilter] = useState<UserRole | undefined>(options.role);
     const [statusFilter, setStatusFilter] = useState<UserProfile['status'] | undefined>(options.status);
 
     const fetchUsers = useCallback(async () => {
@@ -53,7 +53,7 @@ export function useUsers(options: UseUsersOptions = {}) {
         }
     }, []);
 
-    const assignRole = useCallback(async (userId: string, role: UserProfile['role']) => {
+    const assignRole = useCallback(async (userId: string, role: UserRole) => {
         if (!role) return;
         try {
             const { error } = await userService.assignRole(userId, role);
@@ -64,20 +64,6 @@ export function useUsers(options: UseUsersOptions = {}) {
         } catch (err: any) {
             console.error('Error assigning role:', err);
             toast.error('Erro ao alterar função');
-            throw err;
-        }
-    }, [fetchUsers]);
-
-    const deleteUser = useCallback(async (userId: string) => {
-        try {
-            const { error } = await userService.delete(userId);
-            if (error) throw error;
-
-            toast.success('Usuário excluído com sucesso');
-            fetchUsers();
-        } catch (err: any) {
-            console.error('Error deleting user:', err);
-            toast.error('Erro ao excluir usuário');
             throw err;
         }
     }, [fetchUsers]);
@@ -150,6 +136,5 @@ export function useUsers(options: UseUsersOptions = {}) {
         rejectSeller,
         toggleStatus,
         assignRole,
-        deleteUser
     };
 }

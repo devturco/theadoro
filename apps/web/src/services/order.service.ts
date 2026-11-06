@@ -1,5 +1,6 @@
 import { BaseService } from './base.service';
 import { supabase } from '@/integrations/supabase/client';
+import { supabaseLoose } from '@/integrations/supabase/loose';
 import { PostgrestError } from '@supabase/supabase-js';
 import { Order, OrderItem, OrderStats, OrderFilters, OrderStatus } from '@/types/order';
 
@@ -16,7 +17,7 @@ class OrderService extends BaseService<Order> {
     pagination: { page?: number; limit?: number } = {}
   ): Promise<{ data: Order[]; count: number; error: PostgrestError | null }> {
     try {
-      let query = supabase
+      let query = supabaseLoose
         .from(this.tableName)
         .select(`
           *,
@@ -111,7 +112,7 @@ class OrderService extends BaseService<Order> {
       const { buyer_id, seller_id } = filters;
 
       const buildQuery = (status?: string) => {
-        let query = supabase.from(this.tableName).select('*', { count: 'exact', head: true });
+        let query = supabaseLoose.from(this.tableName).select('*', { count: 'exact', head: true });
         if (buyer_id) query = query.eq('buyer_id', buyer_id);
         if (seller_id) query = query.eq('seller_id', seller_id);
         if (status) query = query.eq('status', status);
@@ -138,7 +139,7 @@ class OrderService extends BaseService<Order> {
       }
 
       // Get revenue statistics
-      let revenueQuery = supabase
+      let revenueQuery = supabaseLoose
         .from(this.tableName)
         .select('total_amount, created_at')
         .in('status', ['confirmed', 'processing', 'shipped', 'delivered']);
@@ -158,7 +159,7 @@ class OrderService extends BaseService<Order> {
       startOfMonth.setDate(1);
       startOfMonth.setHours(0, 0, 0, 0);
 
-      let thisMonthQuery = supabase
+      let thisMonthQuery = supabaseLoose
         .from(this.tableName)
         .select('total_amount')
         .gte('created_at', startOfMonth.toISOString())
@@ -180,7 +181,7 @@ class OrderService extends BaseService<Order> {
       lastMonth.setDate(1);
       lastMonth.setHours(0, 0, 0, 0);
 
-      let lastMonthQuery = supabase
+      let lastMonthQuery = supabaseLoose
         .from(this.tableName)
         .select('total_amount')
         .gte('created_at', lastMonth.toISOString())
@@ -225,17 +226,12 @@ class OrderService extends BaseService<Order> {
    */
   async createOrderWithItems(
     orderData: Omit<Order, 'id' | 'created_at' | 'updated_at' | 'order_number' | 'items'>,
-    items: Omit<OrderItem, 'id' | 'order_id'>[]
+    items: Omit<OrderItem, 'id' | 'order_id' | 'created_at'>[]
   ): Promise<{ data: Order | null; error: PostgrestError | null }> {
     try {
-      // Generate order number
-      const orderNumber = await this.generateOrderNumber();
-
-      // Create order
-      const { data: order, error: orderError } = await this.create({
-        ...orderData,
-        order_number: orderNumber
-      });
+      // A tabela `orders` não tem coluna `order_number`: o número exibido
+      // para o cliente é derivado do `id` na interface.
+      const { data: order, error: orderError } = await this.create(orderData);
 
       if (orderError || !order) {
         return { data: null, error: orderError };
@@ -247,7 +243,7 @@ class OrderService extends BaseService<Order> {
         order_id: order.id
       }));
 
-      const { error: itemsError } = await supabase
+      const { error: itemsError } = await supabaseLoose
         .from('order_items')
         .insert(orderItems);
 
@@ -304,7 +300,7 @@ class OrderService extends BaseService<Order> {
       if (options.updateStock) {
         for (const item of items) {
           if (!item.product.is_service && item.product.stock_quantity !== null) {
-            await supabase
+            await supabaseLoose
               .from('products')
               .update({
                 stock_quantity: Math.max(0, item.product.stock_quantity - item.quantity)
@@ -322,7 +318,7 @@ class OrderService extends BaseService<Order> {
               ? JSON.parse(order.shipping_address)
               : order.shipping_address;
 
-            await supabase.from('appointments').insert({
+            await supabaseLoose.from('appointments').insert({
               buyer_id: order.buyer_id,
               seller_id: item.product.seller_id || item.product.seller?.id,
               product_id: item.product.id,
@@ -348,7 +344,7 @@ class OrderService extends BaseService<Order> {
    */
   async getOrderWithItems(orderId: string): Promise<{ data: Order | null; error: PostgrestError | null }> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseLoose
         .from(this.tableName)
         .select(`
           *,
@@ -399,7 +395,7 @@ class OrderService extends BaseService<Order> {
       const updateData: any = { status };
 
       if (trackingNumber || status === 'delivered') {
-        const { data: currentOrder, error: currentOrderError } = await supabase
+        const { data: currentOrder, error: currentOrderError } = await supabaseLoose
           .from(this.tableName)
           .select('notes')
           .eq('id', orderId)
@@ -460,7 +456,7 @@ class OrderService extends BaseService<Order> {
    */
   async getOrdersByBuyer(buyerId: string): Promise<{ data: Order[]; error: PostgrestError | null }> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseLoose
         .from(this.tableName)
         .select(`
           *,
@@ -495,7 +491,7 @@ class OrderService extends BaseService<Order> {
    */
   async getOrdersBySeller(sellerId: string): Promise<{ data: Order[]; error: PostgrestError | null }> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseLoose
         .from(this.tableName)
         .select(`
           *,
@@ -526,20 +522,11 @@ class OrderService extends BaseService<Order> {
   }
 
   /**
-   * Generate unique order number
-   */
-  private async generateOrderNumber(): Promise<string> {
-    const timestamp = Date.now().toString();
-    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-    return `ORD-${timestamp}-${random}`;
-  }
-
-  /**
    * Get recent orders
    */
   async getRecentOrders(limit: number = 10): Promise<{ data: Order[]; error: PostgrestError | null }> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseLoose
         .from(this.tableName)
         .select(`
           *,
@@ -571,7 +558,7 @@ class OrderService extends BaseService<Order> {
     sellerId?: string
   ): Promise<{ data: any; error: PostgrestError | null }> {
     try {
-      let query = supabase
+      let query = supabaseLoose
         .from(this.tableName)
         .select(`
           created_at,

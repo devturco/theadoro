@@ -12,17 +12,17 @@
     "lint": "eslint ."
   },
   "devDependencies": {
-    "@kubb/cli": "latest",
-    "@kubb/core": "latest",
-    "@kubb/plugin-oas": "latest",
-    "@kubb/plugin-ts": "latest",
-    "@kubb/plugin-zod": "latest",
+    "@kubb/cli": "^4.39.3",
+    "@kubb/core": "^4.39.3",
+    "@kubb/plugin-oas": "^4.39.3",
+    "@kubb/plugin-ts": "^4.39.3",
+    "@kubb/plugin-zod": "^4.39.3",
     "@theadoro/config-typescript": "*",
-    "tsup": "^8.0.2",
+    "tsup": "^9.0.0",
     "typescript": "^5.3.3"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.25.0",
-    "zod": "^3.22.4"
+    "zod": "^4.6.7"
   }
 }

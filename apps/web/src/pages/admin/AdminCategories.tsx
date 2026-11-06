@@ -143,16 +143,16 @@ const AdminCategories = () => {
   const columns = [
     {
       key: 'name',
-      label: 'Nome'
+      title: 'Nome'
     },
     {
       key: 'description',
-      label: 'Descrição',
+      title: 'Descrição',
       render: (description: string) => description || 'N/A'
     },
     {
       key: 'is_active',
-      label: 'Status',
+      title: 'Status',
       render: (isActive: boolean) => (
         <Badge variant={isActive ? 'default' : 'secondary'}>
           {isActive ? 'Ativa' : 'Inativa'}
@@ -160,22 +160,22 @@ const AdminCategories = () => {
       )
     },
     {
-      key: 'product_count',
-      label: 'Produtos',
+      key: 'productCount',
+      title: 'Produtos',
       render: (_: any, row: Category) => {
         // This would need to be calculated from products data, hook usage mismatch?
         // Category type in hook vs type in DataTable might differ slightly or just be optional
-        return row.productCount || row.product_count || '0';
+        return row.productCount ?? 0;
       }
     },
     {
       key: 'created_at',
-      label: 'Data de Criação',
+      title: 'Data de Criação',
       render: (value: string) => new Date(value).toLocaleDateString('pt-BR')
     },
     {
       key: 'actions',
-      label: 'Ações',
+      title: 'Ações',
       render: (_: any, row: Category) => (
         <div className="flex gap-2">
           <Button
@@ -383,7 +383,6 @@ const AdminCategories = () => {
             data={categories || []}
             columns={columns}
             loading={loading}
-            searchable={true}
             searchPlaceholder="Buscar categorias..."
           />
         </CardContent>

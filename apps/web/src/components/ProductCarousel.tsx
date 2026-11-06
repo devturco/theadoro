@@ -2,20 +2,7 @@ import { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@theadoro/ui';
 import { ProductCard } from './ProductCard';
-
-interface Product {
-  id: string;
-  name: string;
-  price: number;
-  originalPrice?: number;
-  image: string;
-  rating: number;
-  reviewCount: number;
-  sellerId: string;
-  sellerName: string;
-  categoryId: string;
-  isWishlisted?: boolean;
-}
+import { Product } from '@/types/product';
 
 interface ProductCarouselProps {
   products: Product[];

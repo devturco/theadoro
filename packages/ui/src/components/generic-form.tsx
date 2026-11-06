@@ -86,7 +86,7 @@ export const GenericForm = ({
     }, {} as Record<string, any>)
   );
 
-  const form = useForm({
+  const form = useForm<Record<string, any>>({
     resolver: zodResolver(formSchema),
     defaultValues
   });

@@ -14,6 +14,7 @@ interface ProductReview {
   helpfulCount: number;
 }
 import { supabase } from '@/integrations/supabase/client';
+import { supabaseLoose } from '@/integrations/supabase/loose';
 import { productService } from '@/services/product.service';
 import { toast } from '@/hooks/use-toast';
 
@@ -168,7 +169,7 @@ export const useProduct = (productId: string | undefined) => {
 
   const markReviewHelpful = useCallback(async (reviewId: string) => {
     try {
-      const { error } = await supabase.rpc('increment_review_helpful', {
+      const { error } = await supabaseLoose.rpc('increment_review_helpful', {
         review_id: reviewId
       });
 

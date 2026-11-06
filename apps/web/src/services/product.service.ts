@@ -1,7 +1,28 @@
 import { BaseService, BaseEntity } from './base.service';
 import { supabase } from '@/integrations/supabase/client';
+import { supabaseLoose } from '@/integrations/supabase/loose';
 import { PostgrestError } from '@supabase/supabase-js';
-import { Product, ProductStats, ProductFilters } from '@/types/product';
+import { Product, ProductStats } from '@/types/product';
+
+/**
+ * Filtros no formato de coluna do banco (snake_case). A UI usa
+ * `ProductFilters` (camelCase) e converte antes de chamar o serviço —
+ * ver `useProducts`.
+ */
+export interface ProductQueryFilters {
+  category_id?: string;
+  seller_id?: string;
+  is_active?: boolean;
+  status?: string;
+  featured?: boolean;
+  min_price?: number;
+  max_price?: number;
+  in_stock?: boolean;
+  search?: string;
+}
+
+/** Campos que existem em `Product` mas não são colunas de `products`. */
+const RELATION_KEYS = ['category', 'seller', 'variations', 'isWishlisted'] as const;
 
 class ProductService extends BaseService<Product> {
   constructor() {
@@ -12,11 +33,11 @@ class ProductService extends BaseService<Product> {
    * Get products with relations (category and seller info)
    */
   async getProductsWithRelations(
-    filters: ProductFilters = {},
+    filters: ProductQueryFilters = {},
     pagination: { page?: number; limit?: number } = {}
   ): Promise<{ data: Product[]; count: number; error: PostgrestError | null }> {
     try {
-      let query = supabase
+      let query = supabaseLoose
         .from(this.tableName)
         .select(`
           *,
@@ -101,7 +122,7 @@ class ProductService extends BaseService<Product> {
       if (activeError) throw activeError;
 
       // Get out of stock products (using stock_quantity <= 0)
-      const { data: outOfStockData, error: outOfStockError } = await supabase
+      const { data: outOfStockData, error: outOfStockError } = await supabaseLoose
         .from(this.tableName)
         .select('id', { count: 'exact', head: true })
         .lte('stock_quantity', 0);
@@ -109,7 +130,7 @@ class ProductService extends BaseService<Product> {
       const outOfStock = outOfStockData?.length || 0;
 
       // Get low stock products (stock_quantity <= 10)
-      const { data: lowStockData, error: lowStockError } = await supabase
+      const { data: lowStockData, error: lowStockError } = await supabaseLoose
         .from(this.tableName)
         .select('id', { count: 'exact', head: true })
         .lte('stock_quantity', 10)
@@ -122,7 +143,7 @@ class ProductService extends BaseService<Product> {
       if (featuredError) throw featuredError;
 
       // Get price statistics
-      const { data: priceStats, error: priceError } = await supabase
+      const { data: priceStats, error: priceError } = await supabaseLoose
         .from(this.tableName)
         .select('price')
         .eq('is_active', true);
@@ -155,7 +176,7 @@ class ProductService extends BaseService<Product> {
    */
   async getProductsBySeller(sellerId: string): Promise<{ data: Product[]; error: PostgrestError | null }> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseLoose
         .from(this.tableName)
         .select(`
           *,
@@ -182,7 +203,7 @@ class ProductService extends BaseService<Product> {
    */
   async getFeaturedProducts(limit: number = 10): Promise<{ data: Product[]; error: PostgrestError | null }> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseLoose
         .from(this.tableName)
         .select(`
           *,
@@ -213,7 +234,7 @@ class ProductService extends BaseService<Product> {
    */
   async getProductsByCategory(categoryId: string): Promise<{ data: Product[]; error: PostgrestError | null }> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseLoose
         .from(this.tableName)
         .select(`
           *,
@@ -241,10 +262,10 @@ class ProductService extends BaseService<Product> {
    */
   async searchProducts(
     searchTerm: string,
-    filters: ProductFilters = {}
+    filters: ProductQueryFilters = {}
   ): Promise<{ data: Product[]; error: PostgrestError | null }> {
     try {
-      let query = supabase
+      let query = supabaseLoose
         .from(this.tableName)
         .select(`
           *,
@@ -358,7 +379,7 @@ class ProductService extends BaseService<Product> {
    */
   async incrementViewCount(productId: string): Promise<{ error: PostgrestError | null }> {
     try {
-      const { error } = await supabase.rpc('increment_product_views', {
+      const { error } = await supabaseLoose.rpc('increment_product_views', {
         product_id: productId
       });
 
@@ -374,7 +395,7 @@ class ProductService extends BaseService<Product> {
    */
   async getLowStockProducts(threshold: number = 10): Promise<{ data: Product[]; error: PostgrestError | null }> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseLoose
         .from(this.tableName)
         .select(`
           *,
@@ -404,7 +425,7 @@ class ProductService extends BaseService<Product> {
    */
   async getTopSellingProducts(limit: number = 10): Promise<{ data: Product[]; error: PostgrestError | null }> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseLoose
         .from(this.tableName)
         .select(`
           *,
@@ -433,10 +454,10 @@ class ProductService extends BaseService<Product> {
    */
   async bulkUpdateProducts(
     productIds: string[],
-    updateData: Partial<Pick<Product, 'is_active' | 'featured' | 'category_id' | 'status'>>
+    updateData: Partial<Pick<Product, 'is_active' | 'featured' | 'category_id'>>
   ): Promise<{ data: Product[] | null; error: PostgrestError | null }> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseLoose
         .from(this.tableName)
         .update({
           ...updateData,
@@ -469,7 +490,7 @@ class ProductService extends BaseService<Product> {
         return { data: [], error: currentError };
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await supabaseLoose
         .from(this.tableName)
         .select(`
           *,
@@ -503,22 +524,17 @@ class ProductService extends BaseService<Product> {
     try {
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
 
-      let query = supabase
+      let query = supabaseLoose
         .from(this.tableName)
         .select(`
           *,
           category:categories(id, name, slug, description, image_url),
           seller:profiles(id, full_name, avatar_url, location, verified, seller_delivery_enabled)
-        `)
-        .single();
+        `);
 
-      if (isUUID) {
-        query = query.eq('id', idOrSlug);
-      } else {
-        query = query.eq('slug', idOrSlug);
-      }
+      query = isUUID ? query.eq('id', idOrSlug) : query.eq('slug', idOrSlug);
 
-      const { data, error } = await query;
+      const { data, error } = await query.single();
 
       if (error) throw error;
 
@@ -541,19 +557,26 @@ class ProductService extends BaseService<Product> {
    * Overrides BaseService create to handle specific logic if needed
    */
   async create(data: Partial<Product>): Promise<{ data: Product | null; error: PostgrestError | null }> {
-    // Ensure numeric values
-    const sanitizedData = {
-      ...data,
-      price: Number(data.price),
-      stock_quantity: Number(data.stock_quantity),
-      // Slug is generated by DB trigger, no need to send unless overriding
-    };
-    return super.create(sanitizedData);
+    // Relações/computados vêm da UI e não são colunas — descarta antes de gravar.
+    const payload: Record<string, unknown> = { ...data };
+    RELATION_KEYS.forEach((key) => delete payload[key]);
+
+    // Normaliza os numéricos; o slug é gerado por trigger no banco.
+    payload.price = Number(data.price);
+    payload.stock_quantity = Number(data.stock_quantity);
+
+    const { data: created, error } = await supabaseLoose
+      .from(this.tableName)
+      .insert(payload)
+      .select()
+      .single();
+
+    return { data: created as Product | null, error };
   }
 
   async addVariations(variations: any[]): Promise<{ error: PostgrestError | null }> {
     try {
-      const { error } = await supabase
+      const { error } = await supabaseLoose
         .from('product_variations')
         .insert(variations);
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { supabaseLoose } from '@/integrations/supabase/loose';
 import { toast } from 'sonner';
 import type { PaginationParams, ApiResponse, CRUDOperations } from '@/types/common';
 
@@ -44,7 +45,7 @@ export const useCRUD = <T extends { id: string }>({
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
 
-      let query = supabase
+      let query = supabaseLoose
         .from(table)
         .select(select, { count: 'exact' })
         .range(from, to)
@@ -69,7 +70,8 @@ export const useCRUD = <T extends { id: string }>({
         throw error;
       }
 
-      setData(result || []);
+      // `table`/`select` são dinâmicos: o client não consegue inferir a linha.
+      setData((result as unknown as T[]) || []);
       setPagination({
         page,
         pageSize,
@@ -90,7 +92,7 @@ export const useCRUD = <T extends { id: string }>({
   // Create item
   const create = useCallback(async (item: Omit<T, 'id' | 'created_at' | 'updated_at'>): Promise<T> => {
     try {
-      const { data: result, error } = await supabase
+      const { data: result, error } = await supabaseLoose
         .from(table)
         .insert(item)
         .select()
@@ -111,7 +113,7 @@ export const useCRUD = <T extends { id: string }>({
   // Update item
   const update = useCallback(async (id: string, updates: Partial<T>): Promise<T> => {
     try {
-      const { data: result, error } = await supabase
+      const { data: result, error } = await supabaseLoose
         .from(table)
         .update(updates)
         .eq('id', id)
@@ -133,7 +135,7 @@ export const useCRUD = <T extends { id: string }>({
   // Delete item
   const remove = useCallback(async (id: string): Promise<void> => {
     try {
-      const { error } = await supabase
+      const { error } = await supabaseLoose
         .from(table)
         .delete()
         .eq('id', id);
@@ -152,7 +154,7 @@ export const useCRUD = <T extends { id: string }>({
   // Get single item
   const getById = useCallback(async (id: string): Promise<T | null> => {
     try {
-      const { data: result, error } = await supabase
+      const { data: result, error } = await supabaseLoose
         .from(table)
         .select(select)
         .eq('id', id)
@@ -160,7 +162,7 @@ export const useCRUD = <T extends { id: string }>({
 
       if (error) throw error;
 
-      return result;
+      return result as unknown as T | null;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Erro ao buscar item';
       toast.error(errorMessage);

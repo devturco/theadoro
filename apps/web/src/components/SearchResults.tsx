@@ -3,20 +3,7 @@ import { Grid, List, SortAsc } from 'lucide-react';
 import { Button } from '@theadoro/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@theadoro/ui';
 import { ProductCard } from './ProductCard';
-
-interface Product {
-  id: string;
-  name: string;
-  price: number;
-  originalPrice?: number;
-  image: string;
-  rating: number;
-  reviewCount: number;
-  sellerId: string;
-  sellerName: string;
-  categoryId: string;
-  isWishlisted?: boolean;
-}
+import { Product } from '@/types/product';
 
 interface SearchResultsProps {
   products: Product[];
@@ -168,7 +155,7 @@ export function SearchResults({
                 <div key={product.id} className="border rounded-lg p-4">
                   <div className="flex gap-4">
                     <img
-                      src={product.image}
+                      src={product.images?.[0]}
                       alt={product.name}
                       className="w-24 h-24 object-cover rounded-md"
                     />
@@ -177,7 +164,7 @@ export function SearchResults({
                         {product.name}
                       </h3>
                       <p className="text-sm text-gray-600 mb-2">
-                        por {product.sellerName}
+                        por {product.seller?.full_name || product.seller?.name || 'Vendedor'}
                       </p>
                       <div className="flex items-center gap-2 mb-2">
                         <div className="flex items-center">
@@ -185,7 +172,7 @@ export function SearchResults({
                             <span
                               key={i}
                               className={`text-sm ${
-                                i < Math.floor(product.rating)
+                                i < Math.floor(product.rating || 0)
                                   ? 'text-yellow-400'
                                   : 'text-gray-300'
                               }`}
@@ -195,16 +182,16 @@ export function SearchResults({
                           ))}
                         </div>
                         <span className="text-sm text-gray-600">
-                          ({product.reviewCount})
+                          ({product.review_count || 0})
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-xl font-bold text-pink-600">
                           R$ {product.price.toFixed(2)}
                         </span>
-                        {product.originalPrice && (
+                        {product.original_price && (
                           <span className="text-sm text-gray-500 line-through">
-                            R$ {product.originalPrice.toFixed(2)}
+                            R$ {product.original_price.toFixed(2)}
                           </span>
                         )}
                       </div>

@@ -46,19 +46,20 @@ export const Products: React.FC = () => {
   const [sortBy, setSortBy] = useState(searchParams.get('sort') || 'relevance');
   const [currentPage, setCurrentPage] = useState(Number(searchParams.get('page')) || 1);
 
+  // A página controla os filtros (inclusive a URL); o hook só executa a busca.
   const {
     products,
     loading,
     error,
     totalCount,
     totalPages,
-    refetch,
-  } = useProducts({
-    filters,
-    sortBy,
-    page: currentPage,
-    limit: 24,
-  });
+    fetchProducts,
+  } = useProducts({ autoFetch: false });
+
+  useEffect(() => {
+    fetchProducts({ ...filters, sortBy, page: currentPage, limit: 24 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters, sortBy, currentPage]);
 
   // Update URL when filters change
   useEffect(() => {

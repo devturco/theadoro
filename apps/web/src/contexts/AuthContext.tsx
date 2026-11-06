@@ -1,6 +1,7 @@
 
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode, useMemo } from 'react';
 import { User, Session } from '@supabase/supabase-js';
+import { clearUserStorage } from '@/lib/cartStorage';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { AuthUser, UserProfile, UserRole, AuthContextType } from '@/types/auth';
@@ -37,7 +38,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const roles: UserRole[] = useMemo(() => {
     const r = new Set<UserRole>();
-    if (profile?.role) r.add(profile.role);
+    if (profile?.role) r.add(profile.role as UserRole);
     dbRoles.forEach(role => r.add(role));
 
     // Admins get everything
@@ -215,15 +216,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       // 3. Selective LocalStorage Clear (Keep global settings, but remove user specific data)
       // Note: We clean everything starting with 'theadoro-cart-' to ensure NO LEAKAGE between users
-      Object.keys(localStorage).forEach(key => {
-        if (
-          key.includes('supabase.auth.token') || 
-          key.startsWith('sb-') || 
-          key.startsWith('theadoro-cart-')
-        ) {
-          localStorage.removeItem(key);
-        }
-      });
+      clearUserStorage(localStorage);
 
       sessionStorage.clear();
       console.log('[AuthContext] Isolated user data cleared');

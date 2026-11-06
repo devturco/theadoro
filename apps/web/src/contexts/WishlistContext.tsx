@@ -42,6 +42,10 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           product_id,
           products (
             id,
+            seller_id,
+            category_id,
+            display_id,
+            type,
             name,
             slug,
             description,
@@ -80,14 +84,23 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         ?.filter(item => item.products)
         .map(item => ({
           ...item.products,
+          // `null` do banco vira `undefined` no tipo de UI.
+          description: item.products.description ?? undefined,
+          original_price: item.products.original_price ?? undefined,
+          in_stock: item.products.in_stock ?? (item.products.stock_quantity ?? 0) > 0,
           category: {
-            ...item.products.categories,
-            image: item.products.categories?.image_url
+            id: item.products.categories?.id || '',
+            name: item.products.categories?.name || 'Sem categoria',
+            slug: item.products.categories?.slug || 'sem-categoria',
+            description: item.products.categories?.description ?? undefined,
+            image_url: item.products.categories?.image_url ?? undefined,
+            image: item.products.categories?.image_url ?? undefined,
           },
           seller: {
-            id: item.products.profiles?.id || '',
+            id: item.products.seller_id || item.products.profiles?.id || '',
             name: item.products.profiles?.full_name || 'Vendedor',
-            avatar: item.products.profiles?.avatar_url,
+            full_name: item.products.profiles?.full_name || 'Vendedor',
+            avatar: item.products.profiles?.avatar_url ?? undefined,
             location: item.products.profiles?.city ? `${item.products.profiles.city}, ${item.products.profiles.state}` : '',
             rating: 0,
             reviewCount: 0,

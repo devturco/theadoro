@@ -5,6 +5,9 @@ export interface PaginationOptions {
   totalPages: number;
 }
 
+/** Alias mantido para os hooks de CRUD, que usam `pageSize`. */
+export type PaginationParams = PaginationOptions;
+
 export interface PaginatedResponse<T> {
   data: T[];
   pagination: PaginationOptions;
@@ -43,6 +46,33 @@ export interface CRUDResult<T> {
   };
 }
 
+/** Operações devolvidas por `useCRUD`. */
+export interface CRUDOperations<T> {
+  create: (item: Omit<T, 'id' | 'created_at' | 'updated_at'>) => Promise<T>;
+  update: (id: string, updates: Partial<T>) => Promise<T>;
+  remove: (id: string) => Promise<void>;
+  getById: (id: string) => Promise<T | null>;
+  refresh: () => void;
+  changePage: (page: number) => void;
+  search: (filters: Record<string, any>) => void;
+}
+
+/** Opções do `useFileUpload` / `<FileUpload>`. */
+export interface FileUploadOptions {
+  bucket?: string;
+  folder?: string;
+  fileName?: string;
+  /** Tamanho máximo em bytes. */
+  maxSize?: number;
+  allowedTypes?: string[];
+}
+
+export interface UploadProgress {
+  loaded: number;
+  total: number;
+  percentage: number;
+}
+
 export interface UploadOptions {
   bucket: string;
   folder?: string;
@@ -65,6 +95,23 @@ export interface MetricData {
   change?: string;
   trend?: 'up' | 'down' | 'neutral';
   color?: 'blue' | 'green' | 'purple' | 'orange' | 'red';
+}
+
+/** Campo do `<GenericForm>` (packages/ui). */
+export interface FormFieldConfig {
+  name: string;
+  label: string;
+  type: 'text' | 'email' | 'password' | 'number' | 'textarea' | 'select' | 'checkbox' | 'switch' | 'date' | 'time' | 'file' | 'boolean';
+  placeholder?: string;
+  required?: boolean;
+  disabled?: boolean;
+  options?: { value: string; label: string }[];
+  description?: string;
+  /** Linhas do textarea. */
+  rows?: number;
+  min?: number;
+  max?: number;
+  step?: number;
 }
 
 export interface FormField {

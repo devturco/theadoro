@@ -466,6 +466,58 @@ class UserService extends BaseService<UserProfile> {
       };
     }
   }
+
+  /**
+   * Ações de admin que precisam da service role (edge function `admin-users`).
+   */
+  async adminAction<T = any>(body: Record<string, unknown>): Promise<{ data: T | null; error: string | null }> {
+    const { data, error } = await supabase.functions.invoke('admin-users', { body })
+
+    if (error) {
+      // A function devolve `{ error, message }`; o client embrulha em FunctionsHttpError.
+      let message = error.message
+      try {
+        const context = await (error as any).context?.json?.()
+        if (context?.message) message = context.message
+      } catch {
+        // sem corpo legível — mantém a mensagem padrão
+      }
+      return { data: (data as T) ?? null, error: message }
+    }
+
+    if (data?.error) {
+      return { data: data as T, error: data.message || data.error }
+    }
+
+    return { data: data as T, error: null }
+  }
+
+  /** Remove o usuário; `cascade` apaga também produtos/embalagens do vendedor. */
+  async adminDeleteUser(userId: string, cascade = false) {
+    return this.adminAction({ action: 'delete', userId, cascade })
+  }
+
+  /** Conta o que está vinculado ao usuário antes de excluir. */
+  async adminPreviewDelete(userId: string) {
+    return this.adminAction<{
+      products: number
+      ordersAsSeller: number
+      ordersAsBuyer: number
+      coupons: number
+      giftWraps: number
+      reviews: number
+      requiresConfirmation: boolean
+    }>({ action: 'preview-delete', userId })
+  }
+
+  /** Troca e-mail e/ou senha de um usuário. */
+  async adminSetCredentials(userId: string, credentials: { email?: string; password?: string }) {
+    return this.adminAction<{ ok: boolean; email: string | null }>({
+      action: 'set-credentials',
+      userId,
+      ...credentials,
+    })
+  }
 }
 
 export const userService = new UserService();

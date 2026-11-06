@@ -413,8 +413,3 @@ export default function AdminSellerApprovals() {
         </div>
     );
 }
-
-// Utility for status colors
-function cn(...classes: any[]) {
-    return classes.filter(Boolean).join(' ');
-}

@@ -24,10 +24,27 @@ import {
 } from '@theadoro/ui';
 import { toast } from 'sonner';
 
+interface SellerInvoice {
+    id: string;
+    seller_id: string;
+    subscription_id: string | null;
+    amount: number;
+    status: string;
+    due_date: string;
+    paid_at: string | null;
+    payment_method: string | null;
+    invoice_url: string | null;
+    pix_code: string | null;
+    pix_qr_url: string | null;
+    created_at: string | null;
+    updated_at: string | null;
+    seller?: { full_name: string | null; email: string | null };
+}
+
 const AdminInvoices = () => {
     const [statusFilter, setStatusFilter] = useState<string>('all');
 
-    const invoicesCRUD = useCRUD({
+    const invoicesCRUD = useCRUD<SellerInvoice>({
         table: 'seller_invoices',
         select: `
       *,

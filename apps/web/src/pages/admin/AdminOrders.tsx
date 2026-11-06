@@ -465,7 +465,7 @@ const AdminOrders = () => {
             const shippingCost = selectedOrder.shipping_cost || notes.shipping_cost || notes.shippingCost || 0;
             const discountAmount = selectedOrder.discount_amount || notes.discount_amount || notes.discountAmount || 0;
             // Calculate subtotal if missing, based on total
-            const subtotal = selectedOrder.subtotal || notes.subtotal || notes.subtotal_amount ||
+            const subtotal = selectedOrder.subtotal_amount || notes.subtotal || notes.subtotal_amount ||
               (selectedOrder.total_amount - shippingCost - giftWrapPrice + discountAmount);
 
             return (

@@ -23,14 +23,8 @@ import {
 } from '@/components/payments/PagarmeTokenizecardForm';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import type { GiftWrap } from '@/types/order';
 
-interface GiftWrap {
-  id: string;
-  name: string;
-  price: number;
-  seller_id: string;
-  is_active: boolean;
-}
 interface SavedAddress {
   id: string;
   label: string | null;
@@ -164,7 +158,7 @@ export const Checkout: React.FC = () => {
         .order('updated_at', { ascending: false });
 
       if (error) throw error;
-      return (data || []) as SavedAddress[];
+      return (data || []) as unknown as SavedAddress[];
     },
     enabled: !!user?.id
   });

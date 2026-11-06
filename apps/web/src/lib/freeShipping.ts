@@ -82,13 +82,15 @@ export const getCampaignFreeShippingRules = (campaigns: CampaignLike[]): FreeShi
         return null;
       }
 
-      return {
+      const rule: FreeShippingRule = {
         sourceId: campaign.id,
         sourceName: campaign.title,
-        sourceType: 'campaign' as const,
+        sourceType: 'campaign',
         threshold,
         sellerId: campaign.seller_id,
       };
+
+      return rule;
     })
     .filter((rule): rule is FreeShippingRule => Boolean(rule));
 };

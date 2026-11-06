@@ -1,8 +1,6 @@
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@theadoro/ui';
-import { Mail, Phone, MapPin, Clock, MessageCircle, HelpCircle, AlertTriangle } from 'lucide-react';
+import { Mail, Phone, MapPin, Clock, MessageCircle, HelpCircle, ShoppingBag } from 'lucide-react';
 import ContactForm from '@/components/ContactForm';
-import CompanyInfo from '@/components/CompanyInfo';
 
 const Contact: React.FC = () => {
 
@@ -65,118 +63,8 @@ const Contact: React.FC = () => {
       <section className="py-16 bg-white">
         <div className="container mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-12 max-w-6xl mx-auto">
-            {/* Contact Form */}
-            <div>
-              <h2 className="text-3xl font-bold mb-8 text-gray-800">
-                Envie sua Mensagem
-              </h2>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div>
-                    <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                      Nome Completo *
-                    </label>
-                    <input
-                      type="text"
-                      id="name"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                      placeholder="Seu nome completo"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                      Email *
-                    </label>
-                    <input
-                      type="email"
-                      id="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                      placeholder="seu@email.com"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-2">
-                    Categoria *
-                  </label>
-                  <select
-                    id="category"
-                    name="category"
-                    value={formData.category}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                  >
-                    <option value="geral">Dúvida Geral</option>
-                    <option value="pedido">Dúvida sobre Pedido</option>
-                    <option value="tecnico">Suporte Técnico</option>
-                    <option value="vendedor">Quero ser Vendedor</option>
-                    <option value="parceria">Parcerias</option>
-                    <option value="reclamacao">Reclamação</option>
-                    <option value="sugestao">Sugestão</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-2">
-                    Assunto *
-                  </label>
-                  <input
-                    type="text"
-                    id="subject"
-                    name="subject"
-                    value={formData.subject}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                    placeholder="Resumo do seu contato"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-2">
-                    Mensagem *
-                  </label>
-                  <textarea
-                    id="message"
-                    name="message"
-                    value={formData.message}
-                    onChange={handleInputChange}
-                    required
-                    rows={6}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent resize-none"
-                    placeholder="Descreva sua dúvida ou mensagem em detalhes..."
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-pink-600 hover:to-purple-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                      <span>Enviando...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-5 h-5" />
-                      <span>Enviar Mensagem</span>
-                    </>
-                  )}
-                </button>
-              </form>
-            </div>
+            {/* Contact Form — componente próprio, com validação e estados */}
+            <ContactForm />
 
             {/* Contact Information */}
             <div>

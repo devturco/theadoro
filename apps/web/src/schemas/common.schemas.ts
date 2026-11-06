@@ -32,7 +32,7 @@ export const crudOptionsSchema = <T extends z.ZodTypeAny>(tableSchema: T) =>
       column: z.string().min(1, 'Coluna de ordenação é obrigatória'),
       ascending: z.boolean().optional(),
     }).optional(),
-    filters: z.record(z.any()).optional(),
+    filters: z.record(z.string(), z.any()).optional(),
     realtime: z.boolean().optional(),
   });
 
@@ -89,7 +89,7 @@ export const dateRangeSchema = z.object({
 
 // File Upload Schema
 export const fileUploadSchema = z.object({
-  file: z.instanceof(File, 'Arquivo é obrigatório'),
+  file: z.instanceof(File, { message: 'Arquivo é obrigatório' }),
   folder: z.string().optional(),
   bucket: z.string().default('products'),
 }).refine((data) => {

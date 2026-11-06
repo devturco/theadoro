@@ -49,7 +49,12 @@ const AdminDashboard = () => {
   const {
     data: profiles,
     updateItem: updateUser
-  } = useCRUD({ table: 'profiles' });
+  } = useCRUD<{
+    id: string;
+    full_name: string | null;
+    email: string | null;
+    created_at: string;
+  }>({ table: 'profiles' });
 
   const { data: orders } = useCRUD({ table: 'orders' });
   const { data: products } = useCRUD({ table: 'products' });

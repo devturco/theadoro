@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { supabaseLoose } from '@/integrations/supabase/loose';
 import { PostgrestError, RealtimeChannel } from '@supabase/supabase-js';
 
 export interface BaseEntity {
@@ -34,7 +35,7 @@ export class BaseService<T extends BaseEntity> {
     filters: FilterOptions = {}
   ): Promise<{ data: T[]; count: number; error: PostgrestError | null }> {
     try {
-      let query = supabase
+      let query = supabaseLoose
         .from(this.tableName)
         .select('*', { count: 'exact' });
 
@@ -87,7 +88,7 @@ export class BaseService<T extends BaseEntity> {
    */
   async getById(id: string): Promise<{ data: T | null; error: PostgrestError | null }> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseLoose
         .from(this.tableName)
         .select('*')
         .eq('id', id)
@@ -111,7 +112,7 @@ export class BaseService<T extends BaseEntity> {
    */
   async create(data: Omit<T, 'id' | 'created_at' | 'updated_at'>): Promise<{ data: T | null; error: PostgrestError | null }> {
     try {
-      const { data: result, error } = await supabase
+      const { data: result, error } = await supabaseLoose
         .from(this.tableName)
         .insert(data)
         .select()
@@ -140,7 +141,7 @@ export class BaseService<T extends BaseEntity> {
         updated_at: new Date().toISOString()
       };
 
-      const { data: result, error } = await supabase
+      const { data: result, error } = await supabaseLoose
         .from(this.tableName)
         .update(updateData)
         .eq('id', id)
@@ -165,7 +166,7 @@ export class BaseService<T extends BaseEntity> {
    */
   async delete(id: string): Promise<{ error: PostgrestError | null }> {
     try {
-      const { error } = await supabase
+      const { error } = await supabaseLoose
         .from(this.tableName)
         .delete()
         .eq('id', id);
@@ -222,7 +223,7 @@ export class BaseService<T extends BaseEntity> {
    */
   async executeQuery(queryBuilder: (query: any) => any): Promise<{ data: any; error: PostgrestError | null }> {
     try {
-      const query = supabase.from(this.tableName).select('*');
+      const query = supabaseLoose.from(this.tableName).select('*');
       const { data, error } = await queryBuilder(query);
 
       return {
@@ -243,7 +244,7 @@ export class BaseService<T extends BaseEntity> {
    */
   async count(filters: FilterOptions = {}): Promise<{ count: number; error: PostgrestError | null }> {
     try {
-      let query = supabase
+      let query = supabaseLoose
         .from(this.tableName)
         .select('*', { count: 'exact', head: true });
 
@@ -274,7 +275,7 @@ export class BaseService<T extends BaseEntity> {
    */
   async batchCreate(items: Omit<T, 'id' | 'created_at' | 'updated_at'>[]): Promise<{ data: T[] | null; error: PostgrestError | null }> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseLoose
         .from(this.tableName)
         .insert(items)
         .select();
@@ -320,7 +321,7 @@ export class BaseService<T extends BaseEntity> {
 
   async batchDelete(ids: string[]): Promise<{ error: PostgrestError | null }> {
     try {
-      const { error } = await supabase
+      const { error } = await supabaseLoose
         .from(this.tableName)
         .delete()
         .in('id', ids);

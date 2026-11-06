@@ -56,4 +56,14 @@ export interface ProductFilters {
   limit?: number;
 }
 
+export interface ProductStats {
+  total_products: number;
+  active_products: number;
+  out_of_stock: number;
+  low_stock: number;
+  featured_products: number;
+  average_price: number;
+  total_value: number;
+}
+
 export type ProductType = 'physical' | 'service' | 'digital';
