@@ -39,3 +39,6 @@ graphify-out/
 
 # turbo cache
 .turbo/
+
+# supabase cli artifacts
+supabase/.temp/
