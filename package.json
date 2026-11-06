@@ -8,7 +8,8 @@
     "start": "node start.cjs",
     "dev": "turbo dev",
     "lint": "turbo lint",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\""
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "docs:pdf": "node scripts/build-readme-pdf.mjs"
   },
   "devDependencies": {
     "turbo": "2.9.14"

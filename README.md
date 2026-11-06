@@ -5,6 +5,9 @@ Três papéis convivem na mesma base: **comprador**, **vendedor** e **administra
 
 > Tudo aqui foi verificado contra o código e contra o projeto Supabase real.
 > O que ainda não está pronto está dito explicitamente em [Limitações conhecidas](#limitações-conhecidas).
+>
+> 📄 **Versão em PDF (para compartilhar com quem não tem acesso ao repositório):** `docs/THEADORO-documentacao.pdf`.
+> Regenere com `npm run docs:pdf` (requer Chrome instalado e `npm i --no-save --package-lock=false puppeteer-core`).
 
 ---
 
