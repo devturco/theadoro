@@ -40,11 +40,11 @@ const FeaturedSellers = () => {
             featuredSellers.map((seller, index) => (
               <div
                 key={seller.id}
-                className="group bg-card rounded-2xl overflow-hidden shadow-md hover:shadow-wine transition-all duration-300 animate-fade-in"
+                className="group overflow-hidden rounded-2xl border border-black/[0.07] bg-card shadow-[0_1px_2px_hsl(346_25%_12%/0.05)] transition-all duration-300 hover:shadow-[0_2px_4px_hsl(346_25%_12%/0.06),0_16px_32px_-16px_hsl(346_25%_12%/0.22)] animate-fade-in"
                 style={{ animationDelay: `${index * 100}ms` }}
               >
                 {/* Header Image */}
-                <div className="relative h-32 bg-gradient-wine">
+                <div className="relative h-32 bg-wine">
                   {seller.avatar && (
                     <img
                       src={seller.avatar}
@@ -58,12 +58,24 @@ const FeaturedSellers = () => {
                 <div className="relative px-6 pb-6">
                   <div className="absolute -top-16 left-6">
                     <div className="relative">
-                      <div className="w-28 h-28 rounded-full bg-card border-4 border-card shadow-lg overflow-hidden">
-                        <img
-                          src={seller.avatar || "/placeholder.svg"}
-                          alt={seller.name}
-                          className="w-full h-full object-cover"
-                        />
+                      <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-card bg-wine shadow-lg">
+                        {seller.avatar ? (
+                          <img
+                            src={seller.avatar}
+                            alt={seller.name}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <span className="font-serif text-3xl font-bold text-white">
+                            {seller.name
+                              .split(" ")
+                              .filter(Boolean)
+                              .slice(0, 2)
+                              .map((part) => part[0])
+                              .join("")
+                              .toUpperCase()}
+                          </span>
+                        )}
                       </div>
                       {seller.verified && (
                         <div className="absolute bottom-0 right-0 bg-primary rounded-full p-2">

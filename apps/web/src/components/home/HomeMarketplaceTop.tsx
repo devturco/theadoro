@@ -119,15 +119,10 @@ const HomeMarketplaceTop = () => {
   };
 
   return (
-    <section
-      className="pb-10 text-white"
-      style={{
-        background:
-          "linear-gradient(180deg, hsl(var(--wine)) 0%, hsl(var(--wine)) 78%, hsl(var(--ivory)) 100%)",
-      }}
-    >
-      <div className="container mx-auto px-3 sm:px-4 pt-4">
-        <div className="rounded-2xl border border-white/15 bg-wine/80 px-3 sm:px-4 py-3 sm:py-4 shadow-lg backdrop-blur-sm">
+    <section className="bg-white pb-10">
+      {/* Wine band — solid, full bleed, no gradient or glass */}
+      <div className="bg-wine text-white shadow-[0_12px_28px_-16px_hsl(var(--wine)/0.65)]">
+        <div className="container mx-auto px-3 py-3 sm:px-4 sm:py-4">
 
           {/* ─── Mobile Header Row ─── */}
           <div className="flex items-center gap-2 lg:hidden">
@@ -145,12 +140,12 @@ const HomeMarketplaceTop = () => {
               <img
                 src="/logo-colors.png"
                 alt="THEADORO"
-                className="h-9 w-auto rounded-md bg-white px-2 py-1"
+                className="h-9 w-auto max-w-[104px] rounded-md bg-white object-contain px-2 py-1"
               />
             </Link>
 
             {/* Search — grows */}
-            <form onSubmit={handleSearch} className="relative flex-1">
+            <form onSubmit={handleSearch} className="relative min-w-0 flex-1">
               <input
                 type="text"
                 value={searchQuery}
@@ -193,7 +188,7 @@ const HomeMarketplaceTop = () => {
                 />
               </Link>
 
-              <form onSubmit={handleSearch} className="relative flex-1">
+              <form onSubmit={handleSearch} className="relative min-w-0 flex-1">
                 <input
                   type="text"
                   value={searchQuery}
@@ -276,52 +271,60 @@ const HomeMarketplaceTop = () => {
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Hero + Action cards (unchanged layout) */}
-        <div className="mt-5 grid gap-4 lg:grid-cols-[2fr_1fr]">
-          <div
-            className="relative min-h-[220px] sm:min-h-[280px] overflow-hidden rounded-2xl border border-white/20"
-            style={{
-              backgroundImage: `linear-gradient(120deg, hsl(var(--graphite) / 0.88), hsl(var(--wine) / 0.62)), url(${heroImage})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-            }}
-          >
-            <div className="relative z-10 max-w-xl p-6 sm:p-8">
-              <p className="mb-2 text-sm font-semibold uppercase tracking-[0.18em] text-white/80">
-                Semana 15.3
-              </p>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold leading-tight">
-                Ofertas imperdiveis
-              </h1>
-              <p className="mt-3 text-base sm:text-lg text-white/85">
-                Ate <strong>70% OFF</strong> em presentes, kits e experiencias.
-              </p>
-              <div className="mt-6">
-                <button
-                  onClick={() => navigate("/offers")}
-                  className="rounded-full bg-white px-6 py-3 text-sm font-bold text-wine transition hover:bg-champagne-dark"
-                >
-                  Ver promocoes
-                </button>
+      {/* Body — white plates on a white ground */}
+      <div className="container mx-auto px-3 pt-5 sm:px-4">
+        <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+          <div className="relative overflow-hidden rounded-2xl border border-black/[0.07] bg-white shadow-[0_1px_2px_hsl(346_25%_12%/0.06),0_14px_36px_-16px_hsl(346_25%_12%/0.20)]">
+            <div className="grid h-full sm:grid-cols-[1.15fr_1fr]">
+              <div className="flex flex-col justify-center p-6 sm:p-8 lg:p-10">
+                <h1 className="text-[28px] font-extrabold leading-[1.08] tracking-[-0.02em] text-wine sm:text-4xl lg:text-[44px]">
+                  Ofertas imperdiveis
+                </h1>
+                <p className="mt-3 max-w-md text-[15px] leading-relaxed text-neutral-600 sm:text-base">
+                  Ate <strong className="font-semibold text-neutral-900">70% OFF</strong> em
+                  presentes, kits e experiencias.
+                </p>
+                <div className="mt-6 flex flex-wrap items-center gap-3">
+                  <button
+                    onClick={() => navigate("/offers")}
+                    className="rounded-lg bg-wine px-6 py-3 text-sm font-semibold text-white transition-colors duration-200 hover:bg-wine-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wine/40 focus-visible:ring-offset-2"
+                  >
+                    Ver promocoes
+                  </button>
+                  <button
+                    onClick={() => navigate("/products")}
+                    className="rounded-lg border border-neutral-200 px-6 py-3 text-sm font-semibold text-neutral-800 transition-colors duration-200 hover:border-wine hover:text-wine"
+                  >
+                    Explorar catalogo
+                  </button>
+                </div>
+              </div>
+              <div className="relative min-h-[180px] sm:min-h-full">
+                <img
+                  src={heroImage}
+                  alt="Caixas de presente com laco de cetim sobre seda vinho"
+                  className="h-full w-full object-cover"
+                />
               </div>
             </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-            <div className="rounded-2xl border border-white/25 bg-white/10 p-5 backdrop-blur-sm">
-              <p className="text-xs uppercase tracking-[0.14em] text-white/80">
+            <div className="rounded-2xl border border-black/[0.07] bg-white p-5 shadow-[0_1px_2px_hsl(346_25%_12%/0.05),0_10px_24px_-14px_hsl(346_25%_12%/0.18)]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[hsl(var(--gold))]">
                 Oferta relampago
               </p>
-              <p className="mt-2 text-xl sm:text-2xl font-bold">Por R$129,90</p>
-              <p className="mt-1 text-sm text-white/85">Selecao de presentes com envio rapido.</p>
+              <p className="mt-2 text-xl font-bold text-neutral-900 sm:text-2xl">Por R$129,90</p>
+              <p className="mt-1 text-sm text-neutral-600">Selecao de presentes com envio rapido.</p>
             </div>
-            <div className="rounded-2xl border border-white/25 bg-white/10 p-5 backdrop-blur-sm">
-              <p className="text-xs uppercase tracking-[0.14em] text-white/80">
+            <div className="rounded-2xl border border-black/[0.07] bg-white p-5 shadow-[0_1px_2px_hsl(346_25%_12%/0.05),0_10px_24px_-14px_hsl(346_25%_12%/0.18)]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[hsl(var(--gold))]">
                 Com cupom
               </p>
-              <p className="mt-2 text-xl sm:text-2xl font-bold">Ate R$164,90 OFF</p>
-              <p className="mt-1 text-sm text-white/85">Use cupons exclusivos da THEADORO.</p>
+              <p className="mt-2 text-xl font-bold text-neutral-900 sm:text-2xl">Ate R$164,90 OFF</p>
+              <p className="mt-1 text-sm text-neutral-600">Use cupons exclusivos da THEADORO.</p>
             </div>
           </div>
         </div>
@@ -331,12 +334,12 @@ const HomeMarketplaceTop = () => {
             <Link
               key={card.title}
               to={card.href}
-              className="rounded-xl bg-white p-3 sm:p-4 text-gray-800 shadow-md transition hover:-translate-y-1 hover:shadow-lg"
+              className="rounded-xl border border-black/[0.07] bg-white p-3 text-neutral-800 shadow-[0_1px_2px_hsl(346_25%_12%/0.05)] transition duration-300 hover:-translate-y-0.5 hover:border-black/10 hover:shadow-[0_2px_4px_hsl(346_25%_12%/0.06),0_14px_28px_-14px_hsl(346_25%_12%/0.22)] sm:p-4"
             >
-              <p className="text-sm sm:text-[18px] font-semibold text-gray-900">{card.title}</p>
-              <card.icon className="my-2 sm:my-3 h-7 w-7 sm:h-9 sm:w-9 text-wine" />
-              <p className="hidden sm:block min-h-[52px] text-sm text-gray-600">{card.description}</p>
-              <span className="mt-2 sm:mt-4 inline-flex rounded-md bg-wine/10 px-2 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold text-wine">
+              <p className="text-sm font-semibold text-neutral-900 sm:text-[18px]">{card.title}</p>
+              <card.icon className="my-2 h-7 w-7 text-wine sm:my-3 sm:h-9 sm:w-9" />
+              <p className="hidden min-h-[52px] text-sm text-neutral-600 sm:block">{card.description}</p>
+              <span className="mt-2 inline-flex rounded-md bg-wine/[0.07] px-2 py-1.5 text-xs font-semibold text-wine sm:mt-4 sm:px-3 sm:py-2">
                 {card.cta}
               </span>
             </Link>

@@ -85,7 +85,7 @@ const Categories = () => {
             <Link
               key={category.id}
               to={`/categories/${category.slug}`}
-              className="group relative overflow-hidden rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 active:scale-95"
+              className="group relative overflow-hidden rounded-2xl bg-white ring-1 ring-black/[0.07] shadow-[0_1px_2px_hsl(346_25%_12%/0.05)] transition-all duration-300 hover:shadow-[0_2px_4px_hsl(346_25%_12%/0.06),0_14px_28px_-14px_hsl(346_25%_12%/0.22)] active:scale-[0.98]"
               style={{ animationDelay: `${index * 60}ms` }}
             >
               {/* Fixed-height image container — NOT aspect-square on mobile */}

@@ -62,7 +62,7 @@ const FeaturedProducts = () => {
   if (isLoading) return <div className="py-20 text-center">Carregando destaques...</div>;
 
   return (
-    <section className="py-10 sm:py-16 bg-background">
+    <section className="border-y border-black/[0.05] bg-neutral-50 py-10 sm:py-16">
       <div className="container mx-auto px-4">
         {/* ... keeping header ... */}
         <div className="flex items-center justify-between mb-6 sm:mb-10">

@@ -57,7 +57,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   return (
     <div
       className={cn(
-        'group relative bg-white rounded-lg overflow-hidden transition-all duration-300 hover:shadow-xl flex flex-col h-fit border border-transparent hover:border-gray-100',
+        'group relative flex h-fit flex-col overflow-hidden rounded-xl border border-black/[0.07] bg-white shadow-[0_1px_2px_hsl(346_25%_12%/0.05)] transition-all duration-300 hover:border-black/10 hover:shadow-[0_2px_4px_hsl(346_25%_12%/0.06),0_16px_32px_-16px_hsl(346_25%_12%/0.22)]',
         className
       )}
     >

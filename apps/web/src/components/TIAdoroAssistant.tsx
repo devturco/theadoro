@@ -219,7 +219,7 @@ export default function TIAdoroAssistant() {
 
             <Button
                 onClick={() => setIsOpen(!isOpen)}
-                className="rounded-full w-14 h-14 bg-gradient-to-r from-wine to-pink-600 shadow-lg hover:shadow-xl hover:scale-105 transition-all text-white pointer-events-auto flex items-center justify-center"
+                className="pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full bg-wine text-white shadow-[0_10px_24px_-10px_hsl(var(--wine)/0.65)] transition-all hover:scale-105 hover:bg-wine-dark"
             >
                 {isOpen ? <X className="h-6 w-6" /> : <Sparkles className="h-6 w-6 animate-pulse" />}
             </Button>
