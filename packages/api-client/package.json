@@ -16,7 +16,6 @@
     "@kubb/core": "latest",
     "@kubb/plugin-oas": "latest",
     "@kubb/plugin-ts": "latest",
-    "@kubb/plugin-tanstack-query": "latest",
     "@kubb/plugin-zod": "latest",
     "@theadoro/config-typescript": "*",
     "tsup": "^8.0.2",
