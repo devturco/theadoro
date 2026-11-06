@@ -36,3 +36,6 @@ graphify-out/
 # impeccable local artifacts
 .impeccable/review/
 .impeccable/hook.cache.json
+
+# turbo cache
+.turbo/

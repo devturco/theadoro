@@ -46,11 +46,15 @@ class ShippingService {
 
         return {
             originCep: getVal('store_cep') || '01310-100', // Default if missing
+            store: {
+                street: String(getVal('store_address') || ''),
+                city: String(getVal('store_city') || ''),
+                state: String(getVal('store_state') || ''),
+                zip: String(getVal('store_cep') || ''),
+            },
             uber: {
                 enabled: getVal('shipping_uber_enabled'),
-                clientId: getVal('shipping_uber_client_id'),
-                clientSecret: getVal('shipping_uber_client_secret'),
-                customerId: getVal('shipping_uber_customer_id'),
+                // Credenciais ficam só na edge function. O browser nunca as lê.
                 tariff: Number(getVal('shipping_express_tariff') || 0)
             },
             correios: {
@@ -59,24 +63,51 @@ class ShippingService {
         };
     }
 
-    private async calculateUberDirect(origin: string, destination: string, items: ShippingItem[], config: any): Promise<ShippingOption[]> {
-        // Here we would call the Uber Direct API using the credentials from config
-        // For now, since we are setting up, let's keep it as a dynamic placeholder 
-        // that respects the 'enabled' flag and applies the tariff.
-        
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        const basePrice = 18.90;
-        const finalPrice = basePrice * (1 + (config.tariff / 100));
+    private async calculateUberDirect(
+        origin: string,
+        destination: string,
+        items: ShippingItem[],
+        store?: { street?: string; city?: string; state?: string; zip?: string },
+        tariff = 0
+    ): Promise<ShippingOption[]> {
+        // A cotação é feita na edge function: o client_secret da Uber não pode
+        // existir no bundle do browser.
+        const { data, error } = await supabase.functions.invoke('uber-delivery-quote', {
+            body: {
+                origin: {
+                    street: store?.street || undefined,
+                    city: store?.city || undefined,
+                    state: store?.state || undefined,
+                    zip: store?.zip || origin,
+                },
+                destination: { zip: destination },
+                items: items.map((item) => ({
+                    name: 'Presente',
+                    quantity: item.quantity,
+                    weight: item.weight,
+                })),
+            },
+        })
+
+        if (error) throw new Error(`Uber: ${error.message}`)
+        if (!data || data.error) throw new Error(`Uber: ${data?.message || 'cotação indisponível'}`)
+
+        const fee = Number(data.fee)
+        if (!Number.isFinite(fee) || fee <= 0) {
+            throw new Error('Uber: cotação sem valor de frete')
+        }
+
+        // A tarifa configurada é um percentual de markup sobre o frete real da Uber.
+        const finalPrice = fee * (1 + (Number(tariff) || 0) / 100)
 
         return [{
-            id: 'uber-direct',
+            id: String(data.quote_id || 'uber-direct'),
             name: 'Entrega Express',
             company: 'uber',
             price: Number(finalPrice.toFixed(2)),
             deliveryTime: 0,
             estimated_delivery: 'Até 90 minutos'
-        }];
+        }]
     }
 
     private async calculateCorreios(origin: string, destination: string, items: ShippingItem[]): Promise<ShippingOption[]> {
@@ -136,7 +167,7 @@ class ShippingService {
         // 1. Uber Direct (Entrega Express)
         if (settings.uber.enabled) {
             promises.push(
-                this.calculateUberDirect(originCep, destinationCep, items, settings.uber)
+                this.calculateUberDirect(originCep, destinationCep, items, settings.store, settings.uber.tariff)
                     .then(opts => options.push(...opts))
                     .catch(e => console.error("Uber error:", e))
             );
