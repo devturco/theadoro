@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.uber-delivery]
 verify_jwt = false
+
+[functions.pagarme-webhook]
+verify_jwt = false

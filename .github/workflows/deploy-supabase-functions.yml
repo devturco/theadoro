@@ -38,3 +38,6 @@ jobs:
 
       - name: Deploy uber-delivery without JWT verification
         run: supabase functions deploy uber-delivery --project-ref "$SUPABASE_PROJECT_ID" --no-verify-jwt
+
+      - name: Deploy pagarme-webhook without JWT verification
+        run: supabase functions deploy pagarme-webhook --project-ref "$SUPABASE_PROJECT_ID" --no-verify-jwt
