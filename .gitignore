@@ -29,3 +29,10 @@ dist-ssr
 *.sln
 *.sw?
 .vercel
+
+# graphify knowledge graph
+graphify-out/
+
+# impeccable local artifacts
+.impeccable/review/
+.impeccable/hook.cache.json
