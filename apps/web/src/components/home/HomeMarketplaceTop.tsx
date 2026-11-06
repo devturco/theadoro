@@ -205,8 +205,50 @@ const HomeMarketplaceTop = () => {
                 </button>
               </form>
 
-              <div className="hidden min-w-[180px] rounded-full border border-white/20 bg-white/10 px-4 py-2 text-center text-sm font-semibold md:block">
-                THEADORO+
+              <div className="flex shrink-0 items-center gap-2">
+                {!user ? (
+                  <>
+                    <Link
+                      to="/auth?mode=register"
+                      className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-wine transition-colors hover:bg-white/90"
+                    >
+                      Criar conta
+                    </Link>
+                    <Link
+                      to="/auth"
+                      className="rounded-full border border-white/40 px-4 py-2 text-sm font-semibold text-white transition-colors hover:border-white hover:bg-white/10"
+                    >
+                      Entrar
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <Link
+                      to="/buyer/dashboard"
+                      className="text-sm font-medium text-white/90 transition hover:text-white"
+                    >
+                      Minha conta
+                    </Link>
+                    <Link
+                      to="/buyer/orders"
+                      className="text-sm font-medium text-white/90 transition hover:text-white"
+                    >
+                      Compras
+                    </Link>
+                  </>
+                )}
+                <button
+                  onClick={() => navigate("/cart")}
+                  className="relative ml-1 transition hover:opacity-90"
+                  aria-label="Abrir carrinho"
+                >
+                  <ShoppingCart className="h-6 w-6" />
+                  {cartCount > 0 && (
+                    <span className="absolute -right-2 -top-2 min-h-[18px] min-w-[18px] rounded-full bg-white px-1 text-[10px] font-bold leading-[18px] text-wine">
+                      {cartCount}
+                    </span>
+                  )}
+                </button>
               </div>
             </div>
 
@@ -239,37 +281,7 @@ const HomeMarketplaceTop = () => {
                 </Link>
               </div>
 
-              <div className="flex items-center gap-5 text-[14px]">
-                {!user && (
-                  <Link to="/auth?mode=register" className="text-white/90 transition hover:text-white">
-                    Crie a sua conta
-                  </Link>
-                )}
-                {!user && (
-                  <Link to="/auth" className="text-white/90 transition hover:text-white">
-                    Entre
-                  </Link>
-                )}
-                <Link
-                  to={user ? "/buyer/orders" : "/auth"}
-                  className="text-white/90 transition hover:text-white"
-                >
-                  Compras
-                </Link>
-                <button
-                  onClick={() => navigate("/cart")}
-                  className="relative transition hover:opacity-90"
-                  aria-label="Abrir carrinho"
-                >
-                  <ShoppingCart className="h-6 w-6" />
-                  {cartCount > 0 && (
-                    <span className="absolute -right-2 -top-2 min-h-[18px] min-w-[18px] rounded-full bg-white px-1 text-[10px] font-bold leading-[18px] text-wine">
-                      {cartCount}
-                    </span>
-                  )}
-                </button>
               </div>
-            </div>
           </div>
         </div>
       </div>
