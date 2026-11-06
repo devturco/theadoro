@@ -32,6 +32,8 @@ const AdminSettings = () => {
     const [storeCityId, setStoreCityId] = useState<string | null>(null);
     const [storeState, setStoreState] = useState('');
     const [storeStateId, setStoreStateId] = useState<string | null>(null);
+    const [storePhone, setStorePhone] = useState('');
+    const [storePhoneId, setStorePhoneId] = useState<string | null>(null);
 
     // Integrations - Uber Direct
     const [uberEnabled, setUberEnabled] = useState(false);
@@ -120,6 +122,9 @@ const AdminSettings = () => {
 
             const sState = settings.find(s => s.key === 'store_state');
             if (sState) { setStoreState(String(sState.value)); setStoreStateId(sState.id); }
+
+            const sPhone = settings.find(s => s.key === 'store_phone');
+            if (sPhone) { setStorePhone(String(sPhone.value)); setStorePhoneId(sPhone.id); }
 
 
             // Integrations - Shipping - Uber Direct
@@ -311,6 +316,11 @@ const AdminSettings = () => {
             if (storeNeighborhoodId) promises.push(updateSetting(storeNeighborhoodId, storeNeighborhood, { showToast: false }));
             if (storeCityId) promises.push(updateSetting(storeCityId, storeCity, { showToast: false }));
             if (storeStateId) promises.push(updateSetting(storeStateId, storeState, { showToast: false }));
+            if (storePhoneId) promises.push(updateSetting(storePhoneId, storePhone, { showToast: false }));
+            else promises.push(updateSetting(null, storePhone, {
+                showToast: false,
+                createIfMissing: { key: 'store_phone', value: storePhone, label: 'Telefone da Loja', section: 'general', type: 'text' }
+            }));
 
             await Promise.all(promises);
             toast.success('Endereço da loja atualizado!');
@@ -502,6 +512,15 @@ const AdminSettings = () => {
                                 <div className="space-y-2">
                                     <Label htmlFor="store-city">Cidade</Label>
                                     <Input id="store-city" value={storeCity} onChange={e => setStoreCity(e.target.value)} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="store-phone">Telefone da loja (Uber Direct)</Label>
+                                    <Input
+                                        id="store-phone"
+                                        value={storePhone}
+                                        onChange={e => setStorePhone(e.target.value)}
+                                        placeholder="(65) 99999-9999"
+                                    />
                                 </div>
                             </div>
                             <div className="flex justify-end pt-4">

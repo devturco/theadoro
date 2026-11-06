@@ -72,8 +72,9 @@ class ShippingService {
     ): Promise<ShippingOption[]> {
         // A cotação é feita na edge function: o client_secret da Uber não pode
         // existir no bundle do browser.
-        const { data, error } = await supabase.functions.invoke('uber-delivery-quote', {
+        const { data, error } = await supabase.functions.invoke('uber-delivery', {
             body: {
+                action: 'quote',
                 origin: {
                     street: store?.street || undefined,
                     city: store?.city || undefined,

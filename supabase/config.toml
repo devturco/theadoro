@@ -3,5 +3,5 @@ project_id = "pfpbaepzvgovqheeqxlg"
 [functions.process-payment]
 verify_jwt = false
 
-[functions.uber-delivery-quote]
+[functions.uber-delivery]
 verify_jwt = false

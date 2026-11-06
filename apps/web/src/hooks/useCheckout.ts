@@ -576,6 +576,8 @@ export const useCheckout = () => {
         discount_amount: discount,
         tax_amount: tax,
         shipping_method: selectedShipping?.name || 'Padrão',
+        shipping_provider: selectedShipping?.company || null,
+        shipping_quote_id: selectedShipping?.company === 'uber' ? selectedShipping.id : null,
         status: initialOrderStatus as 'pending' | 'processing',
         shipping_address: JSON.stringify({
           street: checkoutData.street,
@@ -697,6 +699,29 @@ export const useCheckout = () => {
 
         if (paymentEventError) {
           console.error('Payment event persistence FAILED:', paymentEventError);
+        }
+      }
+
+      // 5.1 Despacho Uber Direct — só quando o pagamento já está aprovado.
+      // PIX/boleto dependem de confirmação posterior; nesse caso o despacho é
+      // disparado manualmente pelo admin (Admin → Pedidos).
+      if (paymentStatus === 'approved' && selectedShipping?.company === 'uber') {
+        try {
+          const { data: dispatch, error: dispatchError } = await supabase.functions.invoke('uber-delivery', {
+            body: {
+              action: 'request',
+              orderId: data.id,
+              quote_id: selectedShipping.id,
+              dropoff_phone: sanitizeDigits(checkoutData.phone),
+            },
+          });
+          if (dispatchError) {
+            console.error('Uber dispatch failed:', dispatchError);
+          } else if (dispatch?.error) {
+            console.error('Uber dispatch rejected:', dispatch.message);
+          }
+        } catch (dispatchException) {
+          console.error('Uber dispatch error:', dispatchException);
         }
       }
 

@@ -36,5 +36,5 @@ jobs:
       - name: Deploy process-payment without JWT verification
         run: supabase functions deploy process-payment --project-ref "$SUPABASE_PROJECT_ID" --no-verify-jwt
 
-      - name: Deploy uber-delivery-quote without JWT verification
-        run: supabase functions deploy uber-delivery-quote --project-ref "$SUPABASE_PROJECT_ID" --no-verify-jwt
+      - name: Deploy uber-delivery without JWT verification
+        run: supabase functions deploy uber-delivery --project-ref "$SUPABASE_PROJECT_ID" --no-verify-jwt

@@ -120,6 +120,38 @@ const AdminOrders = () => {
     }
   };
 
+  const [dispatchingUber, setDispatchingUber] = useState(false);
+
+  const handleDispatchUber = async () => {
+    if (!selectedOrder) return;
+    try {
+      setDispatchingUber(true);
+      const { data, error } = await supabase.functions.invoke('uber-delivery', {
+        body: {
+          action: 'request',
+          orderId: selectedOrder.id,
+          quote_id: (selectedOrder as any).shipping_quote_id || null,
+        },
+      });
+
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.message || 'A Uber recusou o despacho.');
+
+      if (data?.reused) {
+        toast.info('Este pedido já tem uma entrega Uber.');
+      } else {
+        toast.success('Entrega solicitada na Uber.');
+        if (data?.tracking_url) window.open(data.tracking_url, '_blank');
+      }
+      refresh();
+    } catch (error: any) {
+      console.error('Uber dispatch error:', error);
+      toast.error(error?.message || 'Falha ao solicitar a entrega na Uber.');
+    } finally {
+      setDispatchingUber(false);
+    }
+  };
+
   const handleDeleteOrder = async (orderId: string) => {
     if (!confirm('Tem certeza que deseja excluir este pedido das estatísticas? Esta ação não pode ser desfeita.')) return;
 
@@ -644,6 +676,15 @@ const AdminOrders = () => {
 
           <DialogFooter className="sm:justify-between">
             <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDispatchUber}
+                disabled={dispatchingUber}
+              >
+                <Truck className="h-4 w-4 mr-2" />
+                {dispatchingUber ? 'Solicitando...' : 'Despachar Uber'}
+              </Button>
               <Button variant="outline" size="sm">
                 <Download className="h-4 w-4 mr-2" /> Nota Fiscal
               </Button>
