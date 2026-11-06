@@ -99,7 +99,7 @@ const FeaturedSellers = () => {
                     {/* Stats */}
                     <div className="flex items-center gap-4 text-sm">
                       <div className="flex items-center gap-1">
-                        <Star className="h-4 w-4 fill-champagne text-champagne" />
+                        <Star className="h-4 w-4 fill-[hsl(var(--gold))] text-[hsl(var(--gold))]" />
                         <span className="font-medium">{seller.rating.toFixed(1)}</span>
                         <span className="text-muted-foreground">({seller.reviewCount})</span>
                       </div>

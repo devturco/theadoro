@@ -1,6 +1,7 @@
 import { FormEvent, useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
+  ArrowRight,
   BadgeDollarSign,
   ChevronDown,
   ChevronRight,
@@ -36,8 +37,8 @@ type ActionCard = {
 
 const actionCards: ActionCard[] = [
   {
-    title: "Frete gratis",
-    description: "Confira ofertas com envio rapido para todo o Brasil.",
+    title: "Frete grátis",
+    description: "Confira ofertas com envio rápido para todo o Brasil.",
     cta: "Ver fretes",
     icon: PackageCheck,
     href: "/products",
@@ -50,29 +51,29 @@ const actionCards: ActionCard[] = [
     href: "/auth",
   },
   {
-    title: "Insira sua localizacao",
-    description: "Melhore os prazos de entrega perto de voce.",
+    title: "Insira sua localização",
+    description: "Melhore os prazos de entrega perto de você.",
     cta: "Atualizar",
     icon: MapPin,
     href: "/buyer/profile",
   },
   {
     title: "Meios de pagamento",
-    description: "Pague com seguranca no cartao, Pix ou boleto.",
-    cta: "Ver opcoes",
+    description: "Pague com segurança no cartão, Pix ou boleto.",
+    cta: "Ver opções",
     icon: Wallet,
     href: "/checkout",
   },
   {
     title: "Menos de R$100",
-    description: "Selecao especial para presentear sem estourar o bolso.",
+    description: "Seleção especial para presentear sem estourar o bolso.",
     cta: "Explorar",
     icon: BadgeDollarSign,
     href: "/offers",
   },
   {
     title: "Mais vendidos",
-    description: "Produtos que estao em alta esta semana na plataforma.",
+    description: "Produtos que estão em alta esta semana na plataforma.",
     cta: "Descobrir",
     icon: TrendingUp,
     href: "/products",
@@ -151,7 +152,7 @@ const HomeMarketplaceTop = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Buscar produtos..."
-                className="h-9 w-full rounded-lg border border-white/20 bg-white/95 px-3 pr-10 text-sm text-gray-800 outline-none placeholder:text-gray-500 focus:border-white"
+                className="h-9 w-full rounded-lg border border-white/20 bg-white/95 px-3 pr-10 text-sm text-gray-800 outline-none placeholder:text-gray-500 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-wine"
               />
               <button
                 type="submit"
@@ -194,7 +195,7 @@ const HomeMarketplaceTop = () => {
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
                   placeholder="Buscar produtos, marcas e muito mais..."
-                  className="h-11 w-full rounded-md border border-white/20 bg-white/95 px-4 pr-14 text-[15px] text-gray-800 outline-none ring-0 placeholder:text-gray-500 focus:border-white"
+                  className="h-11 w-full rounded-md border border-white/20 bg-white/95 px-4 pr-14 text-[15px] text-gray-800 outline-none ring-0 placeholder:text-gray-500 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-wine"
                 />
                 <button
                   type="submit"
@@ -280,24 +281,24 @@ const HomeMarketplaceTop = () => {
             <div className="grid h-full sm:grid-cols-[1.15fr_1fr]">
               <div className="flex flex-col justify-center p-6 sm:p-8 lg:p-10">
                 <h1 className="text-[28px] font-extrabold leading-[1.08] tracking-[-0.02em] text-wine sm:text-4xl lg:text-[44px]">
-                  Ofertas imperdiveis
+                  Ofertas imperdíveis
                 </h1>
                 <p className="mt-3 max-w-md text-[15px] leading-relaxed text-neutral-600 sm:text-base">
-                  Ate <strong className="font-semibold text-neutral-900">70% OFF</strong> em
-                  presentes, kits e experiencias.
+                  Até <strong className="font-semibold text-neutral-900">70% OFF</strong> em
+                  presentes, kits e experiências.
                 </p>
                 <div className="mt-6 flex flex-wrap items-center gap-3">
                   <button
                     onClick={() => navigate("/offers")}
                     className="rounded-lg bg-wine px-6 py-3 text-sm font-semibold text-white transition-colors duration-200 hover:bg-wine-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wine/40 focus-visible:ring-offset-2"
                   >
-                    Ver promocoes
+                    Ver promoções
                   </button>
                   <button
                     onClick={() => navigate("/products")}
                     className="rounded-lg border border-neutral-200 px-6 py-3 text-sm font-semibold text-neutral-800 transition-colors duration-200 hover:border-wine hover:text-wine"
                   >
-                    Explorar catalogo
+                    Explorar catálogo
                   </button>
                 </div>
               </div>
@@ -314,16 +315,16 @@ const HomeMarketplaceTop = () => {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
             <div className="rounded-2xl border border-black/[0.07] bg-white p-5 shadow-[0_1px_2px_hsl(346_25%_12%/0.05),0_10px_24px_-14px_hsl(346_25%_12%/0.18)]">
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[hsl(var(--gold))]">
-                Oferta relampago
+                Oferta relâmpago
               </p>
               <p className="mt-2 text-xl font-bold text-neutral-900 sm:text-2xl">Por R$129,90</p>
-              <p className="mt-1 text-sm text-neutral-600">Selecao de presentes com envio rapido.</p>
+              <p className="mt-1 text-sm text-neutral-600">Seleção de presentes com envio rápido.</p>
             </div>
             <div className="rounded-2xl border border-black/[0.07] bg-white p-5 shadow-[0_1px_2px_hsl(346_25%_12%/0.05),0_10px_24px_-14px_hsl(346_25%_12%/0.18)]">
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[hsl(var(--gold))]">
                 Com cupom
               </p>
-              <p className="mt-2 text-xl font-bold text-neutral-900 sm:text-2xl">Ate R$164,90 OFF</p>
+              <p className="mt-2 text-xl font-bold text-neutral-900 sm:text-2xl">Até R$164,90 OFF</p>
               <p className="mt-1 text-sm text-neutral-600">Use cupons exclusivos da THEADORO.</p>
             </div>
           </div>
@@ -334,13 +335,14 @@ const HomeMarketplaceTop = () => {
             <Link
               key={card.title}
               to={card.href}
-              className="rounded-xl border border-black/[0.07] bg-white p-3 text-neutral-800 shadow-[0_1px_2px_hsl(346_25%_12%/0.05)] transition duration-300 hover:-translate-y-0.5 hover:border-black/10 hover:shadow-[0_2px_4px_hsl(346_25%_12%/0.06),0_14px_28px_-14px_hsl(346_25%_12%/0.22)] sm:p-4"
+              className="group rounded-xl border border-black/[0.07] bg-white p-3 text-neutral-800 shadow-[0_1px_2px_hsl(346_25%_12%/0.05)] transition duration-300 hover:-translate-y-0.5 hover:border-black/10 hover:shadow-[0_2px_4px_hsl(346_25%_12%/0.06),0_14px_28px_-14px_hsl(346_25%_12%/0.22)] sm:p-4"
             >
               <p className="text-sm font-semibold text-neutral-900 sm:text-[18px]">{card.title}</p>
               <card.icon className="my-2 h-7 w-7 text-wine sm:my-3 sm:h-9 sm:w-9" />
               <p className="hidden min-h-[52px] text-sm text-neutral-600 sm:block">{card.description}</p>
-              <span className="mt-2 inline-flex rounded-md bg-wine/[0.07] px-2 py-1.5 text-xs font-semibold text-wine sm:mt-4 sm:px-3 sm:py-2">
+              <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-wine sm:mt-4">
                 {card.cta}
+                <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
               </span>
             </Link>
           ))}

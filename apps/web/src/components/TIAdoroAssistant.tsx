@@ -127,7 +127,7 @@ export default function TIAdoroAssistant() {
                 isOpen ? "scale-100 opacity-100 translate-y-0" : "scale-90 opacity-0 translate-y-10 pointer-events-none h-0 w-0 overflow-hidden"
             )}>
                 <Card className="w-[350px] shadow-2xl border-wine/20">
-                    <CardHeader className="bg-gradient-to-r from-wine to-wine-light text-white p-4 rounded-t-xl flex flex-row justify-between items-center space-y-0">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 rounded-t-xl bg-wine p-4 text-white">
                         <div className="flex items-center gap-2">
                             <div className="bg-white/20 p-1.5 rounded-full">
                                 <Sparkles className="h-4 w-4 text-white" />

@@ -17,10 +17,10 @@ related_targets: []
 
 ## Direction contract
 
-**THESIS:** A home é um balcão branco em camadas — cada seção é uma placa branca elevada sobre um piso neutro, vinho é tinta e dourado é metal. Recusa o degradê vinho→marfim e os cards de vidro fosco.
-**OWN-WORLD:** Faixa sólida vinho `#7D031F`; placas brancas `#FFFFFF`; piso neutro `#FAFAFA`; dourado `#C9A35A` em rótulos e filetes; elevação real (offset + blur, matiz vinho a 6–8% de alfa); raios de 12–16px; Inter para UI, Playfair só em títulos de seção.
+**THESIS:** A home é um balcão branco — cartões brancos elevados sobre chão branco, com filetes neutros separando as faixas; vinho é tinta e dourado é metal. Recusa o degradê vinho→marfim e os cards de vidro fosco.
+**OWN-WORLD:** Faixa sólida vinho `#7D031F`; chão branco `#FFFFFF` (instrução do produto: "branco"); uma faixa neutra `#FAFAFA` usada só em Destaques; dourado `#937226` (4,6:1 sobre branco) em rótulos; elevação real (offset + blur, matiz vinho a 6–8% de alfa); raios de 12–16px; Inter para UI, Playfair só em títulos de seção.
 **STORY:** O visitante reconhece a oferta, entende que é presente curado e clica em um produto ou categoria.
 **FIRST VIEWPORT:** faixa vinho de largura total (~112px) com logo, busca branca e linha de navegação; abaixo, placa branca de hero com título vinho à esquerda e fotografia de presentes à direita; ao lado, duas placas promocionais brancas com rótulo dourado.
-**FORM:** redesign especificado — o produto fixou a estrutura (referência Mercado Livre) e a paleta. Sem sorteio de direção.
-seed: none (unavailable)
+**FORM:** redesign especificado — o produto fixou a estrutura (referência Mercado Livre) e a paleta. Nenhum sorteio de direção foi executado porque o pedido já estava especificado.
+seed: none (no roll — specified redesign)
 **FINISH:** unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance.
