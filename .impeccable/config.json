@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "createdAt": "2026-11-06T04:47:13.919Z",
+        "reason": "pre-existing Google Fonts import; same global stack, unchanged by this redesign"
+      }
+    ]
+  }
+}
