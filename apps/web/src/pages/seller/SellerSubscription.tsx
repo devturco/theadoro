@@ -1,7 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@theadoro/ui';
 import { Button } from '@theadoro/ui';
 import { Badge } from '@theadoro/ui';
+import { Input } from '@theadoro/ui';
+import { Label } from '@theadoro/ui';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@theadoro/ui';
 import {
     Table,
     TableBody,
@@ -15,6 +25,10 @@ import { ptBR } from 'date-fns/locale';
 import { CreditCard, CheckCircle, AlertCircle, Clock, FileText, ArrowUpRight } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import {
+    PagarmeTokenizecardForm,
+    type PagarmeTokenizecardFormHandle,
+} from '@/components/payments/PagarmeTokenizecardForm';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -39,6 +53,7 @@ interface Invoice {
     due_date: string;
     paid_at: string | null;
     invoice_url: string | null;
+    payment_method?: string | null;
 }
 
 export default function SellerSubscription() {
@@ -51,6 +66,11 @@ export default function SellerSubscription() {
     const [subscribing, setSubscribing] = useState<string | null>(null);
     const [canceling, setCanceling] = useState(false);
     const [showPlanSelection, setShowPlanSelection] = useState(false);
+    const [payInvoice, setPayInvoice] = useState<Invoice | null>(null);
+    const [payMethod, setPayMethod] = useState<'credit_card' | 'pix'>('credit_card');
+    const [cardData, setCardData] = useState({ number: '', name: '', expiry: '', cvv: '' });
+    const [pixData, setPixData] = useState<{ code?: string; url?: string } | null>(null);
+    const pagarmeTokenizecardRef = useRef<PagarmeTokenizecardFormHandle | null>(null);
 
     useEffect(() => {
         if (user) {
@@ -131,28 +151,80 @@ export default function SellerSubscription() {
         }
     };
 
-    const handlePayInvoice = async (invoiceId: string) => {
+    const callInvoicePayment = async (body: Record<string, unknown>) => {
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (!session?.access_token) {
+            throw new Error('Sua sessão expirou. Entre novamente.');
+        }
+
+        const response = await fetch(`${supabaseUrl}/functions/v1/seller-invoice-payment`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                apikey: publishableKey,
+                Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify(body),
+        });
+
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok || payload?.error) {
+            throw new Error(payload?.message || payload?.error || 'Falha ao processar o pagamento da fatura.');
+        }
+
+        return payload;
+    };
+
+    const openInvoicePayment = (invoice: Invoice) => {
+        setPixData(null);
+        setCardData({ number: '', name: '', expiry: '', cvv: '' });
+        setPayMethod('credit_card');
+        setPayInvoice(invoice);
+    };
+
+    const handlePayInvoice = async () => {
+        if (!payInvoice) return;
+
         try {
-            setProcessingPayment(invoiceId);
+            setProcessingPayment(payInvoice.id);
 
-            // Simulate payment processing
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            if (payMethod === 'credit_card') {
+                const cardToken = await pagarmeTokenizecardRef.current?.tokenize();
 
-            // Update invoice status locally for demo
-            const { error } = await (supabase as any).from('seller_invoices')
-                .update({
-                    status: 'paid',
-                    paid_at: new Date().toISOString(),
-                    payment_method: 'credit_card'
-                })
-                .eq('id', invoiceId);
+                if (!cardToken) {
+                    throw new Error('Não foi possível tokenizar o cartão.');
+                }
 
-            if (error) throw error;
+                const result = await callInvoicePayment({
+                    action: 'pay_card',
+                    invoiceId: payInvoice.id,
+                    cardToken,
+                    installments: 1,
+                });
 
-            toast.success('Fatura paga com sucesso!');
-            loadData(); // Reload data
+                if (result.status === 'paid') {
+                    toast.success('Fatura paga com sucesso!');
+                    setPayInvoice(null);
+                    loadData();
+                } else {
+                    toast.info(result.message || 'Pagamento em análise pelo gateway.');
+                }
+            } else {
+                const result = await callInvoicePayment({
+                    action: 'create_pix',
+                    invoiceId: payInvoice.id,
+                });
+
+                setPixData({ code: result.pix_code, url: result.pix_url });
+                toast.success('PIX gerado! A confirmação chega automaticamente após o pagamento.');
+                loadData();
+            }
         } catch (error: any) {
-            toast.error('Erro ao processar pagamento: ' + error.message);
+            toast.error(error.message || 'Erro ao pagar a fatura.');
         } finally {
             setProcessingPayment(null);
         }
@@ -162,67 +234,10 @@ export default function SellerSubscription() {
         try {
             setSubscribing(planId);
 
-            if (subscription) {
-                // Update existing subscription
-                const { error: subError } = await (supabase as any)
-                    .from('seller_subscriptions')
-                    .update({
-                        plan_id: planId,
-                        status: 'active', // Reactivate if it was canceled
-                        updated_at: new Date().toISOString()
-                    })
-                    .eq('id', subscription.id);
+            await callInvoicePayment({ action: 'change_plan', planId });
 
-                if (subError) throw subError;
-
-                // Create a new invoice for the new plan
-                const plan = availablePlans.find(p => p.id === planId);
-                const { error: invError } = await (supabase as any)
-                    .from('seller_invoices')
-                    .insert({
-                        seller_id: user?.id,
-                        subscription_id: subscription.id,
-                        amount: plan?.price || 0,
-                        status: 'pending',
-                        due_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString()
-                    });
-
-                if (invError) throw invError;
-
-                toast.success('Plano alterado com sucesso! A nova fatura foi gerada.');
-                setShowPlanSelection(false);
-            } else {
-                // Create new subscription
-                const { data: sub, error: subError } = await (supabase as any)
-                    .from('seller_subscriptions')
-                    .insert({
-                        seller_id: user?.id,
-                        plan_id: planId,
-                        status: 'active',
-                        current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-                    })
-                    .select()
-                    .single();
-
-                if (subError) throw subError;
-
-                // Create the initial invoice
-                const plan = availablePlans.find(p => p.id === planId);
-                const { error: invError } = await (supabase as any)
-                    .from('seller_invoices')
-                    .insert({
-                        seller_id: user?.id,
-                        subscription_id: sub.id,
-                        amount: plan?.price || 0,
-                        status: 'pending',
-                        due_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString()
-                    });
-
-                if (invError) throw invError;
-
-                toast.success('Plano selecionado com sucesso! Realize o pagamento da fatura para concluir.');
-            }
-
+            toast.success('Plano atualizado! A nova fatura foi gerada.');
+            setShowPlanSelection(false);
             loadData();
         } catch (error: any) {
             console.error('Error subscribing:', error);
@@ -240,15 +255,8 @@ export default function SellerSubscription() {
 
         try {
             setCanceling(true);
-            const { error } = await (supabase as any)
-                .from('seller_subscriptions')
-                .update({
-                    status: 'canceled',
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', subscription.id);
 
-            if (error) throw error;
+            await callInvoicePayment({ action: 'cancel_subscription' });
 
             toast.success('Sua assinatura não será renovada. Você continuará como vendedor até o vencimento.');
             loadData();
@@ -417,7 +425,13 @@ export default function SellerSubscription() {
                                     </p>
                                     <p className="text-sm text-gray-600 flex items-center gap-2">
                                         <CreditCard className="h-4 w-4" />
-                                        Forma de pagamento: <span className="font-medium text-gray-900">Cartão de Crédito (**** 1234)</span>
+                                        Forma de pagamento: <span className="font-medium text-gray-900">
+                                            {invoices.some((invoice) => invoice.status === 'paid' && invoice.payment_method === 'pix')
+                                                ? 'PIX'
+                                                : invoices.some((invoice) => invoice.status === 'paid')
+                                                    ? 'Cartão de Crédito'
+                                                    : 'Ainda não informada'}
+                                        </span>
                                     </p>
                                 </div>
                             </div>
@@ -496,7 +510,7 @@ export default function SellerSubscription() {
                                                 <Button
                                                     size="sm"
                                                     className="bg-green-600 hover:bg-green-700 h-8"
-                                                    onClick={() => handlePayInvoice(invoice.id)}
+                                                    onClick={() => openInvoicePayment(invoice)}
                                                     disabled={processingPayment === invoice.id}
                                                 >
                                                     {processingPayment === invoice.id ? 'Processando...' : 'Pagar Agora'}
@@ -515,6 +529,129 @@ export default function SellerSubscription() {
                     )}
                 </CardContent>
             </Card>
+
+            <Dialog open={!!payInvoice} onOpenChange={(open) => { if (!open) setPayInvoice(null); }}>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Pagar fatura</DialogTitle>
+                        <DialogDescription>
+                            {payInvoice
+                                ? `Fatura de R$ ${Number(payInvoice.amount).toFixed(2)} com vencimento em ${format(new Date(payInvoice.due_date), 'dd/MM/yyyy')}.`
+                                : ''}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <PagarmeTokenizecardForm
+                        ref={pagarmeTokenizecardRef}
+                        enabled={payMethod === 'credit_card'}
+                        holderName={cardData.name}
+                        cardNumber={cardData.number}
+                        cardExpiry={cardData.expiry}
+                        cardCvv={cardData.cvv}
+                    />
+
+                    <div className="flex gap-2">
+                        <Button
+                            variant={payMethod === 'credit_card' ? 'default' : 'outline'}
+                            className={payMethod === 'credit_card' ? 'bg-wine' : ''}
+                            onClick={() => setPayMethod('credit_card')}
+                            disabled={!!pixData}
+                        >
+                            Cartão
+                        </Button>
+                        <Button
+                            variant={payMethod === 'pix' ? 'default' : 'outline'}
+                            className={payMethod === 'pix' ? 'bg-wine' : ''}
+                            onClick={() => setPayMethod('pix')}
+                            disabled={!!pixData}
+                        >
+                            PIX
+                        </Button>
+                    </div>
+
+                    {payMethod === 'credit_card' ? (
+                        <div className="space-y-3">
+                            <div className="space-y-1">
+                                <Label>Número do cartão</Label>
+                                <Input
+                                    value={cardData.number}
+                                    onChange={(event) => setCardData({ ...cardData, number: event.target.value })}
+                                    placeholder="0000 0000 0000 0000"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <Label>Nome impresso</Label>
+                                <Input
+                                    value={cardData.name}
+                                    onChange={(event) => setCardData({ ...cardData, name: event.target.value })}
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                    <Label>Validade</Label>
+                                    <Input
+                                        value={cardData.expiry}
+                                        onChange={(event) => setCardData({ ...cardData, expiry: event.target.value })}
+                                        placeholder="MM/AA"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>CVV</Label>
+                                    <Input
+                                        value={cardData.cvv}
+                                        onChange={(event) => setCardData({ ...cardData, cvv: event.target.value })}
+                                        placeholder="123"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    ) : pixData ? (
+                        <div className="space-y-3 text-center">
+                            {pixData.url && (
+                                <img src={pixData.url} alt="QR Code PIX" className="mx-auto h-44 w-44" />
+                            )}
+                            {pixData.code && (
+                                <textarea
+                                    readOnly
+                                    value={pixData.code}
+                                    className="w-full h-24 text-xs border rounded p-2"
+                                />
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                                A fatura será marcada como paga automaticamente quando o PIX for confirmado.
+                            </p>
+                        </div>
+                    ) : (
+                        <p className="text-sm text-muted-foreground">
+                            Gere um PIX no valor da fatura. A confirmação é automática.
+                        </p>
+                    )}
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setPayInvoice(null)}>
+                            Fechar
+                        </Button>
+                        {payMethod === 'credit_card' && (
+                            <Button
+                                className="bg-wine"
+                                onClick={handlePayInvoice}
+                                disabled={processingPayment === payInvoice?.id}
+                            >
+                                {processingPayment === payInvoice?.id ? 'Processando...' : 'Pagar com cartão'}
+                            </Button>
+                        )}
+                        {payMethod === 'pix' && !pixData && (
+                            <Button
+                                className="bg-wine"
+                                onClick={handlePayInvoice}
+                                disabled={processingPayment === payInvoice?.id}
+                            >
+                                {processingPayment === payInvoice?.id ? 'Gerando...' : 'Gerar PIX'}
+                            </Button>
+                        )}
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

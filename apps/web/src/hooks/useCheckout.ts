@@ -7,6 +7,11 @@ import { shippingService, ShippingOption } from '@/services/shippingService';
 import { paymentService, type PaymentOrderItem, type PaymentShippingData, type CustomerData } from '@/services/payment.service';
 import { EmailService } from '@/services/EmailService';
 import { calculatePixCancelAt } from '@/lib/pix-payment';
+import {
+  calculateOrderTotals,
+  validateCoupon,
+  type CouponSnapshot,
+} from '@/lib/checkout-pricing';
 
 export interface CheckoutData {
   // Customer Information
@@ -60,6 +65,9 @@ export interface CheckoutData {
   saveProfile?: boolean;
   saveAddress?: boolean;
   addressLabel?: string;
+
+  // Promoção aplicada na tela — revalidada contra o banco antes de cobrar
+  coupon?: CouponSnapshot;
 }
 
 export interface Order {
@@ -343,7 +351,7 @@ export const useCheckout = () => {
     return `checkout:${data.paymentMethod}:${attemptId}`;
   }, []);
 
-  const processOrder = useCallback(async (
+const processOrder = useCallback(async (
     items: CartItem[],
     checkoutData: CheckoutData,
     shippingOverride?: ShippingOverride
@@ -351,7 +359,17 @@ export const useCheckout = () => {
     setLoading(true);
     setError(null);
 
+    let createdOrderId: string | null = null;
+    let paymentCompleted = false;
+    let initialNotesJson: string | null = null;
+    const decrementedStock: Array<{ id: string; quantity: number }> = [];
+
     try {
+      // 0. O checkout exige conta: o pedido precisa de um comprador.
+      if (!user?.id) {
+        throw new Error('Entre na sua conta para finalizar a compra.');
+      }
+
       // 1. Validate Data
       const validationErrors = validateCheckoutData(checkoutData);
 
@@ -362,7 +380,46 @@ export const useCheckout = () => {
 
       if (!items || items.length === 0) throw new Error('Carrinho vazio');
 
-      // 2. Calculate Totals
+      // 2. Revalida produto, preço e estoque direto no banco.
+      //    O carrinho vive no navegador; o valor cobrado não pode confiar nele.
+      const productIds = Array.from(new Set(items.map((item) => item.product.id)));
+      const { data: freshProducts, error: freshProductsError } = await supabase
+        .from('products')
+        .select('id, name, price, stock_quantity, is_active, is_service')
+        .in('id', productIds);
+
+      if (freshProductsError) throw freshProductsError;
+
+      const productMap = new Map<string, any>(
+        (freshProducts || []).map((product: any) => [product.id, product])
+      );
+
+      for (const item of items) {
+        const fresh = productMap.get(item.product.id);
+
+        if (!fresh || fresh.is_active === false) {
+          throw new Error(`O produto "${item.product.name}" não está mais disponível.`);
+        }
+
+        if (Math.abs(Number(fresh.price) - Number(item.product.price)) > 0.009) {
+          throw new Error(
+            `O preço de "${item.product.name}" mudou para R$ ${Number(fresh.price).toFixed(2)}. Volte ao carrinho para atualizar.`
+          );
+        }
+
+        if (
+          !fresh.is_service &&
+          fresh.stock_quantity !== null &&
+          fresh.stock_quantity !== undefined &&
+          Number(fresh.stock_quantity) < item.quantity
+        ) {
+          throw new Error(
+            `Estoque insuficiente para "${item.product.name}". Disponível: ${fresh.stock_quantity}.`
+          );
+        }
+      }
+
+      // 3. Calculate Totals (mesma regra usada pela tela)
       const subtotal = items.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
       const shipping = shippingOverride?.price ?? selectedShipping?.price ?? 0;
 
@@ -381,23 +438,54 @@ export const useCheckout = () => {
         giftWrapImage = (wrapData as any)?.image_url || '';
       }
 
-      // Calculate Discount based on payment method
-      let discount = 0;
-      if (checkoutData.paymentMethod === 'pix') {
-        discount = (subtotal + shipping + giftWrapPrice) * 0.05;
-      } else if (checkoutData.paymentMethod === 'boleto') {
-        discount = (subtotal + shipping + giftWrapPrice) * 0.03;
+      const sellerIds = Array.from(
+        new Set(
+          items
+            .map((item) => item.product.seller?.id || (item.product as any).seller_id)
+            .filter((id): id is string => Boolean(id))
+        )
+      );
+
+      // 4. Cupom: relê do banco e valida. O que veio da tela é só uma dica.
+      let coupon: CouponSnapshot | null = null;
+      const couponCode = checkoutData.coupon?.code?.trim();
+
+      if (couponCode) {
+        const { data: couponRow, error: couponError } = await (supabase
+          .from('coupons' as any)
+          .select('*')
+          .eq('code', couponCode.toUpperCase())
+          .maybeSingle() as any);
+
+        if (couponError) throw couponError;
+        if (!couponRow) throw new Error('Cupom inválido ou expirado.');
+
+        const couponValidation = validateCoupon(couponRow as CouponSnapshot, subtotal, sellerIds);
+        if (!couponValidation.ok) {
+          throw new Error(couponValidation.reason || 'Cupom inválido.');
+        }
+
+        coupon = couponRow as CouponSnapshot;
       }
 
-      const total = subtotal + shipping + giftWrapPrice - discount;
+      const totals = calculateOrderTotals({
+        subtotal,
+        shipping,
+        giftWrap: giftWrapPrice,
+        paymentMethod: checkoutData.paymentMethod,
+        coupon,
+        sellerIds,
+      });
+
+      const total = totals.total;
+      const discount = totals.discount;
       const tax = 0; // Tax is currently not part of the active pricing model but kept for interface consistency
       const paymentIdempotencyKey = buildPaymentIdempotencyKey(checkoutData);
       const paymentDescription = `Pedido TheAdoro - ${items.length} item(ns)`;
 
-      // 3. Process Payment
       const customerDocument =
         checkoutData.document ||
-        (user?.user_metadata as any)?.cpf ||
+        (user.user_metadata as any)?.cpf ||
         (profile as any)?.document ||
         '';
       const sanitizedCustomerDocument = customerDocument.replace(/\D/g, '');
@@ -407,7 +495,7 @@ export const useCheckout = () => {
       }
 
       if (sanitizedCustomerDocument.length !== 11 && sanitizedCustomerDocument.length !== 14) {
-        throw new Error('Informe um CPF ou CNPJ vÃ¡lido para gerar o pagamento.');
+        throw new Error('Informe um CPF ou CNPJ válido para gerar o pagamento.');
       }
 
       const documentType = sanitizedCustomerDocument.length === 14 ? 'CNPJ' : 'CPF';
@@ -423,7 +511,7 @@ export const useCheckout = () => {
         email: checkoutData.email,
         phone: checkoutData.phone,
         document: sanitizedCustomerDocument,
-        code: user?.id || sanitizedCustomerDocument,
+        code: user.id,
         type: customerType,
         document_type: documentType,
         metadata: {
@@ -433,12 +521,142 @@ export const useCheckout = () => {
         address: billingAddress
       };
 
+      // 5. Cria o pedido ANTES de cobrar. Assim, uma falha de gravação nunca
+      //    deixa o cliente pago e sem pedido.
+      initialNotesJson = JSON.stringify({
+        customer: {
+          firstName: checkoutData.firstName,
+          lastName: checkoutData.lastName,
+          phone: checkoutData.phone,
+          email: checkoutData.email,
+          document: sanitizedCustomerDocument,
+        },
+        billingAddress: checkoutData.billingAddress,
+        userNote: checkoutData.notes,
+        giftOptions: {
+          ...checkoutData.giftOptions,
+          wrap_style_name: giftWrapName,
+          wrap_style_image: giftWrapImage
+        },
+        deliverySchedule: checkoutData.deliverySchedule,
+        coupon: coupon
+          ? {
+              id: coupon.id,
+              code: coupon.code,
+              type: coupon.discount_type,
+              value: coupon.discount_value,
+              discount: totals.couponDiscount,
+            }
+          : null,
+        pricing: {
+          subtotal: totals.subtotal,
+          shipping: totals.shipping,
+          giftWrap: totals.giftWrap,
+          paymentDiscount: totals.paymentDiscount,
+          couponDiscount: totals.couponDiscount,
+          discount: totals.discount,
+          total: totals.total,
+        },
+      });
+
+      const orderData = {
+        buyer_id: user.id,
+        seller_id: items[0]?.product.seller?.id || (items[0]?.product as any).seller_id || null,
+        total_amount: total,
+        subtotal_amount: subtotal,
+        shipping_cost: shipping,
+        gift_wrap_price: giftWrapPrice,
+        discount_amount: discount,
+        tax_amount: tax,
+        shipping_method: selectedShipping?.name || 'Padrão',
+        shipping_provider: selectedShipping?.company || null,
+        shipping_quote_id: selectedShipping?.company === 'uber' ? selectedShipping.id : null,
+        status: 'pending' as const,
+        shipping_address: JSON.stringify({
+          street: checkoutData.street,
+          number: checkoutData.number,
+          complement: checkoutData.complement,
+          neighborhood: checkoutData.neighborhood,
+          city: checkoutData.city,
+          state: checkoutData.state,
+          zipCode: checkoutData.zipCode,
+          country: checkoutData.country,
+        }),
+        payment_method: checkoutData.paymentMethod,
+        notes: initialNotesJson,
+      };
+
+      if (shippingOverride?.label) {
+        (orderData as any).shipping_method = shippingOverride.label;
+      }
+
+      const { data, error: orderError } = await (supabase
+        .from('orders')
+        .insert(orderData as any) as any)
+        .select()
+        .single();
+
+      if (orderError) {
+        console.error('Order creation FAILED:', orderError);
+        throw orderError;
+      }
+
+      createdOrderId = data.id;
+
+      // 6. Create Order Items
+      const orderItems = items.map(item => {
+        const itemSellerId = item.product.seller?.id || (item.product as any).seller_id;
+
+        return {
+          order_id: data.id,
+          product_id: item.product.id,
+          product_name: item.product.name,
+          quantity: item.quantity,
+          unit_price: item.product.price,
+          total_price: item.quantity * item.product.price,
+          variant_id: item.variant?.id || null,
+          seller_id: itemSellerId || '00000000-0000-0000-0000-000000000000',
+          gift_message: checkoutData.giftOptions?.message || checkoutData.giftMessage || null,
+        };
+      });
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
+
+      if (itemsError) {
+        console.error('Order items insertion FAILED:', itemsError);
+        throw itemsError;
+      }
+
+      // 7. Baixa de estoque atômica (a RPC devolve false se não houver saldo).
+      for (const item of items) {
+        const fresh = productMap.get(item.product.id);
+        if (fresh?.is_service) continue;
+        if (fresh?.stock_quantity === null || fresh?.stock_quantity === undefined) continue;
+
+        const { data: stockOk, error: stockError } = await (supabase.rpc as any)(
+          'decrement_product_stock',
+          { p_product_id: item.product.id, p_quantity: item.quantity }
+        );
+
+        if (stockError) {
+          // PGRST202 = função ainda não aplicada na base.
+          if ((stockError as any).code !== 'PGRST202') {
+            console.error('Falha ao baixar estoque:', stockError);
+          }
+        } else if (stockOk === false) {
+          throw new Error(`Estoque insuficiente para "${item.product.name}".`);
+        }
+
+        decrementedStock.push({ id: item.product.id, quantity: item.quantity });
+      }
+
+      // 8. Cobrança
       let paymentResult;
       if (checkoutData.paymentMethod === 'credit_card' || checkoutData.paymentMethod === 'debit_card') {
         if (!checkoutData.paymentDetails?.cardNumber) throw new Error('Dados do cartão incompletos');
 
-        // Tokenize on the client right before submitting the payment.
-        // TODO: migrate this direct token API call to the official Pagar.me tokenizecard.js loader.
         const cardToken = checkoutData.paymentDetails?.cardToken;
 
         if (!cardToken) {
@@ -481,13 +699,15 @@ export const useCheckout = () => {
         const gatewayErrorMessage = (paymentResult as any).gateway_error_message;
         const friendlyMessage =
           gatewayErrorMessage?.includes('action_forbidden')
-            ? 'O gateway recusou a geraÃ§Ã£o do PIX. Verifique se a conta Pagar.me tem PIX habilitado e se o ambiente/credencial estÃ¡ correto.'
+            ? 'O gateway recusou a geração do PIX. Verifique se a conta Pagar.me tem PIX habilitado e se o ambiente/credencial está correto.'
             : gatewayErrorMessage
               ? `Pagamento recusado pelo gateway: ${gatewayErrorMessage}`
               : 'Pagamento recusado. Verifique os dados e tente novamente.';
 
         throw new Error(friendlyMessage);
       }
+
+      paymentCompleted = true;
 
       const paymentStatus =
         paymentResult.status === 'succeeded'
@@ -496,58 +716,14 @@ export const useCheckout = () => {
             ? 'failed'
             : 'pending';
       const pixCancelAt = calculatePixCancelAt(paymentResult.pix_expiration);
+      const finalOrderStatus =
+        paymentStatus === 'approved' &&
+        (checkoutData.paymentMethod === 'credit_card' || checkoutData.paymentMethod === 'debit_card')
+          ? 'processing'
+          : 'pending';
 
-      // 3.5 Save User Data & Address if requested
-      if (user?.id) {
-        if (checkoutData.saveProfile) {
-          const { error: profileErr } = await supabase.from('profiles').update({
-            full_name: `${checkoutData.firstName} ${checkoutData.lastName}`.trim(),
-            phone: checkoutData.phone,
-            address: checkoutData.street,
-            address_number: checkoutData.number,
-            address_complement: checkoutData.complement || '',
-            neighborhood: checkoutData.neighborhood || '',
-            city: checkoutData.city,
-            state: checkoutData.state,
-            postal_code: checkoutData.zipCode,
-          }).eq('id', user.id);
-          if (profileErr) console.error('Error updating profile:', profileErr);
-        }
-
-        if (checkoutData.saveAddress) {
-          const { error: addressError } = await supabase.from('user_addresses' as any).insert({
-            user_id: user.id,
-            label: checkoutData.addressLabel || 'Meu Endereço',
-            zip_code: checkoutData.zipCode,
-            street: checkoutData.street,
-            number: checkoutData.number,
-            complement: checkoutData.complement || '',
-            neighborhood: checkoutData.neighborhood || '',
-            city: checkoutData.city,
-            state: checkoutData.state,
-            is_default: false
-          });
-          if (addressError) console.error('Error saving address:', addressError);
-        }
-      }
-
-      // 4. Create Order in DB
-      const notesJson = JSON.stringify({
-        customer: {
-          firstName: checkoutData.firstName,
-          lastName: checkoutData.lastName,
-          phone: checkoutData.phone,
-          email: checkoutData.email,
-          document: sanitizedCustomerDocument,
-        },
-        billingAddress: checkoutData.billingAddress,
-        userNote: checkoutData.notes,
-        giftOptions: {
-          ...checkoutData.giftOptions,
-          wrap_style_name: giftWrapName,
-          wrap_style_image: giftWrapImage
-        },
-        deliverySchedule: checkoutData.deliverySchedule,
+      const finalNotesJson = JSON.stringify({
+        ...(initialNotesJson ? JSON.parse(initialNotesJson) : {}),
         paymentInfo: {
           id: paymentResult.id,
           merchantOrderCode,
@@ -563,76 +739,48 @@ export const useCheckout = () => {
         }
       });
 
-      const initialOrderStatus =
-        paymentStatus === 'approved' && (checkoutData.paymentMethod === 'credit_card' || checkoutData.paymentMethod === 'debit_card')
-          ? 'processing'
-          : 'pending';
+      const { error: orderUpdateError } = await (supabase
+        .from('orders')
+        .update({
+          status: finalOrderStatus,
+          notes: finalNotesJson,
+        } as any)
+        .eq('id', data.id) as any);
 
-      const orderData = {
-        buyer_id: user?.id || null,
-        seller_id: items[0]?.product.seller?.id || (items[0]?.product as any).seller_id || null,
-        total_amount: total,
-        subtotal_amount: subtotal,
-        shipping_cost: shipping,
-        gift_wrap_price: giftWrapPrice,
-        discount_amount: discount,
-        tax_amount: tax,
-        shipping_method: selectedShipping?.name || 'Padrão',
-        shipping_provider: selectedShipping?.company || null,
-        shipping_quote_id: selectedShipping?.company === 'uber' ? selectedShipping.id : null,
-        status: initialOrderStatus as 'pending' | 'processing',
-        shipping_address: JSON.stringify({
-          street: checkoutData.street,
-          number: checkoutData.number,
-          complement: checkoutData.complement,
-          neighborhood: checkoutData.neighborhood,
+      if (orderUpdateError) {
+        console.error('Order update after payment FAILED:', orderUpdateError);
+      }
+
+      // 3.5 Save User Data & Address if requested
+      if (checkoutData.saveProfile) {
+        const { error: profileErr } = await supabase.from('profiles').update({
+          full_name: `${checkoutData.firstName} ${checkoutData.lastName}`.trim(),
+          phone: checkoutData.phone,
+          address: checkoutData.street,
+          address_number: checkoutData.number,
+          address_complement: checkoutData.complement || '',
+          neighborhood: checkoutData.neighborhood || '',
           city: checkoutData.city,
           state: checkoutData.state,
-          zipCode: checkoutData.zipCode,
-          country: checkoutData.country,
-        }),
-        payment_method: checkoutData.paymentMethod,
-        notes: notesJson,
-      };
-
-      if (shippingOverride?.label) {
-        (orderData as any).shipping_method = shippingOverride.label;
+          postal_code: checkoutData.zipCode,
+        }).eq('id', user.id);
+        if (profileErr) console.error('Error updating profile:', profileErr);
       }
 
-      const { data, error: orderError } = await (supabase
-        .from('orders')
-        .insert(orderData as any) as any)
-        .select()
-        .single();
-
-      if (orderError) {
-        console.error('Order creation FAILED:', orderError);
-        throw orderError;
-      }
-
-      // 5. Create Order Items
-      const orderItems = items.map(item => {
-        const itemSellerId = item.product.seller?.id || (item.product as any).seller_id;
-
-        return {
-          order_id: data.id,
-          product_id: item.product.id,
-          quantity: item.quantity,
-          unit_price: item.product.price,
-          total_price: item.quantity * item.product.price,
-          variant_id: item.variant?.id || null,
-          seller_id: itemSellerId || '00000000-0000-0000-0000-000000000000',
-          gift_message: checkoutData.giftOptions?.message || checkoutData.giftMessage || null,
-        };
-      });
-
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItems);
-
-      if (itemsError) {
-        console.error('Order items insertion FAILED:', itemsError);
-        throw itemsError;
+      if (checkoutData.saveAddress) {
+        const { error: addressError } = await supabase.from('user_addresses' as any).insert({
+          user_id: user.id,
+          label: checkoutData.addressLabel || 'Meu Endereço',
+          zip_code: checkoutData.zipCode,
+          street: checkoutData.street,
+          number: checkoutData.number,
+          complement: checkoutData.complement || '',
+          neighborhood: checkoutData.neighborhood || '',
+          city: checkoutData.city,
+          state: checkoutData.state,
+          is_default: false
+        });
+        if (addressError) console.error('Error saving address:', addressError);
       }
 
       const paymentMetadata = {
@@ -704,6 +852,17 @@ export const useCheckout = () => {
         }
       }
 
+      // 8.1 Contabiliza o uso do cupom (falha não desfaz a compra).
+      if (coupon?.code) {
+        const { error: couponUsageError } = await (supabase.rpc as any)(
+          'increment_coupon_usage',
+          { p_code: coupon.code }
+        );
+        if (couponUsageError && (couponUsageError as any).code !== 'PGRST202') {
+          console.error('Coupon usage increment FAILED:', couponUsageError);
+        }
+      }
+
       // 5.1 Despacho Uber Direct — só quando o pagamento já está aprovado.
       // PIX/boleto dependem de confirmação posterior; nesse caso o despacho é
       // disparado manualmente pelo admin (Admin → Pedidos).
@@ -731,7 +890,7 @@ export const useCheckout = () => {
       for (const item of items) {
         if (item.product.is_service) {
           const { error: apptError } = await supabase.from('appointments').insert({
-            buyer_id: user?.id,
+            buyer_id: user.id,
             seller_id: item.product.seller?.id || (item.product as any).seller_id,
             product_id: item.product.id,
             appointment_date: checkoutData.deliverySchedule?.scheduled_date || new Date().toISOString().split('T')[0],
@@ -741,18 +900,6 @@ export const useCheckout = () => {
             notes: `Agendamento automático via pedido #${data.id.slice(0, 8)}. Mensagem: ${checkoutData.giftMessage || 'N/A'}`
           } as any);
           if (apptError) console.error('Error creating automatic appointment:', apptError);
-        }
-      }
-
-      // 7. Update Stock (Only for physical products)
-      for (const item of items) {
-        if (!item.product.is_service && item.product.stock_quantity !== null && item.product.stock_quantity !== undefined) {
-          await supabase
-            .from('products')
-            .update({
-              stock_quantity: Math.max(0, item.product.stock_quantity - item.quantity)
-            })
-            .eq('id', item.product.id);
         }
       }
 
@@ -770,13 +917,13 @@ export const useCheckout = () => {
 
       const order: Order = {
         id: data.id,
-        userId: data.buyer_id, // Changed from user_id to buyer_id
+        userId: data.buyer_id,
         items,
         subtotal,
         shipping,
         tax,
         total,
-        status: data.status,
+        status: finalOrderStatus,
         checkoutData,
         createdAt: data.created_at,
         updatedAt: data.updated_at,
@@ -803,6 +950,31 @@ export const useCheckout = () => {
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Erro ao processar pedido';
+
+      // Compensação: se o pedido foi criado mas a cobrança não se completou,
+      // cancela o pedido e devolve o estoque reservado.
+      if (createdOrderId && !paymentCompleted) {
+        try {
+          await (supabase
+            .from('orders')
+            .update({ status: 'cancelled' } as any)
+            .eq('id', createdOrderId) as any);
+        } catch (cancelError) {
+          console.error('Falha ao cancelar pedido após erro:', cancelError);
+        }
+
+        for (const entry of decrementedStock) {
+          try {
+            await (supabase.rpc as any)('restore_product_stock', {
+              p_product_id: entry.id,
+              p_quantity: entry.quantity,
+            });
+          } catch (restoreError) {
+            console.error('Falha ao devolver estoque:', restoreError);
+          }
+        }
+      }
+
       setError(errorMessage);
       toast({
         title: "Erro no checkout",
@@ -813,7 +985,7 @@ export const useCheckout = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, selectedShipping, calculateTax, validateCheckoutData, buildPaymentIdempotencyKey]);
+  }, [user, profile, selectedShipping, validateCheckoutData, buildPaymentIdempotencyKey]);
 
   const getOrderById = useCallback(async (orderId: string): Promise<Order | null> => {
     try {

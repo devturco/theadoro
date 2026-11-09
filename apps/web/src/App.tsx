@@ -128,8 +128,8 @@ function App() {
                   <Route path="/categories/:slug" element={<MaintenanceGuard><PublicLayout><CategoryProducts /></PublicLayout></MaintenanceGuard>} />
                   <Route path="/search" element={<MaintenanceGuard><PublicLayout><Search /></PublicLayout></MaintenanceGuard>} />
                   <Route path="/cart" element={<MaintenanceGuard><PublicLayout><Cart /></PublicLayout></MaintenanceGuard>} />
-                  <Route path="/checkout" element={<MaintenanceGuard><PublicLayout><Checkout /></PublicLayout></MaintenanceGuard>} />
-                  <Route path="/order-success/:id" element={<MaintenanceGuard><PublicLayout><OrderSuccess /></PublicLayout></MaintenanceGuard>} />
+                  <Route path="/checkout" element={<MaintenanceGuard><ProtectedRoute><PublicLayout><Checkout /></PublicLayout></ProtectedRoute></MaintenanceGuard>} />
+                  <Route path="/order-success/:id" element={<MaintenanceGuard><ProtectedRoute><PublicLayout><OrderSuccess /></PublicLayout></ProtectedRoute></MaintenanceGuard>} />
                   <Route path="/wishlist" element={<MaintenanceGuard><PublicLayout><Wishlist /></PublicLayout></MaintenanceGuard>} />
                   <Route path="/sellers" element={<MaintenanceGuard><PublicLayout><Sellers /></PublicLayout></MaintenanceGuard>} />
                   <Route path="/sellers/:id" element={<MaintenanceGuard><PublicLayout><SellerProfile /></PublicLayout></MaintenanceGuard>} />

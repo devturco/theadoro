@@ -21,6 +21,23 @@ serve(async (req) => {
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         )
 
+        // O gateway aceita a anon key como JWT; a cobrança exige um usuário real.
+        const callerToken = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim()
+        if (!callerToken) {
+            return new Response(
+                JSON.stringify({ error: 'unauthorized', message: 'Faça login para gerar o pagamento.' }),
+                { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+            )
+        }
+
+        const { data: callerData, error: callerError } = await supabaseClient.auth.getUser(callerToken)
+        if (callerError || !callerData?.user) {
+            return new Response(
+                JSON.stringify({ error: 'unauthorized', message: 'Sessão inválida.' }),
+                { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+            )
+        }
+
         const {
             action,
             gateway,

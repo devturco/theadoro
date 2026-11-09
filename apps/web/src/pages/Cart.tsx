@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingBag, ArrowLeft, Trash2, Heart, Plus, Minus, Truck, MapPin } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { useCart } from '@/hooks/useCart';
 import { useWishlist } from '@/hooks/useWishlist';
 import { useShipping } from '@/hooks/useShipping';
@@ -24,10 +25,72 @@ export const Cart: React.FC = () => {
 
   const [isClearing, setIsClearing] = useState(false);
   const [processingItems, setProcessingItems] = useState<Set<string>>(new Set());
+  const [recommendations, setRecommendations] = useState<any[]>([]);
 
   // Shipping Logic
   const [cep, setCep] = useState('');
   const { calculateShipping, options: shippingOptions, loading: loadingShipping } = useShipping();
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadRecommendations = async () => {
+      if (!cart.items.length) {
+        setRecommendations([]);
+        return;
+      }
+
+      const cartIds = cart.items.map((item) => item.product.id);
+      const categoryIds = Array.from(
+        new Set(
+          cart.items
+            .map((item) => item.product.category?.id)
+            .filter((id): id is string => Boolean(id))
+        )
+      );
+
+      const exclude = `(${cartIds.map((id) => `"${id}"`).join(',')})`;
+
+      const load = async (onlyCategories: boolean) => {
+        let query = supabase
+          .from('products')
+          .select('id, name, price, original_price, images, category_id')
+          .eq('is_active', true)
+          .not('id', 'in', exclude)
+          .limit(4);
+
+        if (onlyCategories && categoryIds.length > 0) {
+          query = query.in('category_id', categoryIds);
+        }
+
+        const { data, error } = await query;
+        if (error) {
+          console.error('Error loading recommendations:', error);
+          return [];
+        }
+        return data || [];
+      };
+
+      let items = await load(categoryIds.length > 0);
+
+      if (items.length < 4) {
+        const fallback = await load(false);
+        const seen = new Set(items.map((item) => item.id));
+        items = [
+          ...items,
+          ...fallback.filter((item) => !seen.has(item.id)),
+        ].slice(0, 4);
+      }
+
+      if (!cancelled) setRecommendations(items);
+    };
+
+    void loadRecommendations();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cart.items]);
 
   const handleCalculateShipping = () => {
     const cleanCep = cep.replace(/\D/g, '');
@@ -407,20 +470,41 @@ export const Cart: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Recommended Products */}
-                {/* Recommended Products - TODO: Implement recommendation logic
-                <div className="mt-6 bg-white rounded-lg border border-gray-200 p-6">
-                  <h4 className="font-medium text-gray-900 mb-4">
-                    Você também pode gostar
-                  </h4>
+                {recommendations.length > 0 && (
+                  <div className="mt-6 bg-white rounded-lg border border-gray-200 p-6">
+                    <h4 className="font-medium text-gray-900 mb-4">
+                      Você também pode gostar
+                    </h4>
 
-                  <div className="space-y-3">
-                    <div className="text-center text-sm text-gray-500 py-4">
-                      Carregando recomendações...
+                    <div className="space-y-3">
+                      {recommendations.map((product) => (
+                        <Link
+                          key={product.id}
+                          to={`/product/${product.id}`}
+                          className="flex items-center gap-3 group"
+                        >
+                          <div className="h-16 w-16 rounded-lg overflow-hidden bg-gray-100 shrink-0">
+                            {product.images?.[0] && (
+                              <img
+                                src={product.images[0]}
+                                alt={product.name}
+                                className="h-full w-full object-cover"
+                              />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate group-hover:text-wine transition-colors">
+                              {product.name}
+                            </p>
+                            <p className="text-sm font-bold text-gray-900">
+                              {formatPrice(Number(product.price))}
+                            </p>
+                          </div>
+                        </Link>
+                      ))}
                     </div>
                   </div>
-                </div>
-                */}
+                )}
               </div>
             </div>
           </div>

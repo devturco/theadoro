@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@theadoro/ui';
 import { Button } from '@theadoro/ui';
@@ -20,18 +20,12 @@ import {
     CheckCircle2,
     Upload,
     AlertCircle,
-    Check,
-    CreditCard
+    Check
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { Checkbox } from '@theadoro/ui';
 import { Badge } from '@theadoro/ui';
-import { paymentService } from '@/services/payment.service';
-import {
-    PagarmeTokenizecardForm,
-    type PagarmeTokenizecardFormHandle,
-} from '@/components/payments/PagarmeTokenizecardForm';
 
 const renderMarkdown = (text: string) => {
     if (!text) return '';
@@ -51,7 +45,7 @@ const renderMarkdown = (text: string) => {
         .replace(/\n/g, '<br/>');
 };
 
-type Step = 'branding' | 'entity' | 'details' | 'documents' | 'plans' | 'payment' | 'legal' | 'success';
+type Step = 'branding' | 'entity' | 'details' | 'documents' | 'plans' | 'legal' | 'success';
 
 interface Plan {
     id: string;
@@ -75,13 +69,6 @@ export default function SellerOnboarding() {
     const [hasReadTerms, setHasReadTerms] = useState(false);
     const [hasReadPrivacy, setHasReadPrivacy] = useState(false);
     const [acceptedLegal, setAcceptedLegal] = useState(false);
-
-    // Payment State
-    const [paymentLoading, setPaymentLoading] = useState(false);
-    const [paymentMethod, setPaymentMethod] = useState<'credit' | 'pix'>('credit');
-    const [cardData, setCardData] = useState({ number: '', name: '', expiry: '', cvv: '', installments: 1 });
-    const [pixData, setPixData] = useState<{ qr_code?: string, qr_code_url?: string } | null>(null);
-    const pagarmeTokenizecardRef = useRef<PagarmeTokenizecardFormHandle | null>(null);
 
     // Form State
     const [formData, setFormData] = useState({
@@ -157,8 +144,7 @@ export default function SellerOnboarding() {
         else if (currentStep === 'entity') setCurrentStep('details');
         else if (currentStep === 'details') setCurrentStep('documents');
         else if (currentStep === 'documents') setCurrentStep('plans');
-        else if (currentStep === 'plans') setCurrentStep('payment');
-        else if (currentStep === 'payment') setCurrentStep('legal');
+        else if (currentStep === 'plans') setCurrentStep('legal');
     };
 
     const handleBack = () => {
@@ -166,48 +152,7 @@ export default function SellerOnboarding() {
         else if (currentStep === 'details') setCurrentStep('entity');
         else if (currentStep === 'documents') setCurrentStep('details');
         else if (currentStep === 'plans') setCurrentStep('documents');
-        else if (currentStep === 'payment') setCurrentStep('plans');
-        else if (currentStep === 'legal') setCurrentStep('payment');
-    };
-
-    const processSubscriptionPayment = async () => {
-        const selectedPlan = plans.find(p => p.id === formData.planId);
-        if (!selectedPlan) return;
-
-        setPaymentLoading(true);
-        try {
-            const customer = {
-                name: formData.type === 'pf' ? formData.fullName : formData.companyName,
-                email: user?.email || '',
-                phone: formData.phone,
-                document: formData.type === 'pf' ? formData.cpf : formData.cnpj
-            };
-
-            if (paymentMethod === 'credit') {
-                const cardToken = await pagarmeTokenizecardRef.current?.tokenize();
-
-                if (!cardToken) {
-                    throw new Error('Não foi possível tokenizar o cartão com o fluxo oficial do Pagar.me.');
-                }
-
-                const result = await paymentService.processCard(selectedPlan.price, {
-                    token: cardToken,
-                    installments: cardData.installments,
-                }, customer);
-                if (result.status === 'succeeded' || result.status === 'pending') {
-                    toast.success('Assinatura processada com sucesso!');
-                    handleNext();
-                }
-            } else {
-                const result = await paymentService.generatePix(selectedPlan.price, customer);
-                setPixData({ qr_code: result.pix_code, qr_code_url: (result as any).pix_url || (result as any).pix_code_url });
-                toast.info('Código Pix gerado!');
-            }
-        } catch (error: any) {
-            toast.error('Erro no pagamento: ' + error.message);
-        } finally {
-            setPaymentLoading(false);
-        }
+        else if (currentStep === 'legal') setCurrentStep('plans');
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, key: keyof typeof files) => {
@@ -288,14 +233,6 @@ export default function SellerOnboarding() {
 
     return (
         <div className="min-h-screen bg-background pb-20">
-            <PagarmeTokenizecardForm
-                ref={pagarmeTokenizecardRef}
-                enabled={paymentMethod === 'credit'}
-                holderName={cardData.name}
-                cardNumber={cardData.number}
-                cardExpiry={cardData.expiry}
-                cardCvv={cardData.cvv}
-            />
             <div className="container max-w-4xl mx-auto px-4 pt-12">
                 {currentStep !== 'success' && (
                     <div className="mb-8">
@@ -373,33 +310,11 @@ export default function SellerOnboarding() {
                             </Card>
                         ))}
                         <div className="md:col-span-3 flex gap-2"><Button variant="outline" className="flex-1" onClick={handleBack}>Voltar</Button><Button className="flex-1 bg-wine" onClick={handleNext} disabled={!formData.planId}>Próximo</Button></div>
+                        <p className="md:col-span-3 text-sm text-muted-foreground text-center">
+                            O pagamento da assinatura é feito depois da aprovação do cadastro,
+                            em <strong>Minha Assinatura</strong>. Nada é cobrado agora.
+                        </p>
                     </div>
-                )}
-
-                {currentStep === 'payment' && (
-                    <Card className="max-w-2xl mx-auto border-none shadow-sm">
-                        <CardHeader><CardTitle>Pagamento</CardTitle></CardHeader>
-                        <CardContent className="space-y-4">
-                            <RadioGroup value={paymentMethod} onValueChange={(v: any) => setPaymentMethod(v)} className="flex gap-4">
-                                <div className="flex items-center space-x-2"><RadioGroupItem value="credit" id="c"/><Label htmlFor="credit">Cartão</Label></div>
-                                <div className="flex items-center space-x-2"><RadioGroupItem value="pix" id="p"/><Label htmlFor="pix">Pix</Label></div>
-                            </RadioGroup>
-                            {paymentMethod === 'credit' ? (
-                                <>
-                                <div className="space-y-2">
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <Input placeholder="MM/AA" value={cardData.expiry} onChange={e => setCardData({...cardData, expiry: e.target.value})} />
-                                        <Input placeholder="CVV" value={cardData.cvv} onChange={e => setCardData({...cardData, cvv: e.target.value})} />
-                                    </div>
-                                </div>
-                                <div className="space-y-2"><Input placeholder="Número" onChange={e => setCardData({...cardData, number: e.target.value})} /><Input placeholder="Nome" onChange={e => setCardData({...cardData, name: e.target.value})} /></div>
-                                </>
-                            ) : (
-                                <div className="text-center">{pixData ? <img src={pixData.qr_code_url} className="mx-auto w-40" /> : <p>Clique em Pagar para gerar o Pix</p>}</div>
-                            )}
-                            <div className="flex gap-2"><Button variant="outline" className="flex-1" onClick={handleBack}>Voltar</Button><Button className="flex-1 bg-wine" onClick={paymentMethod === 'credit' || !pixData ? processSubscriptionPayment : handleNext} disabled={paymentLoading}>{paymentLoading ? '...' : 'Pagar'}</Button></div>
-                        </CardContent>
-                    </Card>
                 )}
 
                 {currentStep === 'legal' && (
@@ -415,7 +330,12 @@ export default function SellerOnboarding() {
                 {currentStep === 'success' && (
                     <div className="text-center space-y-4 py-20">
                         <CheckCircle2 className="h-20 w-20 text-green-500 mx-auto" />
-                        <h2 className="text-3xl font-bold">Sucesso!</h2>
+                        <h2 className="text-3xl font-bold">Cadastro enviado!</h2>
+                        <p className="text-muted-foreground max-w-xl mx-auto">
+                            Nossa equipe vai analisar seus documentos. Quando o cadastro for aprovado,
+                            você recebe uma fatura em <strong>Minha Assinatura</strong>. O plano só é
+                            cobrado depois da aprovação.
+                        </p>
                         <Button className="bg-wine" onClick={() => navigate('/buyer/dashboard')}>Ir para o Painel</Button>
                     </div>
                 )}

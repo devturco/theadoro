@@ -1,3 +1,4 @@
+import { supabase } from '@/integrations/supabase/client';
 
 export interface EmailPayload {
     to: string;
@@ -6,24 +7,40 @@ export interface EmailPayload {
     data: any;
 }
 
+export interface EmailResult {
+    success: boolean;
+    id?: string;
+    error?: string;
+}
+
 /**
- * Service to handle email sending.
- * Connects to 'functions/send-email' in production.
+ * Envia e-mail pela edge function `send-email`.
+ *
+ * Falha de e-mail nunca derruba o checkout: o pedido já foi criado e o
+ * pagamento já foi processado. O erro fica registrado no console.
  */
 export const EmailService = {
-    /**
-     * Send an email.
-     */
-    send: async (payload: EmailPayload): Promise<{ success: boolean; id?: string }> => {
-        // Log briefly in development
-        console.log(`[EmailService] Enviar mock para: ${payload.to} | Assunto: ${payload.subject}`);
+    send: async (payload: EmailPayload): Promise<EmailResult> => {
+        try {
+            const { data, error } = await supabase.functions.invoke('send-email', {
+                body: payload,
+            });
 
-        // Simulate API latency
-        await new Promise(resolve => setTimeout(resolve, 500));
+            if (error) {
+                console.warn('[EmailService] envio falhou:', error.message);
+                return { success: false, error: error.message };
+            }
 
-        return {
-            success: true,
-            id: `email_${Math.random().toString(36).substring(2, 10)}`
-        };
+            if (data?.error) {
+                console.warn('[EmailService] e-mail não enviado:', data.message || data.error);
+                return { success: false, error: data.message || data.error };
+            }
+
+            return { success: true, id: data?.id };
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Erro ao enviar e-mail';
+            console.warn('[EmailService] erro inesperado:', message);
+            return { success: false, error: message };
+        }
     }
 };

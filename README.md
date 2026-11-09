@@ -79,6 +79,7 @@ A entrega é **restrita a Cuiabá/MT** — o gate de CEP aceita apenas faixas `7
 │  Supabase                │        │  Pagar.me          │
 │  ─ Postgres + RLS        │◄──────►│  Uber Direct       │
 │  ─ Edge Functions  ──────┼───────►│  Gemini            │
+│                          │        │  E-mail (SMTP)     │
 └──────────────────────────┘        └────────────────────┘
 ```
 
@@ -113,8 +114,8 @@ theadoro-gift/
 │   └── ui/                   # design system (shadcn)
 ├── supabase/
 │   ├── config.toml           # configuração do projeto + verify_jwt por function
-│   ├── migrations/           # 33 migrations SQL versionadas
-│   └── functions/            # 5 edge functions (Deno)
+│   ├── migrations/           # baseline + bootstrap + seed (histórico em migrations/archive/)
+│   └── functions/            # 7 edge functions (Deno)
 ├── scripts/                  # utilitários legados de reparo (não fazem parte do runtime)
 ├── server.cjs                # servidor HTTP de produção (serve /dist)
 ├── start.cjs                 # entrypoint de deploy: build + server
@@ -189,24 +190,26 @@ npx vite build --mode development   # build de desenvolvimento
 
 ### Migrations
 
-- Ficam em `supabase/migrations/`, no padrão `YYYYMMDDHHMMSS_nome_da_mudanca.sql`.
-- **São a fonte de verdade do schema.** Não altere o banco pelo dashboard sem criar a migration correspondente.
+- `supabase/migrations/20261109000000_baseline_public_schema.sql` é a **fonte de verdade do schema**: enums, tabelas, constraints, índices, views, functions, triggers, RLS, policies e Storage, gerados do banco de produção em 2026-11-09.
+- É idempotente e serve para reconstruir um projeto novo do zero.
+- As migrations antigas estão em `supabase/migrations/archive/` somente como histórico; **não as aplique** em um projeto novo.
 - Toda tabela nova **precisa de RLS habilitado** e policies explícitas.
 
-Aplicar:
+Projeto novo:
 
 ```bash
-supabase link --project-ref pfpbaepzvgovqheeqxlg
+supabase link --project-ref <novo-ref>
 supabase db push
 ```
 
-Ou, sem CLI, cole o SQL no **SQL Editor** do dashboard.
+Depois do push, rode também o bootstrap do admin master e o seed do catálogo
+(as duas migrations já estão em `supabase/migrations/`).
 
-> O histórico de migrations do projeto **não é rastreável pelo CLI** — as migrations foram criadas manualmente e aplicadas via SQL Editor. A tabela `supabase_migrations.schema_migrations` pode não refletir o estado real. **Verifique antes de rodar `db push` em produção**; em caso de divergência, aplique o SQL manualmente.
+> No projeto de produção atual o schema já corresponde ao baseline. Evite `db push` cego nele: o histórico remoto das migrations antigas não bate com os arquivos locais. Mudanças novas entram como migration normal.
 
 ### Admin master
 
-A migration **`20261107000000_bootstrap_master_admin.sql`** cria o administrador principal de uma instalação nova:
+A migration **`20261109000001_bootstrap_master_admin.sql`** (roda depois do baseline) cria o administrador principal de uma instalação nova:
 
 | Campo | Valor padrão |
 |---|---|
@@ -224,26 +227,31 @@ supabase db push        # aplica, entre outras, a migration do admin master
 
 > ⚠️ **Troque a senha no primeiro acesso** (Admin → Usuários → *Alterar Senha*) ou edite a constante `v_password` da migration antes de aplicá-la em produção.
 
-### Tabelas (26)
+### Tabelas (29) e views (2)
 
 | Domínio | Tabelas |
 |---|---|
-| Catálogo | `products`, `product_variations`, `categories`, `reviews`, `wishlist`, `cart` |
+| Catálogo | `products`, `product_variations`, `categories`, `reviews`, `wishlist`, `cart`, `product_analytics` |
 | Pedidos | `orders`, `order_items`, `payments`, `payment_events` |
 | Pessoas | `profiles`, `user_roles`, `user_addresses`, `seller_applications` |
 | Vendedor | `seller_subscriptions`, `subscription_plans`, `seller_invoices`, `campaigns`, `campaign_participants`, `coupons` |
 | Serviços | `appointments`, `delivery_slots`, `service_availability` |
-| Presentes | `gift_wraps` |
-| Plataforma | `site_settings`, `product_analytics` |
+| Presentes | `gift_wraps`, `gift_lists`, `gift_list_items`, `important_dates` |
+| Plataforma | `site_settings` |
+
+Views: `seller_summary` (perfil público do vendedor) e `product_stats_daily` (métricas por dia).
 
 `orders` guarda os campos de entrega: `shipping_method`, `shipping_address` (JSON), `shipping_provider`, `shipping_quote_id`, `uber_delivery_id`, `tracking_url`.
 
 ### Funções e triggers
 
-- `handle_new_user` — cria perfil no signup.
+- `handle_new_user` — cria perfil no signup (trigger em `auth.users`).
 - `handle_updated_at` / `update_updated_at_column` — timestamps.
 - `handle_seller_approval_subscription` — efeitos da aprovação de vendedor.
+- `handle_default_address` — garante um único endereço padrão.
 - `generate_product_slug` / `slugify` — URLs.
+- `decrement_product_stock` / `restore_product_stock` — baixa e devolução atômica de estoque no checkout.
+- `increment_coupon_usage` — contador de uso do cupom.
 - Helpers de autorização usados por RLS: `has_role`, `is_admin`, `can_access_order`, `is_order_seller_check`, `get_my_roles`, `get_my_profile_v2`.
 
 > **Segurança do banco:** `public.exec_sql(query text)` é `SECURITY DEFINER` e executável por `anon` — qualquer visitante com a chave pública podia rodar SQL arbitrário. O `EXECUTE` foi revogado de `PUBLIC`, `anon` e `authenticated`, mantido apenas para `service_role`. O mesmo foi feito para os helpers de introspecção (`get_table_columns`, `get_table_info`, `list_cols`, `get_coupons_columns`, `get_user_debug_info`).
@@ -255,19 +263,27 @@ supabase db push        # aplica, entre outras, a migration do admin master
 
 | Function | `verify_jwt` | Responsabilidade |
 |---|---|---|
-| `process-payment` | `false` | cria cobranças no Pagar.me (cartão, PIX, boleto), consulta e cancela |
-| `pagarme-webhook` | `false` | recebe eventos do Pagar.me, confirma pagamento e dispara o despacho |
-| `uber-delivery` | `false` | cotação (`action: quote`) e despacho (`action: request`) na Uber Direct |
+| `process-payment` | `true` | cria cobranças do pedido no Pagar.me (cartão, PIX, boleto), consulta e cancela |
+| `seller-invoice-payment` | `false` | cobra a fatura de assinatura do vendedor (cartão/PIX) e troca/cancela plano |
+| `pagarme-webhook` | `false` | recebe eventos do Pagar.me, confirma pedidos **e faturas**, dispara o despacho |
+| `send-email` | `false` | e-mail transacional (SMTP ou Resend) |
+| `uber-delivery` | `true` | cotação (`action: quote`) e despacho (`action: request`) na Uber Direct |
 | `admin-users` | `false` | exclusão de usuário (com conferência de dependências) e troca de e-mail/senha pelo admin |
 | `ai-gift-assistant` | padrão (`true`) | sugestão de presentes com Gemini |
 
-`verify_jwt = false` significa que a function aceita chamadas sem JWT do Supabase. A proteção vem do próprio código: `pagarme-webhook` exige autenticação do webhook; `uber-delivery` só executa o que o servidor permite; `process-payment` valida os dados e usa a service role.
+`verify_jwt = false` não significa “aberta”: cada function com essa configuração valida o JWT ou a credencial por conta própria. `process-payment` e `uber-delivery` exigem usuário logado porque o gateway aceita a chave anônima como JWT válido — a checagem é refeita dentro da function. `pagarme-webhook` exige Basic Auth/secrets; `seller-invoice-payment` valida o usuário e o vínculo da fatura; `send-email` valida o usuário para não virar relay.
 
 ### Secrets
 
 ```bash
 supabase secrets set UBER_CLIENT_ID=... UBER_CLIENT_SECRET=... UBER_CUSTOMER_ID=...
 supabase secrets set PAGARME_WEBHOOK_USER=... PAGARME_WEBHOOK_PASSWORD=...
+# e-mail (escolha SMTP ou Resend)
+supabase secrets set EMAIL_FROM="TheAdoro <noreply@theadoro.com.br>"
+supabase secrets set SMTP_HOST=smtp.hostinger.com SMTP_PORT=465 SMTP_SECURE=true \
+  SMTP_USER=noreply@theadoro.com.br SMTP_PASS=...
+# ou:
+supabase secrets set RESEND_API_KEY=...
 ```
 
 `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` já existem no runtime de toda function.
@@ -275,10 +291,13 @@ supabase secrets set PAGARME_WEBHOOK_USER=... PAGARME_WEBHOOK_PASSWORD=...
 ### Deploy
 
 ```bash
-supabase functions deploy process-payment    --project-ref pfpbaepzvgovqheeqxlg --no-verify-jwt
-supabase functions deploy pagarme-webhook    --project-ref pfpbaepzvgovqheeqxlg --no-verify-jwt
-supabase functions deploy uber-delivery      --project-ref pfpbaepzvgovqheeqxlg --no-verify-jwt
-supabase functions deploy ai-gift-assistant  --project-ref pfpbaepzvgovqheeqxlg
+supabase functions deploy process-payment          --project-ref pfpbaepzvgovqheeqxlg
+supabase functions deploy seller-invoice-payment   --project-ref pfpbaepzvgovqheeqxlg --no-verify-jwt
+supabase functions deploy pagarme-webhook          --project-ref pfpbaepzvgovqheeqxlg --no-verify-jwt
+supabase functions deploy send-email               --project-ref pfpbaepzvgovqheeqxlg --no-verify-jwt
+supabase functions deploy uber-delivery            --project-ref pfpbaepzvgovqheeqxlg
+supabase functions deploy admin-users              --project-ref pfpbaepzvgovqheeqxlg --no-verify-jwt
+supabase functions deploy ai-gift-assistant        --project-ref pfpbaepzvgovqheeqxlg
 ```
 
 ### Desenvolvimento local
@@ -338,16 +357,16 @@ Despacho:   POST https://api.uber.com/v1/customers/{customer_id}/deliveries
 ### Checkout
 
 ```
-carrinho → CEP → cotação de frete → dados → pagamento → pedido → itens → pagamento persistido → (despacho) → estoque/agendamentos
+carrinho → CEP → cotação de frete → dados/CPF → revalidação de preço e estoque → pedido pendente → itens → baixa de estoque → cobrança → pagamento persistido → (despacho) → agendamentos
 ```
 
-`apps/web/src/hooks/useCheckout.ts` orquestra tudo. A ordem importa: o pedido é criado **depois** da cobrança, e o `merchant_order_code` (`TA-…`) é o elo entre Pagar.me e o pedido.
+`apps/web/src/hooks/useCheckout.ts` orquestra tudo. A ordem importa: o **pedido e os itens são criados antes da cobrança**. Se o gateway recusar ou algo falhar, o pedido é cancelado e o estoque devolvido — o cliente nunca fica pago e sem pedido. `merchant_order_code` (`TA-…`) é o elo entre Pagar.me e o pedido, e o cupom é relido do banco antes de compor o total.
 
 ### Pagamento
 
 - **Cartão:** aprovado na hora → pedido nasce `processing` → despacho Uber imediato.
 - **PIX/boleto:** pedido nasce `pending` → webhook confirma → `processing` → despacho.
-- Sem webhook configurado, PIX fica `pending` indefinidamente.
+- O webhook já está deployado e autenticado; falta **cadastrar a URL no painel do Pagar.me**. Sem esse cadastro, PIX fica `pending` até o pagamento ser confirmado manualmente pelo admin.
 
 ### Frete e despacho
 
@@ -384,8 +403,10 @@ Requer dois secrets no repositório: `SUPABASE_ACCESS_TOKEN` e `SUPABASE_PROJECT
 O caminho canônico de deploy — e o único que não depende de CI — é a CLI:
 
 ```bash
-supabase functions deploy <nome> --project-ref pfpbaepzvgovqheeqxlg --no-verify-jwt
+supabase functions deploy <nome> --project-ref pfpbaepzvgovqheeqxlg
 ```
+
+`verify_jwt` vem do `supabase/config.toml`. Só acrescente `--no-verify-jwt` nas functions marcadas com `false` ali (`pagarme-webhook`, `seller-invoice-payment`, `send-email`, `admin-users`); em `process-payment` e `uber-delivery` a flag desligaria a exigência de login.
 
 ---
 
@@ -419,11 +440,13 @@ curl -s -X POST https://pfpbaepzvgovqheeqxlg.supabase.co/functions/v1/admin-user
 
 ## Limitações conhecidas
 
-1. **Correios é simulado** — `shippingService.calculateCorreios()` calcula o preço localmente (`28.90 + peso × 4`), sem chamar nenhuma API.
-2. **Sem webhook configurado, PIX não confirma** — depende dos secrets e do cadastro da URL no Pagar.me.
-3. **Região limitada a Cuiabá/MT** — gate fixo no `shippingService` (faixas `780xx`/`781xx`).
-4. **Sem geocodificação** — a Uber recebe o endereço textual, não lat/long. Se a conta exigir coordenadas, a cotação é recusada.
-5. **`packages/api-client`** depende de `swagger.json`; regenerar exige migrar o `kubb.config.ts` (o plugin `@kubb/plugin-tanstack-query` foi removido do npm). O `dist/` já construído atende o app.
+1. **Correios é simulado** — `shippingService.calculateCorreios()` calcula o preço localmente (`28.90 + peso × 4`), sem chamar nenhuma API. Hoje está desligado em produção.
+2. **Webhook do Pagar.me precisa ser cadastrado no painel** — os secrets já estão definidos e a function aceita a autenticação; a URL completa está em `supabase/.env.webhook.local`. Sem o cadastro, PIX de pedido e de fatura não confirmam automaticamente.
+3. **Compra exige conta** — `/checkout` é rota protegida. Visitante é levado ao login antes de pagar, porque o pedido precisa de `buyer_id`.
+4. **Região limitada a Cuiabá/MT** — gate fixo no `shippingService` (faixas `780xx`/`781xx`). Entrega própria do produto continua disponível.
+5. **Sem geocodificação** — a Uber recebe o endereço textual, não lat/long. Se a conta exigir coordenadas, a cotação é recusada.
+6. **E-mail transacional depende de credencial** — a function `send-email` já existe e o `EmailService` chama de verdade (SMTP Hostinger ou Resend). Enquanto `SMTP_PASS`/`RESEND_API_KEY` não for definido, ela responde 503 e o checkout segue normalmente, sem e-mail.
+7. **`packages/api-client`** depende de `swagger.json`; regenerar exige migrar o `kubb.config.ts` (o plugin `@kubb/plugin-tanstack-query` foi removido do npm). O `dist/` já construído atende o app.
 
 ---
 
@@ -432,11 +455,13 @@ curl -s -X POST https://pfpbaepzvgovqheeqxlg.supabase.co/functions/v1/admin-user
 - [ ] `.env.local` criado a partir de `.env.example`
 - [ ] `npm install`, `npm run build` e `npm run dev` funcionando
 - [ ] `supabase link` no projeto `pfpbaepzvgovqheeqxlg`
-- [ ] Migration `20261107000000_bootstrap_master_admin.sql` aplicada (cria `admin@theadoro.com.br`)
+- [ ] Baseline `20261109000000_baseline_public_schema.sql` aplicado (reconstrói o schema inteiro)
+- [ ] `20261109000001_bootstrap_master_admin.sql` aplicado (cria `admin@theadoro.com.br`)
+- [ ] `20261109000002_seed_catalog.sql` aplicado (categorias, planos, embalagens)
 - [ ] **Senha do admin master trocada** em Admin → Usuários
-- [ ] Confirmar o schema real contra `supabase/migrations` antes de `db push`
-- [ ] Secrets `UBER_*` e `PAGARME_WEBHOOK_*` configurados
-- [ ] Webhook do Pagar.me cadastrado com a URL da function
+- [ ] Secrets `UBER_*`, `PAGARME_WEBHOOK_*` e de e-mail (`SMTP_*` ou `RESEND_API_KEY`) configurados
+- [ ] Webhook do Pagar.me cadastrado com a URL de `supabase/.env.webhook.local`
+- [ ] `process-payment` e `uber-delivery` deployadas com `verify_jwt = true`
 - [ ] Credenciais da Uber preenchidas no admin (sandbox primeiro)
 - [ ] `store_address`, `store_city`, `store_state`, `store_cep`, `store_phone` preenchidos
 - [ ] Deploy da Hostinger apontando o startup file para `start.cjs`

@@ -176,6 +176,39 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    // O gateway aceita a anon key como JWT; sem esta checagem qualquer
+    // visitante poderia disparar uma corrida real. Service role (webhook) passa.
+    const callerToken = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim()
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+
+    // Aceita a service role tanto pelo valor exato do runtime quanto por um
+    // JWT legado com role=service_role (o valor do runtime pode mudar).
+    const isServiceRoleToken = (token: string): boolean => {
+      if (!token) return false
+      if (serviceRoleKey && token === serviceRoleKey) return true
+
+      try {
+        const payloadPart = token.split('.')[1]
+        if (!payloadPart) return false
+        const normalized = payloadPart.replace(/-/g, '+').replace(/_/g, '/')
+        const payload = JSON.parse(atob(normalized))
+        return payload?.role === 'service_role'
+      } catch {
+        return false
+      }
+    }
+
+    if (!callerToken) {
+      return json({ error: 'unauthorized', message: 'Token ausente.' }, 401)
+    }
+
+    if (!isServiceRoleToken(callerToken)) {
+      const { data: callerData, error: callerError } = await supabase.auth.getUser(callerToken)
+      if (callerError || !callerData?.user) {
+        return json({ error: 'unauthorized', message: 'Sessão inválida.' }, 401)
+      }
+    }
+
     const body = await req.json()
     const action = body?.action || 'quote'
 

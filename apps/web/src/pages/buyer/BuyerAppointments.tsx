@@ -64,7 +64,7 @@ export default function BuyerAppointments() {
     try {
       setLoading(true);
 
-      let query = supabase
+      const { data, error } = await supabase
         .from('appointments')
         .select(`
           *,
@@ -73,23 +73,24 @@ export default function BuyerAppointments() {
         .eq('buyer_id', user?.id)
         .order('appointment_date', { ascending: true });
 
-      if (statusFilter !== 'all') {
-        query = query.eq('status', statusFilter as any);
-      }
-
-      const { data, error } = await query;
-
       if (error) throw error;
 
-      const mockStats: AppointmentStats = {
-        total: data?.length || 0,
-        pending: data?.filter(a => a.status === 'pending').length || 0,
-        confirmed: data?.filter(a => a.status === 'confirmed').length || 0,
-        completed: data?.filter(a => a.status === 'completed').length || 0,
-        cancelled: data?.filter(a => a.status === 'cancelled').length || 0
-      };
+      const allAppointments = data || [];
 
-      const formattedAppointments = data?.map(appt => ({
+      // Estatísticas sempre sobre o total, não sobre o filtro da tabela.
+      setStats({
+        total: allAppointments.length,
+        pending: allAppointments.filter(a => a.status === 'pending').length,
+        confirmed: allAppointments.filter(a => a.status === 'confirmed').length,
+        completed: allAppointments.filter(a => a.status === 'completed').length,
+        cancelled: allAppointments.filter(a => a.status === 'cancelled').length
+      });
+
+      const visibleAppointments = statusFilter === 'all'
+        ? allAppointments
+        : allAppointments.filter(a => a.status === statusFilter);
+
+      const formattedAppointments = visibleAppointments.map(appt => ({
         ...appt,
         seller_name: (appt.seller as any)?.full_name || 'Vendedor',
         seller_email: (appt.seller as any)?.email || '',
@@ -97,10 +98,9 @@ export default function BuyerAppointments() {
         type: 'consultation', // Defaulting since it's not in schema yet
         location: appt.service_address || 'A combinar',
         duration: 60 // Defaulting
-      })) || [];
+      }));
 
       setAppointments(formattedAppointments);
-      setStats(mockStats);
     } catch (error) {
       console.error('Error loading appointments:', error);
     } finally {

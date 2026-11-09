@@ -1,14 +1,24 @@
 project_id = "pfpbaepzvgovqheeqxlg"
 
 [functions.process-payment]
-verify_jwt = false
+# Só usuários logados podem gerar cobranças (checkout agora exige conta).
+verify_jwt = true
 
 [functions.uber-delivery]
-verify_jwt = false
+# Cotação e despacho só por usuários logados; o webhook usa a service role.
+verify_jwt = true
 
 [functions.pagarme-webhook]
 verify_jwt = false
 
 [functions.admin-users]
 # A própria function valida o JWT e confere o papel de admin.
+verify_jwt = false
+
+[functions.seller-invoice-payment]
+# A própria function valida o JWT e confere que a fatura é do vendedor.
+verify_jwt = false
+
+[functions.send-email]
+# A própria function valida o JWT para evitar relay de spam.
 verify_jwt = false

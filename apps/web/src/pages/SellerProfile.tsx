@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   Star,
@@ -27,79 +27,131 @@ import { ProductCard } from '@/components/ProductCard';
 import { LoadingSpinner } from '@theadoro/ui';
 import { useSeller } from '@/hooks/useSellers';
 import { useProducts } from '@/hooks/useProducts';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
+interface SellerReview {
+  id: string;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+  buyer?: { full_name?: string | null; avatar_url?: string | null } | null;
+  product?: { name?: string | null } | null;
+}
 
-// Reviews Component (Mock for now)
 const Reviews: React.FC<{ sellerId: string }> = ({ sellerId }) => {
-  const mockReviews = [
-    {
-      id: '1',
-      customerName: 'Ana Silva',
-      rating: 5,
-      comment: 'Produtos de excelente qualidade! Atendimento muito atencioso e entrega rápida.',
-      date: '2024-01-15',
-      verified: true
-    },
-    {
-      id: '2',
-      customerName: 'Carlos Santos',
-      rating: 4,
-      comment: 'Muito satisfeito com a compra. O produto chegou exatamente como esperado.',
-      date: '2024-01-10',
-      verified: true
-    },
-    {
-      id: '3',
-      customerName: 'Maria Oliveira',
-      rating: 5,
-      comment: 'Adorei! Já é a segunda vez que compro e sempre supera as expectativas.',
-      date: '2024-01-05',
-      verified: false
-    }
-  ];
+  const [reviews, setReviews] = useState<SellerReview[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadReviews = async () => {
+      setLoading(true);
+
+      const { data, error } = await supabase
+        .from('reviews')
+        .select(`
+          id,
+          rating,
+          comment,
+          created_at,
+          buyer:profiles!reviews_buyer_id_fkey (full_name, avatar_url),
+          product:products!inner (name, seller_id)
+        `)
+        .eq('product.seller_id', sellerId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (cancelled) return;
+
+      if (error) {
+        console.error('Error loading seller reviews:', error);
+        setReviews([]);
+      } else {
+        setReviews((data as any) || []);
+      }
+
+      setLoading(false);
+    };
+
+    if (sellerId) void loadReviews();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sellerId]);
+
+  if (loading) {
+    return <p className="text-sm text-muted-foreground">Carregando avaliações...</p>;
+  }
+
+  if (reviews.length === 0) {
+    return (
+      <Card>
+        <CardContent className="p-6 text-center text-sm text-muted-foreground">
+          Este vendedor ainda não recebeu avaliações.
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-4">
-      {mockReviews.map((review) => (
-        <Card key={review.id}>
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between mb-2">
-              <div className="flex items-center">
-                <Avatar className="w-8 h-8 mr-3">
-                  <AvatarFallback>
-                    {review.customerName.split(' ').map(n => n[0]).join('')}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <div className="flex items-center">
-                    <span className="font-medium text-sm">{review.customerName}</span>
-                    {review.verified && (
-                      <CheckCircle className="w-3 h-3 text-green-600 ml-1" />
+      {reviews.map((review) => {
+        const customerName = review.buyer?.full_name || 'Cliente';
+        const initials = customerName
+          .split(' ')
+          .filter(Boolean)
+          .map((name) => name[0])
+          .slice(0, 2)
+          .join('')
+          .toUpperCase();
+
+        return (
+          <Card key={review.id}>
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex items-center">
+                  <Avatar className="w-8 h-8 mr-3">
+                    {review.buyer?.avatar_url && (
+                      <AvatarImage src={review.buyer.avatar_url} alt={customerName} />
                     )}
-                  </div>
-                  <div className="flex items-center mt-1">
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`w-3 h-3 ${i < review.rating
-                          ? 'text-yellow-400 fill-current'
-                          : 'text-gray-300'
-                          }`}
-                      />
-                    ))}
+                    <AvatarFallback>{initials || 'C'}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <div className="flex items-center">
+                      <span className="font-medium text-sm">{customerName}</span>
+                      <CheckCircle className="w-3 h-3 text-green-600 ml-1" />
+                    </div>
+                    <div className="flex items-center mt-1">
+                      {[...Array(5)].map((_, i) => (
+                        <Star
+                          key={i}
+                          className={`w-3 h-3 ${i < review.rating
+                            ? 'text-yellow-400 fill-current'
+                            : 'text-gray-300'
+                            }`}
+                        />
+                      ))}
+                    </div>
                   </div>
                 </div>
+                <span className="text-xs text-gray-500">
+                  {new Date(review.created_at).toLocaleDateString('pt-BR')}
+                </span>
               </div>
-              <span className="text-xs text-gray-500">
-                {new Date(review.date).toLocaleDateString('pt-BR')}
-              </span>
-            </div>
-            <p className="text-gray-700 text-sm">{review.comment}</p>
-          </CardContent>
-        </Card>
-      ))}
+              {review.product?.name && (
+                <p className="text-xs text-muted-foreground mb-1">
+                  Produto: {review.product.name}
+                </p>
+              )}
+              <p className="text-gray-700 text-sm">{review.comment || 'Sem comentário.'}</p>
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 };

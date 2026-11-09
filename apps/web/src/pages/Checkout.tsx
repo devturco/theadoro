@@ -44,9 +44,13 @@ const CUSTOM_ADDRESS_VALUE = 'custom';
 
 import { Button, Input, Label, Separator, Badge, Avatar, AvatarFallback, AvatarImage, Card, CardContent, CardHeader, CardTitle, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, RadioGroup, RadioGroupItem, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@theadoro/ui';
 import { cn } from '@/lib/utils';
-import { couponService } from '@/services/coupon.service';
 import { toast as toastSonner } from 'sonner';
 import { cepService } from '@/services/cep.service';
+import {
+  calculateOrderTotals,
+  validateCoupon,
+  type CouponSnapshot,
+} from '@/lib/checkout-pricing';
 
 interface CheckoutFormData {
   firstName: string;
@@ -105,7 +109,7 @@ export const Checkout: React.FC = () => {
   const [profileGateMode, setProfileGateMode] = useState<CheckoutGateMode>('required');
   const [selectedAddressId, setSelectedAddressId] = useState<string>(CUSTOM_ADDRESS_VALUE);
   const [couponCode, setCouponCode] = useState('');
-  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<CouponSnapshot | null>(null);
   const [searchingCep, setSearchingCep] = useState(false);
   const pagarmeTokenizecardRef = useRef<PagarmeTokenizecardFormHandle | null>(null);
   const lastAutoFetchedCepRef = useRef<string | null>(null);
@@ -252,14 +256,34 @@ export const Checkout: React.FC = () => {
     return wrap ? Number(wrap.price) : 0;
   }, [formData.giftOptions.is_gift, formData.giftOptions.wrap_style_id, giftWraps]);
 
-  let discount = 0;
-  if (formData.paymentMethod === 'pix') discount = (subtotal + shippingCost + giftWrapPrice) * 0.05;
-  if (appliedCoupon) {
-    if (appliedCoupon.type === 'percentage') discount += (subtotal * appliedCoupon.discountValue) / 100;
-    else discount += appliedCoupon.discountValue;
-  }
+  const sellerIds = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          cart.items
+            .map((item) => item.product.seller_id)
+            .filter((id): id is string => Boolean(id))
+        )
+      ),
+    [cart.items]
+  );
 
-  const total = Math.max(0, subtotal + shippingCost + giftWrapPrice - discount);
+  const totals = calculateOrderTotals({
+    subtotal,
+    shipping: shippingCost,
+    giftWrap: giftWrapPrice,
+    paymentMethod:
+      formData.paymentMethod === 'credit'
+        ? 'credit_card'
+        : formData.paymentMethod === 'debit'
+          ? 'debit_card'
+          : 'pix',
+    coupon: appliedCoupon,
+    sellerIds,
+  });
+
+  const discount = totals.discount;
+  const total = totals.total;
   const formatPrice = (p: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p);
 
   const handleInputChange = (field: keyof CheckoutFormData, value: any) => {
@@ -431,13 +455,29 @@ export const Checkout: React.FC = () => {
     if (!couponCode.trim()) return;
     setIsProcessing(true);
     try {
-      const sellerId = cart.items[0]?.product.seller_id;
-      const { data: coupon, error } = await couponService.getByCode(couponCode, sellerId);
-      if (error || !coupon) throw new Error('Cupom inválido.');
-      setAppliedCoupon({ id: coupon.id, code: coupon.code, discountValue: coupon.discount_value, type: coupon.discount_type });
-      toastSonner.success('Cupom aplicado!');
-    } catch (err: any) { toastSonner.error(err.message); }
-    finally { setIsProcessing(false); }
+      const { data: coupon, error } = await (supabase
+        .from('coupons' as any)
+        .select('*')
+        .eq('code', couponCode.trim().toUpperCase())
+        .maybeSingle() as any);
+
+      if (error) throw error;
+      if (!coupon) throw new Error('Cupom inválido ou expirado.');
+
+      const validation = validateCoupon(coupon, subtotal, sellerIds);
+      if (!validation.ok) throw new Error(validation.reason || 'Cupom inválido.');
+
+      setAppliedCoupon(coupon as CouponSnapshot);
+      setCouponCode(String(coupon.code || couponCode).toUpperCase());
+      toastSonner.success(
+        `Cupom aplicado: R$ ${validation.discount.toFixed(2)} de desconto.`
+      );
+    } catch (err: any) {
+      setAppliedCoupon(null);
+      toastSonner.error(err.message);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const steps = [
@@ -473,7 +513,13 @@ export const Checkout: React.FC = () => {
   const handleBack = () => setCurrentStep(prev => prev - 1);
 
   const handleFinish = async () => {
-    if (user && !profileReadyForCheckout) {
+    if (!user) {
+      toastSonner.error('Entre na sua conta para finalizar a compra.');
+      navigate('/auth', { state: { from: { pathname: '/checkout' } } });
+      return;
+    }
+
+    if (!profileReadyForCheckout) {
       openProfileGate('required');
       toastSonner.error('Seu cadastro precisa estar completo antes de finalizar a compra.');
       return;
@@ -492,6 +538,23 @@ export const Checkout: React.FC = () => {
         address: `${formData.street}, ${formData.number}`,
         country: 'Brasil', // Ensure country is passed
         document: formData.document,
+        coupon: appliedCoupon
+          ? {
+              id: appliedCoupon.id,
+              code: appliedCoupon.code,
+              discount_type: appliedCoupon.discount_type,
+              discount_value: appliedCoupon.discount_value,
+              min_purchase_value: appliedCoupon.min_purchase_value,
+              min_purchase: appliedCoupon.min_purchase,
+              max_discount_value: appliedCoupon.max_discount_value,
+              usage_limit: appliedCoupon.usage_limit,
+              used_count: appliedCoupon.used_count,
+              expires_at: appliedCoupon.expires_at,
+              expiration_date: appliedCoupon.expiration_date,
+              is_active: appliedCoupon.is_active,
+              seller_id: appliedCoupon.seller_id,
+            }
+          : undefined,
         paymentDetails:
           formData.paymentMethod === 'credit' || formData.paymentMethod === 'debit'
             ? {
@@ -509,6 +572,7 @@ export const Checkout: React.FC = () => {
       } : undefined);
       if (order) {
         localStorage.removeItem('checkoutFormData');
+        setAppliedCoupon(null);
         await clearCart();
         navigate(`/order-success/${order.id}`);
       }

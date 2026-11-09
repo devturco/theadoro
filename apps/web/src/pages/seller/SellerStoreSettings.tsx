@@ -145,7 +145,7 @@ export default function SellerStoreSettings() {
                                 <div className="mt-4">
                                     <FileUpload
                                         onUpload={handleBannerUpload}
-                                        options={{ bucket: 'avatars', folder: 'banners' }}
+                                        options={{ bucket: 'avatars', folder: `${user?.id ?? 'anon'}/banners` }}
                                         maxFiles={1}
                                         className="w-full"
                                     />
@@ -172,7 +172,7 @@ export default function SellerStoreSettings() {
                                     <div className="mt-4">
                                         <FileUpload
                                             onUpload={handleAvatarUpload}
-                                            options={{ bucket: 'avatars', folder: 'profiles' }}
+                                            options={{ bucket: 'avatars', folder: `${user?.id ?? 'anon'}/profiles` }}
                                             maxFiles={1}
                                         />
                                     </div>

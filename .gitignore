@@ -37,8 +37,9 @@ graphify-out/
 .impeccable/review/
 .impeccable/hook.cache.json
 
-# turbo cache
+# build caches
 .turbo/
+.vite/
 
 # supabase cli artifacts
 supabase/.temp/

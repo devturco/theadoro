@@ -8,23 +8,40 @@ Este diretório é a fonte de verdade do backend. Alterações de schema entram 
 
 ## Migrations
 
-### Regra
+`migrations/20261109000000_baseline_public_schema.sql` é a **fonte de verdade** do banco. Foi gerado a partir do projeto de produção em 2026-11-09 e inclui:
 
-- Arquivo em `migrations/`, padrão `YYYYMMDDHHMMSS_nome_da_mudanca.sql`.
-- **Toda tabela nova precisa de RLS habilitado e policies explícitas.**
-- Nunca altere o schema pelo dashboard sem gerar a migration correspondente.
-- Não edite migration já aplicada; crie uma nova.
+- enums, sequences, tabelas e colunas
+- constraints, índices e as views `seller_summary` / `product_stats_daily`
+- functions e triggers (inclusive `auth.users.on_auth_user_created`)
+- RLS e todas as policies
+- buckets e policies de Storage
 
-### Aplicar
+É idempotente: usa `create ... if not exists`, `create or replace` e blocos `do $$` que conferem `pg_constraint` / `pg_policies`.
+
+As migrations antigas ficam em `migrations/archive/` **apenas como histórico**. Não as aplique em um projeto novo — o baseline já contém o resultado delas.
+
+### Projeto novo
 
 ```bash
-supabase link --project-ref pfpbaepzvgovqheeqxlg
+supabase link --project-ref <novo-ref>
 supabase db push
 ```
 
-Sem CLI: cole o SQL no **SQL Editor** do dashboard.
+Depois do push:
 
-> ⚠️ **Antes do primeiro `db push`:** o histórico de migrations foi construído manualmente e aplicado via SQL Editor. A tabela `supabase_migrations.schema_migrations` pode **não** refletir o banco real. Rode `supabase db diff` ou compare as tabelas/colunas antes de deixar o CLI tentar reaplicar tudo.
+1. `20261109000001_bootstrap_master_admin.sql` cria `admin@theadoro.com.br` (senha `theadoro@2025` — troque no primeiro acesso).
+2. `20261109000002_seed_catalog.sql` cria categorias, planos, embalagens e configurações públicas.
+3. Configure os secrets/credenciais de Pagar.me, Uber e e-mail (ver abaixo).
+
+### Projeto existente
+
+O banco de produção já corresponde ao baseline. Não rode `db push` cego: o histórico remoto das migrations antigas não bate com os arquivos locais. Mudanças novas entram como migration normal, `migrations/YYYYMMDDHHMMSS_nome.sql`.
+
+### Regra
+
+- Toda tabela nova precisa de RLS habilitado e policies explícitas.
+- Nunca altere o schema pelo dashboard sem gerar a migration correspondente.
+- Não edite migration já aplicada; crie uma nova.
 
 ### Padrões usados no projeto
 
@@ -36,7 +53,7 @@ Sem CLI: cole o SQL no **SQL Editor** do dashboard.
 
 ### Admin master
 
-`migrations/20261107000000_bootstrap_master_admin.sql` cria o administrador padrão de uma instalação nova:
+`migrations/20261109000001_bootstrap_master_admin.sql` (roda depois do baseline) cria o administrador padrão de uma instalação nova:
 
 - e-mail `admin@theadoro.com.br`, senha `theadoro@2025`
 - perfil em `profiles` (`role = 'admin'`, `verified`, `is_approved`)
@@ -59,11 +76,13 @@ O mesmo vale para os helpers de introspecção: `get_table_columns`, `get_table_
 
 ```
 functions/
-├── process-payment/     # Pagar.me: cria/consulta/cancela cobranças
-├── pagarme-webhook/     # recebe eventos e confirma pagamento
-├── uber-delivery/       # Uber Direct: quote + request
-├── admin-users/         # exclusão de usuário + troca de e-mail/senha (admin)
-└── ai-gift-assistant/   # sugestão de presentes (Gemini)
+├── process-payment/          # Pagar.me: cria/consulta/cancela cobranças de pedido
+├── seller-invoice-payment/   # Pagar.me: cobra fatura de assinatura do vendedor
+├── pagarme-webhook/          # recebe eventos e confirma pedidos e faturas
+├── send-email/               # e-mail transacional (SMTP ou Resend)
+├── uber-delivery/            # Uber Direct: quote + request
+├── admin-users/              # exclusão de usuário + troca de e-mail/senha (admin)
+└── ai-gift-assistant/        # sugestão de presentes (Gemini)
 ```
 
 ### Configuração de JWT
@@ -72,12 +91,18 @@ Definida em `config.toml`:
 
 ```toml
 [functions.process-payment]
-verify_jwt = false
+verify_jwt = true
 
 [functions.pagarme-webhook]
 verify_jwt = false
 
 [functions.uber-delivery]
+verify_jwt = true
+
+[functions.seller-invoice-payment]
+verify_jwt = false
+
+[functions.send-email]
 verify_jwt = false
 
 [functions.admin-users]
@@ -86,11 +111,13 @@ verify_jwt = false
 
 `ai-gift-assistant` não tem entrada → mantém o padrão (`true`).
 
+`process-payment` e `uber-delivery` exigem JWT **e** conferem o usuário dentro do código — o gateway aceita a chave anônima como JWT válido, então `verify_jwt` sozinho não bloqueia visitante.
+
 `verify_jwt = false` só é aceitável porque cada function se protege sozinha:
 
 - `pagarme-webhook` exige autenticação (Basic Auth ou `x-webhook-secret`) e recusa tudo se nenhum secret estiver configurado.
-- `uber-delivery` só executa ações previstas e usa a service role para ler/gravar o pedido.
-- `process-payment` valida o payload e nunca devolve segredo ao cliente.
+- `seller-invoice-payment` valida o JWT, confere que a fatura pertence ao chamador e lê o valor do banco.
+- `send-email` valida o JWT para não virar relay de spam.
 - `admin-users` valida o JWT do chamador e confere o papel `admin` em `user_roles` antes de qualquer ação.
 
 ### Secrets
@@ -100,19 +127,35 @@ supabase secrets set UBER_CLIENT_ID=... UBER_CLIENT_SECRET=... UBER_CUSTOMER_ID=
 supabase secrets set PAGARME_WEBHOOK_USER=... PAGARME_WEBHOOK_PASSWORD=...
 # alternativa ao Basic Auth:
 supabase secrets set PAGARME_WEBHOOK_SECRET=...
+
+# e-mail transacional (escolha SMTP ou Resend):
+supabase secrets set EMAIL_FROM="TheAdoro <noreply@theadoro.com.br>"
+supabase secrets set SMTP_HOST=smtp.hostinger.com SMTP_PORT=465 SMTP_SECURE=true \
+  SMTP_USER=noreply@theadoro.com.br SMTP_PASS=...
+# ou:
+supabase secrets set RESEND_API_KEY=...
 ```
+
+Sem `SMTP_PASS` nem `RESEND_API_KEY`, a function responde 503 e o
+`EmailService` apenas registra o aviso — o checkout não quebra.
 
 `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` são injetados pelo runtime.
 
 ### Deploy
 
 ```bash
-supabase functions deploy process-payment   --project-ref pfpbaepzvgovqheeqxlg --no-verify-jwt
-supabase functions deploy pagarme-webhook   --project-ref pfpbaepzvgovqheeqxlg --no-verify-jwt
-supabase functions deploy uber-delivery     --project-ref pfpbaepzvgovqheeqxlg --no-verify-jwt
-supabase functions deploy admin-users        --project-ref pfpbaepzvgovqheeqxlg --no-verify-jwt
-supabase functions deploy ai-gift-assistant --project-ref pfpbaepzvgovqheeqxlg
+supabase functions deploy process-payment          --project-ref pfpbaepzvgovqheeqxlg
+supabase functions deploy seller-invoice-payment   --project-ref pfpbaepzvgovqheeqxlg --no-verify-jwt
+supabase functions deploy pagarme-webhook          --project-ref pfpbaepzvgovqheeqxlg --no-verify-jwt
+supabase functions deploy send-email               --project-ref pfpbaepzvgovqheeqxlg --no-verify-jwt
+supabase functions deploy uber-delivery            --project-ref pfpbaepzvgovqheeqxlg
+supabase functions deploy admin-users              --project-ref pfpbaepzvgovqheeqxlg --no-verify-jwt
+supabase functions deploy ai-gift-assistant        --project-ref pfpbaepzvgovqheeqxlg
 ```
+
+> `process-payment` e `uber-delivery` exigem JWT porque o gateway aceita a
+> chave anônima como JWT válido. As duas functions ainda conferem o usuário
+> dentro do código.
 
 ### Rodar localmente
 
@@ -162,6 +205,52 @@ O próprio admin não pode excluir a própria conta (`{ "error": "self_delete" }
 Recebe o evento do Pagar.me, autentica, encontra o pagamento por `provider_transaction_id` ou `merchant_order_code`, atualiza `payments`/`orders`, grava em `payment_events` e dispara o despacho Uber quando aplicável.
 
 Eventos tratados: `charge.paid`, `order.paid`, `charge.payment_failed`, `order.payment_failed`, `charge.failed`, `order.failed`.
+
+Também confirma faturas de assinatura: quando o código do pedido começa com
+`INV-`, o evento atualiza `seller_invoices` em vez de `orders`.
+
+**Cadastro obrigatório no painel do Pagar.me:** a URL do webhook com Basic
+Auth está em `supabase/.env.webhook.local` (arquivo ignorado pelo git). Sem
+esse cadastro, PIX de pedido e de fatura nunca confirmam.
+
+### `seller-invoice-payment` — contrato
+
+```jsonc
+// cobrança no cartão (token gerado no navegador)
+{ "action": "pay_card", "invoiceId": "<uuid>", "cardToken": "token_...", "installments": 1 }
+
+// PIX da fatura (a confirmação chega pelo webhook)
+{ "action": "create_pix", "invoiceId": "<uuid>" }
+
+// troca de plano (cria/atualiza assinatura e gera a fatura)
+{ "action": "change_plan", "planId": "<uuid>" }
+
+// cancelamento da assinatura
+{ "action": "cancel_subscription" }
+```
+
+- Valida o JWT do chamador e confere que a fatura pertence a ele.
+- Lê o valor de `seller_invoices` e o preço do plano no banco — nunca aceita
+  valor do cliente.
+- Cartão aprovado marca a fatura como paga; PIX fica pendente até o webhook.
+- O vendedor não tem permissão de UPDATE em `seller_invoices`/`seller_subscriptions`;
+  a marcação de pago e a troca de plano são feitas no servidor.
+
+### `send-email` — contrato
+
+```jsonc
+{
+  "to": "cliente@email.com",
+  "subject": "Pedido confirmado",
+  "template": "order_confirmation", // ou "shipping_update"
+  "data": { "orderId": "<uuid>", "items": ["..."], "total": 123.45 }
+}
+```
+
+- Valida o JWT do chamador (não é relay aberto).
+- Usa `RESEND_API_KEY` ou `SMTP_*`; remetente padrão `EMAIL_FROM`.
+- Sem credencial configurada responde **503 `not_configured`** — o
+  `EmailService` registra o aviso e o checkout continua.
 
 ---
 

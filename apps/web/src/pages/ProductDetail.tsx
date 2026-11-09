@@ -191,7 +191,8 @@ export const ProductDetail: React.FC = () => {
         .insert({
           list_id: listId,
           product_id: product.id,
-          quantity: 1
+          quantity_desired: 1,
+          quantity_purchased: 0
         });
 
       if (error) throw error;

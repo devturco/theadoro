@@ -113,6 +113,19 @@ serve(async (req) => {
       return json({ error: 'cannot_identify_order', message: 'Evento sem id de transação nem código de pedido.' }, 422)
     }
 
+    // ── Fatura de assinatura do vendedor (código INV-<uuid>) ─────────────
+    // Faturas não passam por `orders`/`payments`; são confirmadas direto em
+    // seller_invoices.
+    if (orderCode.startsWith('INV-')) {
+      return await handleInvoiceEvent({
+        supabase,
+        invoiceId: orderCode.slice(4),
+        type,
+        eventId,
+        data,
+      })
+    }
+
     // ── Localiza o pagamento ──────────────────────────────────────────────
     let payment: any = null
 
@@ -189,6 +202,69 @@ serve(async (req) => {
     return json({ error: 'internal_error', message: (error as Error).message }, 500)
   }
 })
+
+/**
+ * Confirma o pagamento de uma fatura de assinatura de vendedor.
+ */
+async function handleInvoiceEvent({
+  supabase,
+  invoiceId,
+  type,
+  eventId,
+  data,
+}: {
+  supabase: ReturnType<typeof createClient>
+  invoiceId: string
+  type: string
+  eventId: string
+  data: any
+}): Promise<Response> {
+  const { data: invoice, error } = await supabase
+    .from('seller_invoices')
+    .select('id, seller_id, status, amount')
+    .eq('id', invoiceId)
+    .maybeSingle()
+
+  if (error) throw error
+  if (!invoice) {
+    return json({ error: 'invoice_not_found', message: 'Fatura não encontrada.' }, 404)
+  }
+
+  const isPaid = PAID_EVENTS.has(type)
+  const isFailed = FAILED_EVENTS.has(type)
+  const alreadyPaid = (invoice as any).status === 'paid'
+
+  if (isPaid && !alreadyPaid) {
+    await supabase
+      .from('seller_invoices')
+      .update({
+        status: 'paid',
+        paid_at: new Date().toISOString(),
+        payment_method: data?.payment_method || 'credit_card',
+      })
+      .eq('id', (invoice as any).id)
+  }
+
+  try {
+    await supabase.from('payment_events').insert({
+      provider: 'pagarme',
+      event_type: type || 'unknown',
+      payload: { eventId, type, data, invoiceId },
+      processed_at: new Date().toISOString(),
+    } as any)
+  } catch (eventError) {
+    console.error('invoice payment_events insert failed:', eventError)
+  }
+
+  return json({
+    ok: true,
+    processed: true,
+    invoiceId: (invoice as any).id,
+    status: isPaid ? 'paid' : (invoice as any).status,
+    duplicated: isPaid && alreadyPaid,
+    failed: isFailed,
+  })
+}
 
 /**
  * Solicita a entrega na Uber quando o pedido usa Uber e ainda não foi

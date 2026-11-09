@@ -8,6 +8,7 @@ import { Card, CardContent } from '@theadoro/ui';
 import { SearchResults } from '@/components/SearchResults';
 import { SearchFilters } from '@/components/SearchFilters';
 import { useProducts } from '@/hooks/useProducts';
+import { useSellers } from '@/hooks/useSellers';
 import { useCRUD } from '@/hooks/useCRUD'; // For categories
 
 const trendingSearches = [
@@ -42,10 +43,12 @@ export default function Search() {
 
   const { data: categories } = useCRUD({ table: 'categories' });
 
-  // Mock sellers for filter sidebar (since we don't have a hook for sellers yet)
-  const sellers = [
-    { id: '1', label: 'Todos os Vendedores', count: 0 }
-  ];
+  const { sellers: sellerList } = useSellers({});
+  const sellers = sellerList.map((seller) => ({
+    id: seller.id,
+    label: seller.name,
+    count: seller.productCount || 0,
+  }));
 
   useEffect(() => {
     const savedHistory = localStorage.getItem('searchHistory');
@@ -124,14 +127,14 @@ export default function Search() {
           <div className="lg:w-64 flex-shrink-0">
             <SearchFilters
               categories={categories?.map((c: any) => ({ id: c.id, label: c.name, count: 0 })) || []}
-              sellers={[]}
+              sellers={sellers}
               priceRange={[0, 10000]}
               maxPrice={10000}
               selectedCategories={filters.category ? [filters.category] : []}
-              selectedSellers={[]}
+              selectedSellers={filters.seller ? [filters.seller] : []}
               selectedPriceRange={[filters.minPrice || 0, filters.maxPrice || 10000]}
               onCategoryChange={handleCategoryChange}
-              onSellerChange={() => { }}
+              onSellerChange={(sellerId, checked) => updateFilters({ seller: checked ? sellerId : undefined })}
               onPriceRangeChange={handlePriceRangeChange}
               onClearFilters={handleClearFilters}
             />
