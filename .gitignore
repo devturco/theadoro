@@ -33,9 +33,9 @@ dist-ssr
 # graphify knowledge graph
 graphify-out/
 
-# impeccable local artifacts
-.impeccable/review/
-.impeccable/hook.cache.json
+# local-only tooling (não versionar)
+.agent/
+.impeccable/
 
 # build caches
 .turbo/
